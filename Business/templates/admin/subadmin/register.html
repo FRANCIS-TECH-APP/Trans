@@ -1,0 +1,461 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sign Up — TransEdge</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:         #f0f7ff;
+  --surface:    #ffffff;
+  --border:     #c8e0f4;
+  --accent:     #0ea5e9;
+  --accent-dark:#0284c7;
+  --accent-dim: #e0f2fe;
+  --accent-text:#0369a1;
+  --text:       #0f172a;
+  --text2:      #334155;
+  --muted:      #64748b;
+  --red:        #dc2626;
+  --red-dim:    #fee2e2;
+  --green:      #16a34a;
+  --green-dim:  #dcfce7;
+  --amber:      #d97706;
+  --amber-dim:  #fef3c7;
+  --radius:     10px;
+}
+[data-theme="dark"] {
+  --bg:         #0c1220;
+  --surface:    #131c2e;
+  --border:     #1e3050;
+  --accent:     #38bdf8;
+  --accent-dark:#0ea5e9;
+  --accent-dim: #0c2d4a;
+  --accent-text:#7dd3fc;
+  --text:       #e2e8f0;
+  --text2:      #cbd5e1;
+  --muted:      #64748b;
+  --red:        #f87171;
+  --red-dim:    #7f1d1d33;
+  --green:      #22c55e;
+  --green-dim:  #14532d33;
+  --amber:      #f59e0b;
+  --amber-dim:  #78350f33;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 16px;
+  transition: background .2s, color .2s;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* ── Animated background (from landing) ── */
+.page-bg {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden;
+}
+.page-bg::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse 80% 60% at 65% 40%, rgba(14,165,233,.10) 0%, transparent 70%);
+}
+.dot-grid {
+  position: absolute; inset: 0;
+  background-image: radial-gradient(circle, rgba(14,165,233,.13) 1px, transparent 1px);
+  background-size: 32px 32px;
+  animation: gridFloat 22s linear infinite;
+}
+@keyframes gridFloat {
+  0%   { transform: translate(0,0); }
+  100% { transform: translate(32px,32px); }
+}
+.route-lines { position: absolute; inset: 0; }
+.route-line {
+  position: absolute; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(14,165,233,.25), transparent);
+  animation: routeSlide linear infinite;
+}
+.route-line:nth-child(1){ top:20%; width:55%; left:-20%; animation-duration:9s;  animation-delay:0s; }
+.route-line:nth-child(2){ top:45%; width:75%; left:-30%; animation-duration:12s; animation-delay:2s; }
+.route-line:nth-child(3){ top:72%; width:45%; left:-10%; animation-duration:10s; animation-delay:4s; }
+@keyframes routeSlide {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(180%); }
+}
+.floating-pkg {
+  position: absolute; opacity: .06;
+  animation: pkgFloat ease-in-out infinite;
+  font-size: 52px;
+}
+[data-theme="dark"] .floating-pkg { opacity: .04; }
+.floating-pkg:nth-child(1){ top:10%; right:6%;  animation-duration:7s;  animation-delay:0s; }
+.floating-pkg:nth-child(2){ bottom:15%; right:4%; font-size:36px; animation-duration:9s; animation-delay:2s; }
+.floating-pkg:nth-child(3){ top:40%; left:3%;  font-size:40px; animation-duration:8s; animation-delay:3.5s; }
+@keyframes pkgFloat {
+  0%,100%{ transform: translateY(0) rotate(0deg); }
+  50%    { transform: translateY(-16px) rotate(4deg); }
+}
+
+/* ── Layout ── */
+.auth-wrap {
+  width: 100%; max-width: 480px;
+  position: relative; z-index: 1;
+}
+
+.auth-logo {
+  display: flex; align-items: center; gap: 10px;
+  justify-content: center;
+  margin-bottom: 28px;
+  text-decoration: none;
+}
+.logo-mark {
+  width: 40px; height: 40px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 14px rgba(14,165,233,.3);
+}
+.logo-name { font-size: 20px; font-weight: 700; color: var(--text); letter-spacing: -.3px; }
+.logo-name span { color: var(--accent); }
+
+/* ── Card ── */
+.auth-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 32px 30px;
+  box-shadow: 0 4px 32px rgba(14,165,233,.09), 0 1px 4px rgba(0,0,0,.06);
+}
+
+.card-top { margin-bottom: 24px; }
+.card-top h1 { font-size: 21px; font-weight: 700; margin-bottom: 4px; }
+.card-top p  { font-size: 13.5px; color: var(--muted); line-height: 1.5; }
+
+/* ── Messages ── */
+.messages { margin-bottom: 16px; }
+.msg {
+  padding: 10px 14px; border-radius: 8px;
+  font-size: 13px; margin-bottom: 8px; border-left: 3px solid;
+}
+.msg.error   { background: var(--red-dim);   border-color: var(--red);   color: var(--red); }
+.msg.success { background: var(--green-dim); border-color: var(--green); color: var(--green); }
+.msg.warning { background: var(--amber-dim); border-color: var(--amber); color: var(--amber); }
+.msg.info    { background: var(--accent-dim); border-color: var(--accent); color: var(--accent-text); }
+
+/* ── Form ── */
+.form-row {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+}
+.form-group { margin-bottom: 14px; }
+.form-group label {
+  display: block; font-size: 13px; font-weight: 500;
+  color: var(--text2); margin-bottom: 6px;
+}
+.form-group input,
+.form-group textarea {
+  width: 100%; padding: 10px 14px;
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 14px; color: var(--text);
+  outline: none; -webkit-appearance: none;
+  transition: border-color .2s, box-shadow .2s, background .2s;
+  font-family: inherit;
+}
+.form-group textarea { resize: vertical; min-height: 72px; }
+.form-group input:focus,
+.form-group textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(14,165,233,.12);
+  background: var(--surface);
+}
+
+/* Password strength indicator */
+.pw-strength { margin-top: 6px; display: flex; gap: 4px; }
+.pw-bar {
+  height: 3px; flex: 1; border-radius: 2px;
+  background: var(--border);
+  transition: background .3s;
+}
+.pw-bar.weak   { background: var(--red); }
+.pw-bar.medium { background: var(--amber); }
+.pw-bar.strong { background: var(--green); }
+.pw-hint { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+/* ── Divider ── */
+.section-divider {
+  display: flex; align-items: center; gap: 10px;
+  margin: 6px 0 18px;
+}
+.section-divider span { font-size: 11px; font-weight: 600; letter-spacing: .5px; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+.section-divider::before,
+.section-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+/* ── Submit ── */
+.btn-submit {
+  width: 100%; padding: 13px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+  color: #fff; border: none;
+  border-radius: var(--radius);
+  font-size: 15px; font-weight: 600; cursor: pointer;
+  box-shadow: 0 4px 14px rgba(14,165,233,.3);
+  transition: opacity .2s, transform .15s, box-shadow .15s;
+  margin-top: 6px;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.btn-submit:hover { opacity: .92; transform: translateY(-1px); box-shadow: 0 6px 20px rgba(14,165,233,.38); }
+.btn-submit:active { transform: translateY(0); }
+
+/* ── Footer ── */
+.auth-footer { text-align: center; margin-top: 18px; font-size: 13px; color: var(--muted); }
+.auth-footer a { color: var(--accent-text); text-decoration: none; font-weight: 500; }
+.auth-footer a:hover { text-decoration: underline; }
+.divider { height: 1px; background: var(--border); margin: 16px 0; }
+
+/* ── Notice box ── */
+.notice {
+  display: flex; gap: 10px; align-items: flex-start;
+  background: var(--amber-dim); border: 1px solid var(--amber);
+  border-radius: 8px; padding: 12px 14px;
+  font-size: 13px; color: var(--amber);
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+/* ── Dark toggle ── */
+.theme-toggle {
+  position: fixed; top: 16px; right: 16px; z-index: 10;
+  width: 38px; height: 38px; border-radius: 50%;
+  background: var(--surface); border: 1px solid var(--border);
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  color: var(--text2); transition: background .2s;
+  box-shadow: var(--shadow-sm);
+}
+.theme-toggle:hover { background: var(--accent-dim); color: var(--accent); }
+.icon-sun, .icon-moon { width: 18px; height: 18px; }
+[data-theme="light"] .icon-moon { display: none; }
+[data-theme="dark"]  .icon-sun  { display: none; }
+
+/* ── Mobile ── */
+@media (max-width: 500px) {
+  .auth-card { padding: 24px 18px; }
+  .form-row  { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- Animated background -->
+<div class="page-bg">
+  <div class="dot-grid"></div>
+  <div class="route-lines">
+    <div class="route-line"></div>
+    <div class="route-line"></div>
+    <div class="route-line"></div>
+  </div>
+  <div class="floating-pkg">📦</div>
+  <div class="floating-pkg">✈️</div>
+  <div class="floating-pkg">🚚</div>
+</div>
+
+<!-- Dark mode toggle -->
+<button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode">
+  <svg class="icon-sun" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+    <circle cx="12" cy="12" r="5"/>
+    <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+    <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+  </svg>
+  <svg class="icon-moon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+    <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+  </svg>
+</button>
+
+<div class="auth-wrap">
+
+  <!-- Logo -->
+  <a href="{% url 'sub-admin-landing' %}" class="auth-logo">
+    <div class="logo-mark">
+      <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="white" stroke-width="2.5">
+        <path d="M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h11a2 2 0 012 2v3"/>
+        <rect x="9" y="11" width="14" height="10" rx="2"/>
+        <circle cx="12" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+      </svg>
+    </div>
+    <span class="logo-name">Trans<span>Edge</span></span>
+  </a>
+
+  <div class="auth-card">
+
+    <div class="card-top">
+      <h1>Create your account</h1>
+      <p>Submit your application — a super admin will review and activate it shortly.</p>
+    </div>
+
+    <!-- Approval notice -->
+    <div class="notice">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="flex-shrink:0;margin-top:1px;">
+        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+      Your account will be <strong>pending approval</strong> after registration. You'll be able to log in but won't create shipments until approved.
+    </div>
+
+    {% if messages %}
+    <div class="messages">
+      {% for message in messages %}
+      <div class="msg {{ message.tags }}">{{ message }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <form method="post">
+      {% csrf_token %}
+
+      <!-- Personal info -->
+      <div class="section-divider"><span>Personal Info</span></div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="full_name">Full Name *</label>
+          <input type="text" id="full_name" name="full_name"
+                 value="{{ post.full_name }}" required
+                 placeholder="John Doe" autocomplete="name">
+        </div>
+        <div class="form-group">
+          <label for="phone">Phone Number</label>
+          <input type="text" id="phone" name="phone"
+                 value="{{ post.phone }}"
+                 placeholder="+234 800 000 0000" autocomplete="tel">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="email">Email Address *</label>
+        <input type="email" id="email" name="email"
+               value="{{ post.email }}" required
+               placeholder="you@example.com" autocomplete="email">
+      </div>
+
+      <!-- Business info -->
+      <div class="section-divider"><span>Business Info</span></div>
+
+      <div class="form-group">
+        <label for="company_name">Company / Business Name</label>
+        <input type="text" id="company_name" name="company_name"
+               value="{{ post.company_name }}"
+               placeholder="Acme Logistics Ltd.">
+      </div>
+
+      <div class="form-group">
+        <label for="address">Address</label>
+        <textarea id="address" name="address"
+                  placeholder="Street address, city, state…">{{ post.address }}</textarea>
+      </div>
+
+      <!-- Password -->
+      <div class="section-divider"><span>Security</span></div>
+
+      <div class="form-group">
+        <label for="password">Password *</label>
+        <input type="password" id="password" name="password"
+               required autocomplete="new-password"
+               placeholder="Min. 8 characters"
+               oninput="checkStrength(this.value)">
+        <div class="pw-strength">
+          <div class="pw-bar" id="bar1"></div>
+          <div class="pw-bar" id="bar2"></div>
+          <div class="pw-bar" id="bar3"></div>
+          <div class="pw-bar" id="bar4"></div>
+        </div>
+        <p class="pw-hint" id="pw-hint">Use 8+ characters with letters and numbers.</p>
+      </div>
+
+      <div class="form-group">
+        <label for="password2">Confirm Password *</label>
+        <input type="password" id="password2" name="password2"
+               required autocomplete="new-password"
+               placeholder="Re-enter your password"
+               oninput="checkMatch()">
+        <p class="pw-hint" id="match-hint"></p>
+      </div>
+
+      <button type="submit" class="btn-submit">
+        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+          <path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/>
+          <circle cx="9" cy="7" r="4"/>
+          <line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>
+        </svg>
+        Submit Application
+      </button>
+    </form>
+
+    <div class="divider"></div>
+    <div class="auth-footer">
+      Already have an account? <a href="{% url 'sub-admin-login' %}">Sign in here</a>
+    </div>
+    <div class="auth-footer" style="margin-top:10px;">
+      <small>Super admin? <a href="{% url 'admin-login' %}">Login here</a></small>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  // ── Theme ──────────────────────────────────────
+  const html = document.documentElement;
+  html.setAttribute('data-theme', localStorage.getItem('te-theme') || 'light');
+  document.getElementById('themeToggle').addEventListener('click', () => {
+    const next = html.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+    html.setAttribute('data-theme', next);
+    localStorage.setItem('te-theme', next);
+  });
+
+  // ── Password strength ──────────────────────────
+  function checkStrength(val) {
+    const bars = [document.getElementById('bar1'), document.getElementById('bar2'),
+                  document.getElementById('bar3'), document.getElementById('bar4')];
+    const hint = document.getElementById('pw-hint');
+    bars.forEach(b => { b.className = 'pw-bar'; });
+
+    let score = 0;
+    if (val.length >= 8)  score++;
+    if (/[A-Z]/.test(val)) score++;
+    if (/[0-9]/.test(val)) score++;
+    if (/[^A-Za-z0-9]/.test(val)) score++;
+
+    const cls   = score <= 1 ? 'weak' : score <= 2 ? 'medium' : 'strong';
+    const label = score <= 1 ? 'Weak' : score <= 2 ? 'Fair' : score === 3 ? 'Good' : 'Strong';
+    const color = score <= 1 ? '#dc2626' : score <= 2 ? '#d97706' : '#16a34a';
+
+    for (let i = 0; i < score; i++) bars[i].classList.add(cls);
+    hint.textContent = val.length ? `Password strength: ${label}` : 'Use 8+ characters with letters and numbers.';
+    hint.style.color = val.length ? color : '';
+  }
+
+  // ── Password match ─────────────────────────────
+  function checkMatch() {
+    const pw  = document.getElementById('password').value;
+    const pw2 = document.getElementById('password2').value;
+    const hint = document.getElementById('match-hint');
+    if (!pw2) { hint.textContent = ''; return; }
+    if (pw === pw2) {
+      hint.textContent = '✓ Passwords match';
+      hint.style.color = '#16a34a';
+    } else {
+      hint.textContent = '✗ Passwords do not match';
+      hint.style.color = '#dc2626';
+    }
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<head><title>Account Suspended</title></head>
+<body>
+
+<h1>Account Suspended</h1>
+
+<p>Hello <strong>{{ profile.user.full_name }}</strong>,</p>
+<p>Your sub-admin account has been suspended. Please contact support to resolve this.</p>
+
+<p><a href="{% url 'sub-admin-logout' %}">Logout</a></p>
+
+</body>
+</html>

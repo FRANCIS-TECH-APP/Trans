@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block title %}{{ shipment.tracking_id }} — SwiftTrack{% endblock %}
+
+{% block extra_css %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0c10; --surface: #14171e; --surface2: #1b1f28; --border: rgba(255,255,255,.08);
+    --text: #f1f3f5; --muted: #8b8f99;
+    --accent: #f97316; --accent-dim: rgba(249,115,22,.15);
+    --green: #22c55e; --green-dim: rgba(34,197,94,.15);
+    --radius: 18px; --radius-sm: 12px;
+  }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; }
+  nav { background: var(--surface); border-bottom: 1px solid var(--border); }
+  nav a { color: var(--text); }
+  nav .brand a { color: var(--accent) !important; font-weight: 800; }
+  footer { color: var(--muted); border-top: 1px solid var(--border); }
+
+  .container { max-width: 640px; }
+
+  /* Hero */
+  .hero-card {
+    background: linear-gradient(160deg, #1a1d24, #0f1218);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 22px 20px;
+    margin-bottom: 16px;
+  }
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--accent-dim); color: var(--accent);
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+    padding: 5px 12px; border-radius: 999px; margin-bottom: 14px;
+  }
+  .status-pill::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+  .hero-card h1 {
+    font-size: 22px; font-weight: 800; letter-spacing: .02em; font-family: 'Courier New', monospace;
+    margin-bottom: 6px;
+  }
+  .hero-card .route { font-size: 13.5px; color: var(--muted); margin-bottom: 18px; }
+  .route strong { color: var(--text); }
+
+  .hero-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .hero-stat { background: rgba(255,255,255,.04); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; }
+  .hero-stat .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-bottom: 4px; }
+  .hero-stat .val { font-size: 15px; font-weight: 700; }
+
+  /* Progress stepper */
+  .progress-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 20px; margin-bottom: 16px;
+  }
+  .progress-card h2 {
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--muted); margin-bottom: 20px;
+  }
+  .stepper { display: flex; align-items: flex-start; justify-content: space-between; list-style: none; margin: 0; padding: 0; }
+  .stepper li { flex: 1; display: flex; flex-direction: column; align-items: center; position: relative; text-align: center; }
+  .stepper li::before {
+    content: ''; width: 24px; height: 24px; border-radius: 50%;
+    background: var(--surface2); border: 2px solid var(--border);
+    margin-bottom: 8px; z-index: 1;
+  }
+  .stepper li::after {
+    content: ''; position: absolute; top: 11px; left: 50%; width: 100%; height: 2px;
+    background: var(--border); z-index: 0;
+  }
+  .stepper li:last-child::after { display: none; }
+  .stepper li[aria-current="step"]::before,
+  .stepper li.done::before { background: var(--accent); border-color: var(--accent); }
+  .stepper li.done::after { background: var(--accent); }
+  .stepper li span { font-size: 10.5px; color: var(--muted); font-weight: 600; }
+  .stepper li[aria-current="step"] span { color: var(--accent); font-weight: 700; }
+
+  /* Link rows */
+  .link-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 14px 16px; margin-bottom: 10px; text-decoration: none; color: var(--text);
+  }
+  .link-row .arrow { color: var(--accent); font-weight: 700; flex-shrink: 0; }
+
+  /* Support */
+  .support-card {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 16px; margin-top: 16px;
+  }
+  .support-card p { font-size: 12.5px; color: var(--muted); }
+  .btn-support {
+    background: var(--accent); color: #fff; font-size: 12.5px; font-weight: 700;
+    padding: 9px 18px; border-radius: 999px; text-decoration: none; white-space: nowrap;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="hero-card">
+  <span class="status-pill">{{ shipment.get_status_display }}</span>
+  <h1>{{ shipment.tracking_id }}</h1>
+  <p class="route">Transit Route: <strong>{{ shipment.origin_country }}</strong> to <strong>{{ shipment.destination_country }}</strong></p>
+  <div class="hero-stats">
+    <div class="hero-stat">
+      <div class="lbl">Estimated Delivery</div>
+      <div class="val">{% if shipment.estimated_delivery %}{{ shipment.estimated_delivery|date:"M d, Y" }}{% else %}TBD{% endif %}</div>
+    </div>
+    <div class="hero-stat">
+      <div class="lbl">Weight</div>
+      <div class="val">{% if shipment.weight_kg %}{{ shipment.weight_kg }} kg{% else %}—{% endif %}</div>
+    </div>
+  </div>
+</div>
+
+<div class="progress-card">
+  <h2>Shipment Progress</h2>
+  {% with s=shipment.status %}
+  <ol class="stepper">
+    <li class="{% if s != 'created' %}done{% endif %}" {% if s == 'created' %}aria-current="step"{% endif %}><span>Order Placed</span></li>
+    <li class="{% if s in 'in_transit,at_customs,out_for_delivery,delivered' %}done{% endif %}" {% if s == 'picked_up' %}aria-current="step"{% endif %}><span>Processing</span></li>
+    <li class="{% if s in 'at_customs,out_for_delivery,delivered' %}done{% endif %}" {% if s == 'in_transit' %}aria-current="step"{% endif %}><span>In Transit</span></li>
+    <li class="{% if s in 'out_for_delivery,delivered' %}done{% endif %}" {% if s == 'at_customs' %}aria-current="step"{% endif %}><span>At Customs</span></li>
+    <li class="{% if s == 'delivered' %}done{% endif %}" {% if s == 'delivered' %}aria-current="step"{% endif %}><span>Delivered</span></li>
+  </ol>
+  {% endwith %}
+</div>
+
+<a href="{% url 'tracking-shipment-info' tracking_id=shipment.tracking_id %}" class="link-row">
+  <span>View shipment details, sender/receiver &amp; live map</span>
+  <span class="arrow">→</span>
+</a>
+<a href="{% url 'tracking-driver' tracking_id=shipment.tracking_id %}" class="link-row">
+  <span>View delivery partner details</span>
+  <span class="arrow">→</span>
+</a>
+
+{% if shipment.support_link_active and shipment.support_link_url %}
+<div class="support-card">
+  <p>Need help? Contact our support team directly.</p>
+  <a href="{{ shipment.support_link_url }}" target="_blank" rel="noopener noreferrer" class="btn-support">
+    {{ shipment.support_link_label|default:"Chat with Support" }}
+  </a>
+</div>
+{% endif %}
+
+{% endblock %}

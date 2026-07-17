@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head><title>Activation Payment</title></head>
+<body>
+
+<h1>Activation Payment</h1>
+
+{% if messages %}
+  {% for message in messages %}
+    <p><strong>{{ message }}</strong></p>
+  {% endfor %}
+{% endif %}
+
+<p>Name: {{ profile.user.full_name }}</p>
+<p>Email: {{ profile.user.email }}</p>
+<p>Amount Due: {{ profile.activation_fee }} NGN</p>
+<p>Payment Provider: {{ profile.get_payment_provider_display }}</p>
+
+<form method="post">
+  {% csrf_token %}
+  <p>
+    <button type="submit">Proceed to Payment</button>
+  </p>
+</form>
+
+<p>
+  You will be redirected to
+  {% if profile.payment_provider == 'paystack' %}Paystack{% else %}Flutterwave{% endif %}
+  to complete your payment securely.
+</p>
+
+<p><a href="{% url 'sub-admin-pending' %}">Back</a></p>
+
+</body>
+</html>

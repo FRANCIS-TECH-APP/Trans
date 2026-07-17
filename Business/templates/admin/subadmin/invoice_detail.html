@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Invoice {{ invoice.invoice_number }} — TransEdge</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --sky:#0ea5e9;--sky2:#0284c7;--sky-dim:rgba(14,165,233,.12);
+  --bg:#f0f7ff;--surface:#ffffff;--surface2:#f8fafc;--border:#c8e0f4;
+  --text:#0f172a;--muted:#64748b;--green:#16a34a;--green-dim:rgba(22,163,74,.12);
+  --amber:#d97706;--amber-dim:rgba(217,119,6,.12);--red:#dc2626;--red-dim:rgba(220,38,38,.12);
+  --purple:#7c3aed;--purple-dim:rgba(124,58,237,.12);--sidebar-w:240px;--header-h:60px;--radius:12px;
+}
+[data-theme="dark"] {
+  --bg:#0c1220;--surface:#131c2e;--surface2:#1a2540;--border:#1e3050;--text:#e2e8f0;--muted:#64748b;
+  --sky-dim:rgba(14,165,233,.15);--green-dim:rgba(22,163,74,.15);--amber-dim:rgba(217,119,6,.15);
+  --red-dim:rgba(220,38,38,.15);--purple-dim:rgba(124,58,237,.15);
+}
+body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;transition:background .3s,color .3s; }
+
+/* SIDEBAR */
+.sidebar { width:var(--sidebar-w);background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:200;transition:transform .3s ease,background .3s,border-color .3s;overflow-y:auto; }
+.sidebar-logo { height:var(--header-h);display:flex;align-items:center;gap:10px;padding:0 20px;border-bottom:1px solid var(--border);flex-shrink:0; }
+.logo-mark { width:32px;height:32px;background:linear-gradient(135deg,var(--sky),var(--sky2));border-radius:8px;display:flex;align-items:center;justify-content:center; }
+.logo-name { font-size:16px;font-weight:700;color:var(--text);letter-spacing:-.3px; }
+.logo-name span { color:var(--sky); }
+.sidebar-section { padding:16px 12px 4px; }
+.sidebar-label { font-size:10px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);padding:0 8px;margin-bottom:4px; }
+.nav-item { display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;font-size:13.5px;color:var(--muted);text-decoration:none;transition:background .15s,color .15s;margin-bottom:2px; }
+.nav-item:hover { background:var(--surface2);color:var(--text); }
+.nav-item.active { background:var(--sky-dim);color:var(--sky);font-weight:500; }
+.nav-item svg { flex-shrink:0;opacity:.7; }
+.nav-item.active svg { opacity:1; }
+.sidebar-footer { margin-top:auto;padding:12px;border-top:1px solid var(--border);flex-shrink:0; }
+.user-card { display:flex;align-items:center;gap:10px;padding:10px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);margin-bottom:8px; }
+.avatar { width:34px;height:34px;border-radius:50%;background:var(--sky-dim);color:var(--sky);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0; }
+.user-info { flex:1;min-width:0; }
+.user-name { font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.user-role { font-size:11px;color:var(--muted); }
+.logout-btn { display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;font-size:13px;color:var(--red);text-decoration:none;transition:background .15s; }
+.logout-btn:hover { background:var(--red-dim); }
+.sidebar-overlay { display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:150; }
+
+/* MAIN */
+.main { margin-left:var(--sidebar-w);flex:1;display:flex;flex-direction:column;min-height:100vh;transition:margin .3s; }
+.topbar { height:var(--header-h);background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 20px;position:sticky;top:0;z-index:100;transition:background .3s,border-color .3s; }
+.topbar-left { display:flex;align-items:center;gap:12px; }
+.menu-btn { display:none;width:36px;height:36px;background:none;border:none;cursor:pointer;color:var(--muted);border-radius:8px;align-items:center;justify-content:center; }
+.menu-btn:hover { background:var(--surface2); }
+.page-title { font-size:15px;font-weight:600; }
+.topbar-right { display:flex;align-items:center;gap:10px; }
+.theme-btn { width:36px;height:36px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--muted); }
+[data-theme="light"] .icon-moon { display:none; }
+[data-theme="dark"]  .icon-sun  { display:none; }
+.content { padding:24px 20px;max-width:900px;flex:1;width:100%;margin:0 auto; }
+
+/* MESSAGES */
+.messages { margin-bottom:20px; }
+.msg { padding:12px 16px;border-radius:8px;font-size:13.5px;margin-bottom:8px;border-left:3px solid; }
+.msg.success { background:var(--green-dim);border-color:var(--green);color:var(--green); }
+.msg.error   { background:var(--red-dim);border-color:var(--red);color:var(--red); }
+.msg.warning { background:var(--amber-dim);border-color:var(--amber);color:var(--amber); }
+
+/* PAGE HEADER */
+.page-header { display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:20px;flex-wrap:wrap; }
+.ph-left h2 { font-size:20px;font-weight:700; }
+.ph-left p { font-size:13px;color:var(--muted);margin-top:4px; }
+.ph-right { display:flex;gap:10px;align-items:center;flex-wrap:wrap; }
+
+/* BADGES */
+.badge { display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;white-space:nowrap; }
+.badge::before { content:'';width:5px;height:5px;border-radius:50%;background:currentColor; }
+.b-draft     { background:rgba(100,116,139,.12);color:var(--muted); }
+.b-sent      { background:var(--sky-dim);color:var(--sky); }
+.b-paid      { background:var(--green-dim);color:var(--green); }
+.b-overdue   { background:var(--red-dim);color:var(--red); }
+.b-cancelled { background:rgba(100,116,139,.12);color:var(--muted); }
+
+/* BUTTONS */
+.btn { display:inline-flex;align-items:center;gap:7px;padding:9px 18px;border-radius:8px;font-size:13.5px;font-weight:500;text-decoration:none;border:none;cursor:pointer;transition:opacity .15s,transform .1s; }
+.btn:hover { opacity:.88;transform:translateY(-1px); }
+.btn-primary { background:var(--sky);color:#fff;box-shadow:0 2px 8px rgba(14,165,233,.3); }
+.btn-outline { background:transparent;color:var(--text);border:1px solid var(--border); }
+.btn-green { background:var(--green);color:#fff; }
+.btn-sm { padding:6px 14px;font-size:12px; }
+
+/* INVOICE SHEET */
+.invoice-sheet {
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:36px;margin-bottom:20px;transition:background .3s,border-color .3s;
+}
+.inv-top { display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap;margin-bottom:32px;padding-bottom:24px;border-bottom:2px solid var(--border); }
+.inv-brand { display:flex;align-items:center;gap:10px; }
+.inv-brand .logo-mark { width:36px;height:36px; }
+.inv-brand-name { font-size:18px;font-weight:700; }
+.inv-brand-name span { color:var(--sky); }
+.inv-meta { text-align:right; }
+.inv-meta h1 { font-size:22px;font-weight:800;letter-spacing:1px;color:var(--sky);margin-bottom:4px; }
+.inv-meta .inv-num { font-size:13px;color:var(--muted);font-family:'Courier New',monospace; }
+
+.inv-parties { display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:28px; }
+.inv-party-block h4 { font-size:10.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:8px; }
+.inv-party-block p { font-size:13.5px;line-height:1.6; }
+.inv-party-block .name { font-weight:600;font-size:14.5px;margin-bottom:2px; }
+
+.inv-dates { display:flex;gap:32px;margin-bottom:28px;flex-wrap:wrap; }
+.inv-date-item label { display:block;font-size:10.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin-bottom:4px; }
+.inv-date-item span { font-size:13.5px;font-weight:600; }
+
+table.inv-table { width:100%;border-collapse:collapse;margin-bottom:24px; }
+table.inv-table thead th {
+  text-align:left;font-size:10.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;
+  color:var(--muted);padding:10px 8px;border-bottom:2px solid var(--border);
+}
+table.inv-table thead th.num { text-align:right; }
+table.inv-table tbody td { padding:12px 8px;font-size:13.5px;border-bottom:1px solid var(--border); }
+table.inv-table tbody td.num { text-align:right;font-variant-numeric:tabular-nums; }
+table.inv-table tbody tr:last-child td { border-bottom:none; }
+
+.inv-totals { margin-left:auto;width:280px;margin-bottom:28px; }
+.inv-totals-row { display:flex;justify-content:space-between;padding:7px 0;font-size:13.5px; }
+.inv-totals-row.grand { border-top:2px solid var(--border);margin-top:6px;padding-top:12px;font-size:17px;font-weight:800;color:var(--sky); }
+.inv-totals-row .muted { color:var(--muted); }
+
+.inv-notes { padding-top:20px;border-top:1px solid var(--border); }
+.inv-notes h4 { font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin-bottom:6px; }
+.inv-notes p { font-size:12.5px;color:var(--muted);line-height:1.6; }
+
+/* MANAGE PANEL (hidden on print) */
+.manage-card { background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:20px; }
+.manage-card h3 { font-size:14px;font-weight:600;margin-bottom:14px; }
+.form-grid { display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px; }
+.span-2 { grid-column:span 2; }
+.form-group { display:flex;flex-direction:column;gap:6px; }
+.form-group label { font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.3px; }
+.form-group input,.form-group select,.form-group textarea {
+  padding:9px 12px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;
+  font-size:13px;color:var(--text);outline:none;transition:border-color .2s;font-family:inherit;
+}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus { border-color:var(--sky); }
+.form-group textarea { resize:vertical;min-height:60px; }
+.item-row-form { display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-top:10px; }
+.item-row-form .form-group { flex:1;min-width:120px; }
+.remove-item-form { display:inline; }
+.remove-item-btn { background:none;border:none;color:var(--red);cursor:pointer;font-size:12px;padding:4px 8px;border-radius:6px; }
+.remove-item-btn:hover { background:var(--red-dim); }
+
+/* PRINT */
+@media print {
+  .sidebar, .topbar, .manage-card, .ph-right, .page-footer { display:none !important; }
+  .main { margin-left:0; }
+  .content { max-width:100%;padding:0; }
+  .invoice-sheet { border:none;padding:0;box-shadow:none; }
+  body { background:#fff; }
+}
+
+.page-footer { text-align:center;padding:20px 16px;font-size:11.5px;color:var(--muted);border-top:1px solid var(--border);margin-top:auto; }
+.page-footer a { color:var(--sky);text-decoration:none; }
+.page-footer a:hover { text-decoration:underline; }
+
+@media (max-width:768px) {
+  .sidebar { transform:translateX(-100%); }
+  .sidebar.open { transform:translateX(0); }
+  .sidebar-overlay.open { display:block; }
+  .main { margin-left:0; }
+  .menu-btn { display:flex; }
+  .content { padding:16px; }
+  .inv-parties, .form-grid { grid-template-columns:1fr; }
+  .span-2 { grid-column:span 1; }
+  .inv-sheet { padding:20px; }
+  .inv-totals { width:100%; }
+}
+</style>
+</head>
+<body>
+<div class="sidebar-overlay" id="overlay" onclick="closeSidebar()"></div>
+
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">
+      <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="white" stroke-width="2.5"><path d="M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h11a2 2 0 012 2v3"/><rect x="9" y="11" width="14" height="10" rx="2"/><circle cx="12" cy="21" r="1"/><circle cx="20" cy="21" r="1"/></svg>
+    </div>
+    <span class="logo-name">Trans<span>Edge</span></span>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-label">Main</div>
+    <a href="{% url 'sub-admin-dashboard' %}" class="nav-item">
+      <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      Dashboard
+    </a>
+    <a href="{% url 'sub-admin-shipment-list' %}" class="nav-item active">
+      <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+      My Shipments
+    </a>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-label">Points</div>
+    <a href="{% url 'sub-admin-buy-points' %}" class="nav-item">
+      <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+      Buy Points
+    </a>
+  </div>
+  <div class="sidebar-footer">
+    <div class="user-card">
+      <div class="avatar">{{ request.user.full_name|first|upper }}</div>
+      <div class="user-info">
+        <div class="user-name">{{ request.user.full_name }}</div>
+        <div class="user-role">Sub Admin</div>
+      </div>
+    </div>
+    <a href="{% url 'sub-admin-logout' %}" class="logout-btn">
+      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      Sign out
+    </a>
+  </div>
+</aside>
+
+<div class="main">
+  <header class="topbar">
+    <div class="topbar-left">
+      <button class="menu-btn" onclick="openSidebar()" aria-label="Open menu">
+        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <span class="page-title">Invoice {{ invoice.invoice_number }}</span>
+    </div>
+    <div class="topbar-right">
+      <button class="theme-btn" id="themeToggle" aria-label="Toggle theme">
+        <svg class="icon-sun" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        <svg class="icon-moon" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="content">
+    {% if messages %}
+    <div class="messages">{% for message in messages %}<div class="msg {{ message.tags }}">{{ message }}</div>{% endfor %}</div>
+    {% endif %}
+
+    <div class="page-header">
+      <div class="ph-left">
+        <h2>Invoice {{ invoice.invoice_number }}</h2>
+        <p>For shipment {{ invoice.shipment.tracking_id }}</p>
+      </div>
+      <div class="ph-right">
+        <span class="badge b-{{ invoice.status }}">{{ invoice.get_status_display }}</span>
+        {% if invoice.status != 'paid' %}
+        <form method="post" action="{% url 'sub-admin-invoice-mark-paid' pk=invoice.pk %}" style="display:inline;">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-green btn-sm">Mark as Paid</button>
+        </form>
+        {% endif %}
+        <a href="{% url 'sub-admin-invoice-pdf' pk=invoice.pk %}" class="btn btn-outline btn-sm">
+           <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          Download PDF
+        </a>
+        <a href="{% url 'sub-admin-shipment-detail' pk=invoice.shipment.pk %}" class="btn btn-outline btn-sm">← Back to Shipment</a>
+      </div>
+    </div>
+
+    <!-- PRINTABLE INVOICE -->
+    <div class="invoice-sheet">
+      <div class="inv-top">
+        <div class="inv-brand">
+          <div class="logo-mark">
+            <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="white" stroke-width="2.5"><path d="M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h11a2 2 0 012 2v3"/><rect x="9" y="11" width="14" height="10" rx="2"/><circle cx="12" cy="21" r="1"/><circle cx="20" cy="21" r="1"/></svg>
+          </div>
+          <span class="inv-brand-name">Trans<span>Edge</span></span>
+        </div>
+        <div class="inv-meta">
+          <h1>INVOICE</h1>
+          <div class="inv-num">{{ invoice.invoice_number }}</div>
+        </div>
+      </div>
+
+      <div class="inv-parties">
+        <div class="inv-party-block">
+          <h4>From</h4>
+          <p class="name">{{ invoice.shipment.sender.full_name }}</p>
+          <p>{{ invoice.shipment.sender.address }}{% if invoice.shipment.sender.city %}, {{ invoice.shipment.sender.city }}{% endif %}{% if invoice.shipment.sender.country %}, {{ invoice.shipment.sender.country }}{% endif %}</p>
+          <p>{{ invoice.shipment.sender.email }}</p>
+          <p>{{ invoice.shipment.sender.phone }}</p>
+        </div>
+        <div class="inv-party-block">
+          <h4>Bill To</h4>
+          <p class="name">{{ invoice.bill_to_name }}</p>
+          <p>{{ invoice.bill_to_address }}</p>
+          <p>{{ invoice.bill_to_email }}</p>
+        </div>
+      </div>
+
+      <div class="inv-dates">
+        <div class="inv-date-item"><label>Issue Date</label><span>{{ invoice.issue_date|date:"d M Y" }}</span></div>
+        {% if invoice.due_date %}<div class="inv-date-item"><label>Due Date</label><span>{{ invoice.due_date|date:"d M Y" }}</span></div>{% endif %}
+        <div class="inv-date-item"><label>Tracking ID</label><span>{{ invoice.shipment.tracking_id }}</span></div>
+      </div>
+
+      <table class="inv-table">
+        <thead>
+          <tr>
+            <th>Description</th>
+            <th class="num">Qty</th>
+            <th class="num">Unit Price</th>
+            <th class="num">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in invoice.items.all %}
+          <tr>
+            <td>{{ item.description }}</td>
+            <td class="num">{{ item.quantity }}</td>
+            <td class="num">{{ invoice.currency }} {{ item.unit_price }}</td>
+            <td class="num">{{ invoice.currency }} {{ item.amount }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" style="text-align:center;color:var(--muted);">No line items yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <div class="inv-totals">
+        <div class="inv-totals-row"><span class="muted">Subtotal</span><span>{{ invoice.currency }} {{ invoice.subtotal }}</span></div>
+        {% if invoice.tax_rate %}
+        <div class="inv-totals-row"><span class="muted">Tax ({{ invoice.tax_rate }}%)</span><span>{{ invoice.currency }} {{ invoice.tax_amount }}</span></div>
+        {% endif %}
+        {% if invoice.discount_amount %}
+        <div class="inv-totals-row"><span class="muted">Discount</span><span>-{{ invoice.currency }} {{ invoice.discount_amount }}</span></div>
+        {% endif %}
+        <div class="inv-totals-row grand"><span>Total</span><span>{{ invoice.currency }} {{ invoice.total_amount }}</span></div>
+        {% if invoice.amount_paid %}
+        <div class="inv-totals-row"><span class="muted">Paid</span><span>{{ invoice.currency }} {{ invoice.amount_paid }}</span></div>
+        <div class="inv-totals-row"><span class="muted">Balance Due</span><span>{{ invoice.currency }} {{ invoice.balance_due }}</span></div>
+        {% endif %}
+      </div>
+
+      {% if invoice.notes %}
+      <div class="inv-notes">
+        <h4>Notes</h4>
+        <p>{{ invoice.notes }}</p>
+      </div>
+      {% endif %}
+
+      {% if invoice.terms %}
+      <div class="inv-notes">
+        <h4>Terms</h4>
+        <p>{{ invoice.terms }}</p>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- MANAGE (not printed) -->
+    <div class="manage-card">
+      <h3>Add Line Item</h3>
+      <form method="post" action="{% url 'sub-admin-invoice-add-item' pk=invoice.pk %}">
+        {% csrf_token %}
+        <div class="item-row-form">
+          <div class="form-group" style="flex:2;"><label>Description</label><input type="text" name="description" placeholder="e.g. Handling fee" required></div>
+          <div class="form-group"><label>Qty</label><input type="number" name="quantity" value="1" min="1" required></div>
+          <div class="form-group"><label>Unit Price</label><input type="number" step="0.01" name="unit_price" placeholder="0.00" required></div>
+          <button type="submit" class="btn btn-primary btn-sm">Add</button>
+        </div>
+      </form>
+
+      {% if invoice.items.all %}
+      <div style="margin-top:16px;">
+        {% for item in invoice.items.all %}
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;">
+          <span>{{ item.description }} <span style="color:var(--muted);">× {{ item.quantity }}</span></span>
+          <span style="display:flex;align-items:center;gap:10px;">
+            {{ invoice.currency }} {{ item.amount }}
+            <form method="post" action="{% url 'sub-admin-invoice-remove-item' pk=invoice.pk item_pk=item.pk %}" class="remove-item-form">
+              {% csrf_token %}
+              <button type="submit" class="remove-item-btn">Remove</button>
+            </form>
+          </span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="manage-card">
+      <h3>Invoice Settings</h3>
+      <form method="post" action="{% url 'sub-admin-invoice-update' pk=invoice.pk %}">
+        {% csrf_token %}
+        <div class="form-grid">
+          <div class="form-group"><label>Bill To Name</label><input type="text" name="bill_to_name" value="{{ invoice.bill_to_name }}"></div>
+          <div class="form-group"><label>Bill To Email</label><input type="email" name="bill_to_email" value="{{ invoice.bill_to_email }}"></div>
+          <div class="form-group span-2"><label>Bill To Address</label><textarea name="bill_to_address">{{ invoice.bill_to_address }}</textarea></div>
+          <div class="form-group"><label>Due Date</label><input type="date" name="due_date" value="{{ invoice.due_date|date:'Y-m-d' }}"></div>
+          <div class="form-group">
+            <label>Status</label>
+            <select name="status">
+              {% for value, label in invoice.Status.choices %}
+              <option value="{{ value }}" {% if invoice.status == value %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group"><label>Tax Rate (%)</label><input type="number" step="0.01" name="tax_rate" value="{{ invoice.tax_rate }}"></div>
+          <div class="form-group"><label>Discount Amount</label><input type="number" step="0.01" name="discount_amount" value="{{ invoice.discount_amount }}"></div>
+          <div class="form-group span-2"><label>Notes</label><textarea name="notes">{{ invoice.notes }}</textarea></div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm">Save Changes</button>
+      </form>
+    </div>
+
+  </div>
+
+  <footer class="page-footer">
+    © {% now "Y" %} TransEdge. All rights reserved.<br>
+    <a href="{% url 'sub-admin-dashboard' %}">Dashboard</a> ·
+    <a href="{% url 'sub-admin-shipment-list' %}">Shipments</a>
+  </footer>
+</div>
+
+<script>
+  const html = document.documentElement;
+  html.setAttribute('data-theme', localStorage.getItem('te-theme') || 'light');
+  document.getElementById('themeToggle').addEventListener('click', () => {
+    const next = html.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+    html.setAttribute('data-theme', next);
+    localStorage.setItem('te-theme', next);
+  });
+  function openSidebar() { document.getElementById('sidebar').classList.add('open'); document.getElementById('overlay').classList.add('open'); }
+  function closeSidebar() { document.getElementById('sidebar').classList.remove('open'); document.getElementById('overlay').classList.remove('open'); }
+</script>
+</body>
+</html>

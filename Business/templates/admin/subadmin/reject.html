@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head><title>Application Rejected</title></head>
+<body>
+
+<h1>Application Not Approved</h1>
+
+<p>Hello {{ profile.user.full_name }},</p>
+<p>Unfortunately your sub-admin application was not approved.</p>
+
+{% if profile.rejection_reason %}
+  <p>Reason: {{ profile.rejection_reason }}</p>
+{% endif %}
+
+<p>If you believe this is a mistake, please contact support.</p>
+
+<p><a href="{% url 'sub-admin-logout' %}">Logout</a></p>
+
+</body>
+</html>

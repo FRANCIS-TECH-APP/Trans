@@ -1,0 +1,121 @@
+
+cat > /mnt/user-data/outputs/full_project/templates/admin/testimonials.html << 'HTMLEOF'
+{% extends "admin/base_admin.html" %}
+{% block title %}Testimonials{% endblock %}
+{% block page_title %}Testimonials{% endblock %}
+{% block breadcrumb %}<a href="{% url 'admin-dashboard' %}">Home</a> / Testimonials{% endblock %}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:1fr 360px;gap:16px;align-items:start;">
+
+  <!-- List -->
+  <div class="card">
+    <div class="card-header">
+      <h3>All Testimonials</h3>
+      <div class="card-actions">
+        <span style="font-size:11px;color:var(--muted);">{{ testimonials.count }} total</span>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Name</th><th>Role</th><th>Rating</th><th>Active</th><th>Order</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% for t in testimonials %}
+          <tr>
+            <td>
+              <div style="display:flex;align-items:center;gap:8px;">
+                {% if t.get_avatar %}
+                <img src="{{ t.get_avatar }}" style="width:30px;height:30px;border-radius:50%;object-fit:cover;"/>
+                {% else %}
+                <div style="width:30px;height:30px;border-radius:50%;background:rgba(56,189,248,.2);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:var(--accent);">{{ t.name|slice:":1" }}</div>
+                {% endif %}
+                <span style="font-size:13px;">{{ t.name }}</span>
+              </div>
+            </td>
+            <td style="font-size:12px;color:var(--muted);">{{ t.role|truncatechars:30 }}</td>
+            <td>
+              <span style="color:#fcd34d;font-size:12px;">
+                {% for i in "12345" %}{% if forloop.counter <= t.rating %}★{% else %}☆{% endif %}{% endfor %}
+              </span>
+            </td>
+            <td>
+              {% if t.is_active %}<span class="badge b-green">Active</span>
+              {% else %}<span class="badge b-gray">Hidden</span>{% endif %}
+            </td>
+            <td style="font-size:12px;">{{ t.sort_order }}</td>
+            <td>
+              <div style="display:flex;gap:4px;">
+                <a href="{% url 'admin-testimonial-edit' t.pk %}" class="btn btn-ghost btn-sm">Edit</a>
+                <form method="post" action="{% url 'admin-testimonial-delete' t.pk %}" onsubmit="return confirm('Delete?')">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-danger btn-sm"><i class="fas fa-trash"></i></button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:2rem;">No testimonials yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Add new -->
+  <div class="card">
+    <div class="card-header"><h3>{% if edit_obj %}Edit Testimonial{% else %}Add New{% endif %}</h3></div>
+    <div class="card-body">
+      <form method="post" enctype="multipart/form-data" action="{% if edit_obj %}{% url 'admin-testimonial-edit' edit_obj.pk %}{% else %}{% url 'admin-testimonials' %}{% endif %}">
+        {% csrf_token %}
+        <div class="form-group" style="margin-bottom:10px;">
+          <label>Full Name *</label>
+          <input type="text" name="name" value="{{ edit_obj.name|default:'' }}" required/>
+        </div>
+        <div class="form-group" style="margin-bottom:10px;">
+          <label>Role / Company *</label>
+          <input type="text" name="role" value="{{ edit_obj.role|default:'' }}" placeholder="CEO, Acme Corp" required/>
+        </div>
+        <div class="form-group" style="margin-bottom:10px;">
+          <label>Avatar URL (or upload below)</label>
+          <input type="url" name="avatar_url" value="{{ edit_obj.avatar_url|default:'' }}" placeholder="https://..."/>
+        </div>
+        <div class="form-group" style="margin-bottom:10px;">
+          <label>Avatar Image Upload</label>
+          <input type="file" name="avatar" accept="image/*" style="padding:5px;font-size:12px;"/>
+        </div>
+        <div class="form-group" style="margin-bottom:10px;">
+          <label>Testimonial Content *</label>
+          <textarea name="content" rows="4" required>{{ edit_obj.content|default:'' }}</textarea>
+        </div>
+        <div class="form-group" style="margin-bottom:10px;">
+          <label>Rating (1–5)</label>
+          <select name="rating">
+            {% for i in "12345" %}
+            <option value="{{ forloop.counter }}" {% if edit_obj.rating == forloop.counter %}selected{% endif %}>{{ forloop.counter }} Star{{ forloop.counter|pluralize }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div style="display:flex;gap:12px;margin-bottom:10px;align-items:center;">
+          <div class="form-group" style="flex:1;margin-bottom:0;">
+            <label>Sort Order</label>
+            <input type="number" name="sort_order" value="{{ edit_obj.sort_order|default:'0' }}" min="0"/>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;margin-top:16px;">
+            <input type="checkbox" name="is_active" id="is_active" {% if edit_obj.is_active or not edit_obj %}checked{% endif %} style="width:auto;"/>
+            <label for="is_active" style="font-size:12px;cursor:pointer;">Show on site</label>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;">
+          {% if edit_obj %}<a href="{% url 'admin-testimonials' %}" class="btn btn-ghost btn-sm">Cancel</a>{% endif %}
+          <button type="submit" class="btn btn-primary" style="flex:1;">
+            <i class="fas fa-save"></i> {% if edit_obj %}Update{% else %}Add Testimonial{% endif %}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

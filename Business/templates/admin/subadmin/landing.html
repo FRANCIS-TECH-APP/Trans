@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TransEdge — Smart Shipment Management</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --sky:   #0ea5e9;
+  --sky2:  #0284c7;
+  --bg:    #f0f7ff;
+  --surface: #ffffff;
+  --border: #c8e0f4;
+  --text:  #0f172a;
+  --muted: #64748b;
+  --radius: 12px;
+}
+[data-theme="dark"] {
+  --bg:     #0c1220;
+  --surface:#131c2e;
+  --border: #1e3050;
+  --text:   #e2e8f0;
+  --muted:  #94a3b8;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+  transition: background .3s, color .3s;
+}
+
+/* ── NAV ─────────────────────────────────────── */
+nav {
+  position: fixed; top: 0; left: 0; right: 0;
+  z-index: 100;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 5%;
+  height: 64px;
+  background: rgba(255,255,255,.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  transition: background .3s, border-color .3s;
+}
+[data-theme="dark"] nav { background: rgba(19,28,46,.88); }
+
+.nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+.logo-mark {
+  width: 36px; height: 36px;
+  background: linear-gradient(135deg, var(--sky), var(--sky2));
+  border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+}
+.logo-name { font-size: 18px; font-weight: 700; color: var(--text); letter-spacing: -.3px; }
+.logo-name span { color: var(--sky); }
+
+.nav-right { display: flex; align-items: center; gap: 10px; }
+.nav-link {
+  padding: 7px 16px; border-radius: 8px;
+  font-size: 14px; font-weight: 500;
+  text-decoration: none; color: var(--muted);
+  transition: background .15s, color .15s;
+}
+.nav-link:hover { background: var(--border); color: var(--text); }
+.nav-cta {
+  padding: 8px 20px; border-radius: 8px;
+  background: var(--sky); color: #fff;
+  font-size: 14px; font-weight: 600;
+  text-decoration: none;
+  box-shadow: 0 2px 8px rgba(14,165,233,.3);
+  transition: opacity .2s, transform .1s;
+}
+.nav-cta:hover { opacity: .9; transform: translateY(-1px); }
+
+.theme-btn {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--border); border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--muted);
+}
+.icon-sun, .icon-moon { width: 17px; height: 17px; }
+[data-theme="light"] .icon-moon { display: none; }
+[data-theme="dark"]  .icon-sun  { display: none; }
+
+/* ── HERO ─────────────────────────────────────── */
+.hero {
+  min-height: 100vh;
+  display: flex; align-items: center;
+  position: relative; overflow: hidden;
+  padding: 100px 5% 60px;
+}
+
+/* Animated background dots */
+.hero-bg {
+  position: absolute; inset: 0;
+  overflow: hidden; z-index: 0;
+}
+.hero-bg::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse 80% 60% at 60% 40%, rgba(14,165,233,.12) 0%, transparent 70%);
+}
+.dot-grid {
+  position: absolute; inset: 0;
+  background-image: radial-gradient(circle, rgba(14,165,233,.15) 1px, transparent 1px);
+  background-size: 32px 32px;
+  animation: gridFloat 20s linear infinite;
+}
+@keyframes gridFloat {
+  0%   { transform: translate(0,0); }
+  100% { transform: translate(32px, 32px); }
+}
+
+/* Floating route lines */
+.route-lines {
+  position: absolute; inset: 0; z-index: 0;
+}
+.route-line {
+  position: absolute;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(14,165,233,.3), transparent);
+  animation: routeSlide linear infinite;
+}
+.route-line:nth-child(1) { top: 25%; width: 60%; left: -20%; animation-duration: 8s; animation-delay: 0s; }
+.route-line:nth-child(2) { top: 50%; width: 80%; left: -30%; animation-duration: 11s; animation-delay: 2s; }
+.route-line:nth-child(3) { top: 70%; width: 50%; left: -10%; animation-duration: 9s; animation-delay: 4s; }
+.route-line:nth-child(4) { top: 40%; width: 70%; left: -25%; animation-duration: 13s; animation-delay: 1s; }
+
+@keyframes routeSlide {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(160%); }
+}
+
+/* Floating package icons */
+.floating-pkg {
+  position: absolute; z-index: 1;
+  opacity: .08;
+  animation: pkgFloat ease-in-out infinite;
+}
+[data-theme="dark"] .floating-pkg { opacity: .05; }
+.floating-pkg:nth-child(1) { top: 15%; right: 5%;  font-size: 64px; animation-duration: 6s; animation-delay: 0s; }
+.floating-pkg:nth-child(2) { top: 55%; right: 12%; font-size: 40px; animation-duration: 8s; animation-delay: 1.5s; }
+.floating-pkg:nth-child(3) { bottom: 20%; right: 3%; font-size: 52px; animation-duration: 7s; animation-delay: 3s; }
+.floating-pkg:nth-child(4) { top: 30%; left: 3%;   font-size: 36px; animation-duration: 9s; animation-delay: 2s; }
+@keyframes pkgFloat {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50%       { transform: translateY(-18px) rotate(5deg); }
+}
+
+.hero-content {
+  position: relative; z-index: 2;
+  max-width: 600px;
+}
+
+.hero-eyebrow {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(14,165,233,.1);
+  border: 1px solid rgba(14,165,233,.25);
+  color: var(--sky);
+  padding: 5px 14px; border-radius: 20px;
+  font-size: 12px; font-weight: 600;
+  letter-spacing: .5px; text-transform: uppercase;
+  margin-bottom: 20px;
+}
+
+.hero-title {
+  font-size: clamp(32px, 6vw, 58px);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -1px;
+  margin-bottom: 18px;
+  color: var(--text);
+}
+.hero-title .accent { color: var(--sky); }
+
+.hero-sub {
+  font-size: clamp(15px, 2.5vw, 18px);
+  color: var(--muted);
+  line-height: 1.6;
+  margin-bottom: 32px;
+  max-width: 480px;
+}
+
+.hero-actions {
+  display: flex; gap: 12px; flex-wrap: wrap;
+}
+.btn-hero-primary {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 14px 28px; border-radius: var(--radius);
+  background: var(--sky); color: #fff;
+  font-size: 15px; font-weight: 600;
+  text-decoration: none;
+  box-shadow: 0 4px 16px rgba(14,165,233,.35);
+  transition: transform .15s, box-shadow .15s;
+}
+.btn-hero-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(14,165,233,.4); }
+
+.btn-hero-outline {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 14px 28px; border-radius: var(--radius);
+  background: transparent; color: var(--text);
+  border: 1.5px solid var(--border);
+  font-size: 15px; font-weight: 500;
+  text-decoration: none;
+  transition: background .15s;
+}
+.btn-hero-outline:hover { background: var(--border); }
+
+/* ── STATS STRIP ─────────────────────────────── */
+.stats-strip {
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 28px 5%;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 24px;
+  transition: background .3s;
+}
+.strip-stat { text-align: center; }
+.strip-stat .num { font-size: 28px; font-weight: 800; color: var(--sky); }
+.strip-stat .lbl { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+/* ── FEATURES ────────────────────────────────── */
+.features {
+  padding: 72px 5%;
+  max-width: 1100px; margin: 0 auto;
+}
+.section-label {
+  text-align: center;
+  font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--sky); margin-bottom: 10px;
+}
+.section-title {
+  text-align: center;
+  font-size: clamp(22px, 4vw, 34px); font-weight: 800;
+  letter-spacing: -.5px; margin-bottom: 48px;
+  color: var(--text);
+}
+
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+}
+.feature-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 24px;
+  transition: transform .2s, box-shadow .2s, background .3s;
+}
+.feature-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(14,165,233,.1); }
+.feature-icon {
+  width: 44px; height: 44px; border-radius: 10px;
+  background: rgba(14,165,233,.1);
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 14px;
+  color: var(--sky);
+}
+.feature-card h3 { font-size: 15px; font-weight: 600; margin-bottom: 8px; }
+.feature-card p  { font-size: 13.5px; color: var(--muted); line-height: 1.6; }
+
+/* ── HOW IT WORKS ────────────────────────────── */
+.how {
+  padding: 72px 5%;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  transition: background .3s;
+}
+.how-inner { max-width: 900px; margin: 0 auto; }
+.steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 32px; margin-top: 48px;
+}
+.step { text-align: center; }
+.step-num {
+  width: 48px; height: 48px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--sky), var(--sky2));
+  color: #fff; font-size: 18px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 14px;
+}
+.step h3 { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+.step p  { font-size: 13px; color: var(--muted); line-height: 1.6; }
+
+/* ── CTA ─────────────────────────────────────── */
+.cta-section {
+  padding: 80px 5%;
+  text-align: center;
+}
+.cta-box {
+  max-width: 560px; margin: 0 auto;
+  background: linear-gradient(135deg, rgba(14,165,233,.12), rgba(2,132,199,.06));
+  border: 1px solid rgba(14,165,233,.2);
+  border-radius: 20px;
+  padding: 52px 40px;
+}
+.cta-box h2 { font-size: clamp(22px, 4vw, 30px); font-weight: 800; margin-bottom: 12px; }
+.cta-box p  { font-size: 15px; color: var(--muted); margin-bottom: 28px; }
+
+/* ── FOOTER ──────────────────────────────────── */
+footer {
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding: 24px 5%;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 10px;
+  font-size: 13px; color: var(--muted);
+  transition: background .3s;
+}
+footer a { color: var(--sky); text-decoration: none; }
+
+/* ── MOBILE ──────────────────────────────────── */
+@media (max-width: 600px) {
+  .nav-link { display: none; }
+  .hero { padding: 90px 5% 48px; }
+  .hero-actions { flex-direction: column; }
+  .btn-hero-primary, .btn-hero-outline { justify-content: center; }
+  .cta-box { padding: 36px 20px; }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="#" class="nav-logo">
+    <div class="logo-mark">
+      <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="white" stroke-width="2.5">
+        <path d="M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h11a2 2 0 012 2v3"/>
+        <rect x="9" y="11" width="14" height="10" rx="2"/>
+        <circle cx="12" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+      </svg>
+    </div>
+    <span class="logo-name">Trans<span>Edge</span></span>
+  </a>
+  <div class="nav-right">
+    <a href="{% url 'sub-admin-login' %}" class="nav-link">Sign in</a>
+    <a href="{% url 'sub-admin-register' %}" class="nav-cta">Get started</a>
+    <button class="theme-btn" id="themeToggle" aria-label="Toggle dark mode">
+      <svg class="icon-sun" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="5"/>
+        <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+        <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+      </svg>
+      <svg class="icon-moon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+      </svg>
+    </button>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-bg">
+    <div class="dot-grid"></div>
+    <div class="route-lines">
+      <div class="route-line"></div>
+      <div class="route-line"></div>
+      <div class="route-line"></div>
+      <div class="route-line"></div>
+    </div>
+    <div class="floating-pkg">📦</div>
+    <div class="floating-pkg">🚚</div>
+    <div class="floating-pkg">✈️</div>
+    <div class="floating-pkg">🏭</div>
+  </div>
+
+  <div class="hero-content">
+    <div class="hero-eyebrow">
+      <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Real-time shipment tracking
+    </div>
+    <h1 class="hero-title">
+      Ship smarter.<br>
+      Track <span class="accent">everything.</span>
+    </h1>
+    <p class="hero-sub">
+      TransEdge gives logistics teams a powerful sub-admin portal to create, manage, and track international shipments — all in one place.
+    </p>
+    <div class="hero-actions">
+      <a href="{% url 'sub-admin-register' %}" class="btn-hero-primary">
+        Start for free
+        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+      </a>
+      <a href="{% url 'sub-admin-login' %}" class="btn-hero-outline">Sign in to portal</a>
+    </div>
+  </div>
+</section>
+
+<!-- STATS STRIP -->
+<div class="stats-strip">
+  <div class="strip-stat">
+    <div class="num">10k+</div>
+    <div class="lbl">Shipments tracked</div>
+  </div>
+  <div class="strip-stat">
+    <div class="num">50+</div>
+    <div class="lbl">Countries covered</div>
+  </div>
+  <div class="strip-stat">
+    <div class="num">99.9%</div>
+    <div class="lbl">Uptime guaranteed</div>
+  </div>
+  <div class="strip-stat">
+    <div class="num">24/7</div>
+    <div class="lbl">Live tracking</div>
+  </div>
+</div>
+
+<!-- FEATURES -->
+<section class="features">
+  <div class="section-label">Why TransEdge</div>
+  <div class="section-title">Everything your team needs</div>
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon">
+        <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/>
+        </svg>
+      </div>
+      <h3>Live map tracking</h3>
+      <p>Add GPS checkpoints to every shipment. Clients see exactly where their package is in real time.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">
+        <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+        </svg>
+      </div>
+      <h3>Sub-admin portal</h3>
+      <p>Give logistics partners their own login to create and manage shipments — without full admin access.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">
+        <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>
+        </svg>
+      </div>
+      <h3>Points system</h3>
+      <p>Sub-admins top up a points wallet via Paystack and spend points to generate tracking codes — no subscriptions.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">
+        <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+        </svg>
+      </div>
+      <h3>Auto-generated codes</h3>
+      <p>Every shipment gets a unique tracking ID instantly — shareable with senders and receivers right away.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">
+        <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+      </div>
+      <h3>Secure payments</h3>
+      <p>Paystack integration handles all point purchases with full webhook verification and idempotent processing.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">
+        <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>
+        </svg>
+      </div>
+      <h3>Mobile-ready</h3>
+      <p>The entire portal works on phones and tablets — manage shipments from anywhere in the field.</p>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="how">
+  <div class="how-inner">
+    <div class="section-label">How it works</div>
+    <div class="section-title">Up and running in minutes</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <h3>Register & get approved</h3>
+        <p>Sign up as a sub-admin and wait for super-admin approval — usually within the hour.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <h3>Buy points</h3>
+        <p>Top up your points wallet with any amount via Paystack. Points never expire.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <h3>Create shipments</h3>
+        <p>Fill in sender, receiver, and package details. A tracking code is generated instantly.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <h3>Track live</h3>
+        <p>Add checkpoints as the package moves. Clients track with a simple public link.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section">
+  <div class="cta-box">
+    <h2>Ready to streamline your logistics?</h2>
+    <p>Join TransEdge today — no monthly fees, just pay per shipment.</p>
+    <a href="{% url 'sub-admin-register' %}" class="btn-hero-primary" style="display:inline-flex;margin:0 auto;">
+      Create your account
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+    </a>
+    <p style="margin-top:16px;font-size:12px;color:var(--muted);">
+      Already have an account? <a href="{% url 'sub-admin-login' %}" style="color:var(--sky);">Sign in →</a>
+    </p>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <span>© 2025 TransEdge. All rights reserved.</span>
+  <span>
+    Super admin? <a href="{% url 'admin-login' %}">Login here</a>
+  </span>
+</footer>
+
+<script>
+  const html = document.documentElement;
+  html.setAttribute('data-theme', localStorage.getItem('te-theme') || 'light');
+  document.getElementById('themeToggle').addEventListener('click', () => {
+    const next = html.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+    html.setAttribute('data-theme', next);
+    localStorage.setItem('te-theme', next);
+  });
+</script>
+</body>
+</html>

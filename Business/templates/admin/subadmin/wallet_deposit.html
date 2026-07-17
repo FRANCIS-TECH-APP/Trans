@@ -1,0 +1,141 @@
+{% extends "admin/subadmin/base.html" %}
+
+{% block title %}Fund Wallet — TransEdge{% endblock %}
+{% block page_title %}Fund Wallet{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* Wallet hero — green variant of the dashboard's gradient hero */
+  .wallet-hero {
+    background: linear-gradient(135deg, var(--green), #0d8f42);
+    border-radius: var(--radius);
+    padding: 20px 22px;
+    margin-bottom: 16px;
+    color: #fff;
+    box-shadow: 0 4px 20px rgba(22,163,74,.2);
+    position: relative;
+    overflow: hidden;
+  }
+  .wallet-hero::after { content: ''; position: absolute; right: -30px; top: -30px; width: 140px; height: 140px; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.1), transparent 70%); }
+  .wallet-hero-label { font-size: 11px; font-weight: 600; letter-spacing: .5px; text-transform: uppercase; opacity: .85; margin-bottom: 5px; }
+  .wallet-hero-amount { font-size: 28px; font-weight: 800; letter-spacing: -.3px; }
+  .wallet-hero-note { font-size: 11px; opacity: .8; margin-top: 5px; }
+
+  .section-body { padding: 16px; }
+  .sh-icon { width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+
+  /* Amount presets */
+  .amount-presets { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .preset-btn { padding: 8px 15px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--surface2); font-size: 12.5px; font-weight: 600; cursor: pointer; color: var(--text); font-family: inherit; transition: border-color .15s, color .15s, background .15s; }
+  .preset-btn:hover, .preset-btn.active { border-color: var(--green); color: var(--green); background: var(--green-dim); }
+
+  .form-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+  .form-group label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .3px; }
+  .form-group input {
+    padding: 11px 13px; background: var(--surface2); border: 1.5px solid var(--border); border-radius: 8px;
+    font-size: 15px; font-weight: 600; color: var(--text); outline: none; transition: border-color .2s; width: 100%;
+    font-family: inherit;
+  }
+  .form-group input:focus { border-color: var(--green); }
+
+  .btn-green { background: var(--green); color: #fff; width: 100%; justify-content: center; padding: 12px; font-size: 13.5px; }
+
+  /* History table */
+  table.history-table { width: 100%; border-collapse: collapse; }
+  table.history-table thead th { text-align: left; font-size: 10px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--muted); padding: 8px; border-bottom: 2px solid var(--border); }
+  table.history-table thead th.num { text-align: right; }
+  table.history-table tbody td { padding: 10px 8px; font-size: 12.5px; border-bottom: 1px solid var(--border); }
+  table.history-table tbody td.num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+  table.history-table tbody tr:last-child td { border-bottom: none; }
+
+  .b-success { background: var(--green-dim); color: var(--green); }
+  .b-pending { background: var(--amber-dim); color: var(--amber); }
+  .b-failed  { background: var(--red-dim); color: var(--red); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Wallet Hero -->
+<div class="wallet-hero">
+  <div class="wallet-hero-label">Current Balance</div>
+  <div class="wallet-hero-amount">₦{{ account.balance|floatformat:2 }}</div>
+  <div class="wallet-hero-note">Account No: {{ account.account_number }}</div>
+</div>
+
+<!-- Add Funds -->
+<div class="section">
+  <div class="section-header">
+    <div class="sh-icon" style="background:var(--green-dim);">
+      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="color:var(--green);"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+    </div>
+    <h3>Add Funds</h3>
+  </div>
+  <div class="section-body">
+    <form method="post" action="{% url 'sub-admin-wallet-deposit-pay' %}" id="depositForm">
+      {% csrf_token %}
+      <div class="amount-presets">
+        <button type="button" class="preset-btn" data-amount="1000">₦1,000</button>
+        <button type="button" class="preset-btn" data-amount="5000">₦5,000</button>
+        <button type="button" class="preset-btn" data-amount="10000">₦10,000</button>
+        <button type="button" class="preset-btn" data-amount="20000">₦20,000</button>
+      </div>
+      <div class="form-group">
+        <label>Amount (NGN)</label>
+        <input type="number" name="amount" id="amountInput" min="100" step="1" placeholder="Enter amount" required>
+      </div>
+      <button type="submit" class="btn btn-green">
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+        Pay with Paystack
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- Recent Deposits — its own standalone section, separate from the funding form -->
+<div class="section" id="deposit-history">
+  <div class="section-header">
+    <div class="sh-icon" style="background:var(--sky-dim);">
+      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="color:var(--sky);"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg>
+    </div>
+    <h3>Recent Deposits</h3>
+  </div>
+  <div class="section-body">
+    {% if history %}
+    <table class="history-table">
+      <thead>
+        <tr><th>Date</th><th class="num">Amount</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        {% for d in history %}
+        <tr>
+          <td>{{ d.created_at|date:"d M Y, H:i" }}</td>
+          <td class="num">₦{{ d.amount|floatformat:0 }}</td>
+          <td>
+            {% if d.status == "success" %}<span class="badge b-success">Success</span>
+            {% elif d.status == "pending" %}<span class="badge b-pending">Pending</span>
+            {% else %}<span class="badge b-failed">Failed</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty-cell">No deposits yet.</div>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.querySelectorAll('.preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('amountInput').value = btn.dataset.amount;
+    });
+  });
+</script>
+{% endblock %}

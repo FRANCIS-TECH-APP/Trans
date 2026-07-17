@@ -1,0 +1,65 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Admin Login — SwiftTrack</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{--bg:#0d0f14;--bg2:#13161e;--bg3:#1a1e28;--border:rgba(255,255,255,0.07);--accent:#4f8ef7;--text:#e8eaf0;--muted:#6b7280;--danger:#f7594f}
+    body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center}
+    .login-wrap{width:100%;max-width:400px;padding:1.5rem}
+    .logo{text-align:center;margin-bottom:2rem}
+    .logo .wordmark{font-family:'Syne',sans-serif;font-size:24px;font-weight:700}
+    .logo .wordmark span{color:var(--accent)}
+    .logo p{font-size:13px;color:var(--muted);margin-top:4px}
+    .card{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:2rem}
+    .card h2{font-family:'Syne',sans-serif;font-size:18px;font-weight:600;margin-bottom:1.5rem}
+    .form-group{margin-bottom:1rem}
+    label{display:block;font-size:12px;font-weight:500;color:var(--muted);margin-bottom:5px}
+    .input-wrap{position:relative}
+    .input-wrap i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:13px;pointer-events:none}
+    input{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;padding:10px 12px 10px 36px;transition:border-color 0.15s}
+    input:focus{outline:none;border-color:var(--accent)}
+    .btn{width:100%;padding:11px;border-radius:8px;background:var(--accent);color:#fff;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;border:none;cursor:pointer;transition:opacity 0.15s;margin-top:0.5rem}
+    .btn:hover{opacity:0.85}
+    .alert{background:rgba(247,89,79,0.1);color:#f98080;border:1px solid rgba(247,89,79,0.2);border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:1rem;display:flex;align-items:center;gap:8px}
+  </style>
+</head>
+<body>
+<div class="login-wrap">
+  <div class="logo">
+    <div class="wordmark">Swift<span>Track</span></div>
+    <p>Shipment Management System</p>
+  </div>
+  <div class="card">
+    <h2>Sign in to your account</h2>
+    {% for message in messages %}
+      <div class="alert"><i class="fas fa-exclamation-circle"></i> {{ message }}</div>
+    {% endfor %}
+    <form method="post">
+      {% csrf_token %}
+      <div class="form-group">
+        <label for="email">Email address</label>
+        <div class="input-wrap">
+          <i class="fas fa-envelope"></i>
+          <input type="email" id="email" name="email" placeholder="admin@example.com" required autofocus/>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <div class="input-wrap">
+          <i class="fas fa-lock"></i>
+          <input type="password" id="password" name="password" placeholder="••••••••" required/>
+        </div>
+      </div>
+      <button type="submit" class="btn">Sign In &nbsp;<i class="fas fa-arrow-right"></i></button>
+    </form>
+  </div>
+</div>
+</body>
+</html>
+

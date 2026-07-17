@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head><title>Sub-Admin Applications</title></head>
+<body>
+
+<h1>Sub-Admin Applications</h1>
+
+{% if messages %}
+  {% for message in messages %}
+    <p><strong>{{ message }}</strong></p>
+  {% endfor %}
+{% endif %}
+
+{% if pending_count %}
+  <p><strong>{{ pending_count }} application(s) awaiting review.</strong></p>
+{% endif %}
+
+<form method="get">
+  <input type="text" name="q" value="{{ query }}" placeholder="Search name, email, business">
+  <select name="status">
+    <option value="">All Statuses</option>
+    {% for value, label in status_choices %}
+      <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit">Filter</button>
+  <a href="{% url 'sub-admin-list' %}">Clear</a>
+</form>
+
+<table border="1" cellpadding="6">
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Email</th>
+      <th>Business</th>
+      <th>Approval</th>
+      <th>Payment</th>
+      <th>Fee (NGN)</th>
+      <th>Active</th>
+      <th>Registered</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for profile in page_obj %}
+    <tr>
+      <td>{{ profile.user.full_name }}</td>
+      <td>{{ profile.user.email }}</td>
+      <td>{{ profile.business_name|default:"-" }}</td>
+      <td>{{ profile.get_approval_status_display }}</td>
+      <td>{{ profile.get_payment_status_display }}</td>
+      <td>{{ profile.activation_fee }}</td>
+      <td>{% if profile.is_active %}Yes{% else %}No{% endif %}</td>
+      <td>{{ profile.created_at|date:"d M Y" }}</td>
+      <td><a href="{% url 'sub-admin-detail' pk=profile.pk %}">View</a></td>
+    </tr>
+    {% empty %}
+    <tr>
+      <td colspan="9">No applications found.</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<p>
+  Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+  {% if page_obj.has_previous %}
+    <a href="?page={{ page_obj.previous_page_number }}&q={{ query }}&status={{ status_filter }}">Previous</a>
+  {% endif %}
+  {% if page_obj.has_next %}
+    <a href="?page={{ page_obj.next_page_number }}&q={{ query }}&status={{ status_filter }}">Next</a>
+  {% endif %}
+</p>
+
+<p><a href="{% url 'admin-dashboard' %}">Back to Dashboard</a></p>
+
+</body>
+</html>

@@ -1,0 +1,63 @@
+
+
+<!-- ── SHIPMENT HISTORY ──────────────────────── -->
+<div class="block">
+  <div class="block-header">
+    Recent Shipments
+    <a href="{% url 'sub-admin-shipment-list' %}" class="view-all">View All</a>
+  </div>
+
+  {% for s in recent %}
+  <a href="{% url 'sub-admin-shipment-detail' pk=s.pk %}" class="ship-row">
+
+    <div class="ship-icon
+      {% if s.status == 'in_transit' %}si-transit
+      {% elif s.status == 'delivered' %}si-delivered
+      {% elif s.status == 'held' %}si-held
+      {% elif s.status == 'at_customs' %}si-customs
+      {% elif s.status == 'out_for_delivery' %}si-out
+      {% elif s.status == 'picked_up' %}si-transit
+      {% else %}si-created{% endif %}">
+      {% if s.status == 'delivered' %}
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      {% elif s.status == 'out_for_delivery' %}
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+      {% else %}
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+      {% endif %}
+    </div>
+
+    <div class="ship-info">
+      <div class="ship-tid">{{ s.tracking_id }}</div>
+      <div class="ship-name">{{ s.receiver.full_name }}</div>
+    </div>
+
+    <div class="ship-right">
+      <span class="s-badge
+        {% if s.status == 'in_transit' %}sb-transit
+        {% elif s.status == 'delivered' %}sb-delivered
+        {% elif s.status == 'held' %}sb-held
+        {% elif s.status == 'at_customs' %}sb-customs
+        {% elif s.status == 'out_for_delivery' %}sb-out
+        {% elif s.status == 'picked_up' %}sb-arrived
+        {% else %}sb-created{% endif %}">
+        {% if s.status == 'in_transit' %}In Transit
+        {% elif s.status == 'delivered' %}Delivered
+        {% elif s.status == 'held' %}On Hold
+        {% elif s.status == 'at_customs' %}At Customs
+        {% elif s.status == 'out_for_delivery' %}Out for Delivery
+        {% elif s.status == 'picked_up' %}Arrived
+        {% else %}{{ s.get_status_display }}{% endif %}
+      </span>
+      <span class="ship-time">{{ s.created_at|timesince }} ago</span>
+    </div>
+
+  </a>
+  {% empty %}
+  <div class="empty-row">No shipments yet. <a href="{% url 'sub-admin-shipment-create' %}" style="color:var(--sky);">Create your first →</a></div>
+  {% endfor %}
+
+</div>
+
+{% endblock %}
+

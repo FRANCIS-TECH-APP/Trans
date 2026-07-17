@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head><title>Sub-Admin: {{ profile.user.full_name }}</title></head>
+<body>
+
+<h1>Sub-Admin: {{ profile.user.full_name }}</h1>
+
+{% if messages %}
+  {% for message in messages %}
+    <p><strong>{{ message }}</strong></p>
+  {% endfor %}
+{% endif %}
+
+<h2>Account Info</h2>
+<p>Email: {{ profile.user.email }}</p>
+<p>Phone: {{ profile.user.phone|default:"-" }}</p>
+<p>Business: {{ profile.business_name|default:"-" }}</p>
+<p>Registered: {{ profile.created_at|date:"d M Y H:i" }}</p>
+<p>Active: {% if profile.is_active %}Yes{% else %}No{% endif %}</p>
+<p>Shipments Created: {{ shipment_count }}</p>
+
+<h2>Approval</h2>
+<p>Status: {{ profile.get_approval_status_display }}</p>
+{% if profile.approved_by %}
+  <p>Approved By: {{ profile.approved_by.full_name }}</p>
+  <p>Approved At: {{ profile.approved_at|date:"d M Y H:i" }}</p>
+{% endif %}
+{% if profile.rejection_reason %}
+  <p>Rejection Reason: {{ profile.rejection_reason }}</p>
+{% endif %}
+{% if profile.notes %}
+  <p>Notes: {{ profile.notes }}</p>
+{% endif %}
+
+<h2>Payment</h2>
+<p>Status: {{ profile.get_payment_status_display }}</p>
+<p>Activation Fee: {{ profile.activation_fee }} NGN</p>
+<p>Amount Paid: {{ profile.amount_paid }} NGN</p>
+{% if profile.payment_reference %}
+  <p>Reference: {{ profile.payment_reference }}</p>
+{% endif %}
+{% if profile.paid_at %}
+  <p>Paid At: {{ profile.paid_at|date:"d M Y H:i" }}</p>
+{% endif %}
+
+<hr>
+
+{% if profile.approval_status == 'pending' %}
+  <h2>Approve Application</h2>
+  <form method="post" action="{% url 'sub-admin-approve' pk=profile.pk %}">
+    {% csrf_token %}
+    <p>
+      <label>Activation Fee (NGN) — set 0 to activate immediately</label><br>
+      <input type="number" name="activation_fee" value="0" min="0" step="0.01">
+    </p>
+    <p>
+      <label>Internal Notes (optional)</label><br>
+      <textarea name="notes" rows="3" cols="50"></textarea>
+    </p>
+    <p><button type="submit">Approve</button></p>
+  </form>
+
+  <h2>Reject Application</h2>
+  <form method="post" action="{% url 'sub-admin-reject' pk=profile.pk %}">
+    {% csrf_token %}
+    <p>
+      <label>Reason (optional)</label><br>
+      <textarea name="rejection_reason" rows="3" cols="50"></textarea>
+    </p>
+    <p><button type="submit">Reject</button></p>
+  </form>
+{% endif %}
+
+{% if profile.approval_status == 'approved' and not profile.is_fully_activated %}
+  <h2>Update Activation Fee</h2>
+  <form method="post" action="{% url 'sub-admin-set-fee' pk=profile.pk %}">
+    {% csrf_token %}
+    <p>
+      <label>New Fee (NGN)</label><br>
+      <input type="number" name="activation_fee" value="{{ profile.activation_fee }}" min="0" step="0.01">
+    </p>
+    <p><button type="submit">Update Fee</button></p>
+  </form>
+{% endif %}
+
+{% if profile.is_active %}
+  <h2>Revoke Access</h2>
+  <form method="post" action="{% url 'sub-admin-revoke' pk=profile.pk %}">
+    {% csrf_token %}
+    <p>
+      <label>Reason</label><br>
+      <input type="text" name="reason" placeholder="Reason for revoking">
+    </p>
+    <p><button type="submit">Revoke Sub-Admin</button></p>
+  </form>
+{% endif %}
+
+<p><a href="{% url 'sub-admin-list' %}">Back to List</a></p>
+
+</body>
+</html>

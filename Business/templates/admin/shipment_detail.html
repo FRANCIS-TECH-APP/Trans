@@ -1,0 +1,375 @@
+
+{% extends "admin/base_admin.html" %}
+{% block title %}{{ shipment.tracking_id }}{% endblock %}
+{% block page_title %}{{ shipment.tracking_id }}{% endblock %}
+{% block breadcrumb %}
+  <a href="{% url 'admin-dashboard' %}">Home</a> /
+  <a href="{% url 'shipment-list' %}">Shipments</a> /
+  {{ shipment.tracking_id }}
+{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{% url 'shipment-edit' shipment.pk %}" class="btn btn-ghost btn-sm">
+    <i class="fas fa-pen"></i> Edit
+  </a>
+  <form method="post" action="{% url 'shipment-delete' shipment.pk %}" style="display:inline;" onsubmit="return confirm('Delete this shipment permanently?')">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-danger btn-sm"><i class="fas fa-trash"></i> Delete</button>
+  </form>
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+  .detail-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .field label { display:block; font-size:11px; color:var(--muted); margin-bottom:2px; text-transform:uppercase; }
+  .field span  { font-size:13px; }
+  #map { height:280px; border-radius:8px; border:1px solid var(--border); margin-top:10px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="display:grid; grid-template-columns:2fr 1fr; gap:16px; align-items:start;">
+
+  <!-- LEFT COLUMN -->
+  <div>
+
+    <!-- Status bar -->
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+      {% if shipment.status == 'in_transit' %}<span class="badge badge-blue">In Transit</span>
+      {% elif shipment.status == 'delivered' %}<span class="badge badge-green">Delivered</span>
+      {% elif shipment.status == 'held' %}<span class="badge badge-yellow">On Hold</span>
+      {% elif shipment.status == 'cancelled' %}<span class="badge badge-red">Cancelled</span>
+      {% else %}<span class="badge badge-gray">{{ shipment.get_status_display }}</span>
+      {% endif %}
+      <span style="font-size:12px;color:var(--muted);">Created {{ shipment.created_at|date:"d M Y, H:i" }} by {{ shipment.created_by.full_name|default:"Unknown" }}</span>
+    </div>
+
+    <!-- Shipment info -->
+    <div class="card" style="margin-bottom:14px;">
+      <div class="card-header"><h3>Shipment Info</h3></div>
+      <div class="card-body">
+        <div class="detail-grid">
+          <div class="field"><label>Type</label><span>{{ shipment.get_shipment_type_display }}</span></div>
+          <div class="field"><label>Route</label><span>{{ shipment.origin_country }} → {{ shipment.destination_country }}</span></div>
+          <div class="field" style="grid-column:span 2"><label>Description</label><span>{{ shipment.description }}</span></div>
+          <div class="field"><label>Weight</label><span>{% if shipment.weight_kg %}{{ shipment.weight_kg }} kg{% else %}—{% endif %}</span></div>
+          <div class="field"><label>Dimensions</label><span>{{ shipment.dimensions|default:"—" }}</span></div>
+          <div class="field"><label>Quantity</label><span>{{ shipment.quantity }}</span></div>
+          <div class="field"><label>Declared Value</label><span>{% if shipment.declared_value %}{{ shipment.currency }} {{ shipment.declared_value }}{% else %}—{% endif %}</span></div>
+          <div class="field"><label>Est. Delivery</label><span>{% if shipment.estimated_delivery %}{{ shipment.estimated_delivery|date:"d M Y" }}{% else %}—{% endif %}</span></div>
+          <div class="field"><label>Actual Delivery</label><span>{% if shipment.actual_delivery %}{{ shipment.actual_delivery|date:"d M Y" }}{% else %}—{% endif %}</span></div>
+          {% if shipment.special_instructions %}
+          <div class="field" style="grid-column:span 2"><label>Special Instructions</label><span>{{ shipment.special_instructions }}</span></div>
+          {% endif %}
+          {% if shipment.internal_notes %}
+          <div class="field" style="grid-column:span 2"><label>Internal Notes</label><span style="color:var(--warning);">{{ shipment.internal_notes }}</span></div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Sender & Receiver -->
+    <div class="card" style="margin-bottom:14px;">
+      <div class="card-header"><h3>Parties</h3></div>
+      <div class="card-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+          <div>
+            <p style="font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:8px;">Sender</p>
+            <div class="field" style="margin-bottom:6px;"><label>Name</label><span>{{ shipment.sender.full_name }}</span></div>
+            <div class="field" style="margin-bottom:6px;"><label>Email</label><span>{{ shipment.sender.email }}</span></div>
+            <div class="field" style="margin-bottom:6px;"><label>Phone</label><span>{{ shipment.sender.phone }}</span></div>
+            <div class="field"><label>Address</label><span>{{ shipment.sender.address }}, {{ shipment.sender.city }} {{ shipment.sender.country }}</span></div>
+          </div>
+          <div>
+            <p style="font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:8px;">Receiver</p>
+            <div class="field" style="margin-bottom:6px;"><label>Name</label><span>{{ shipment.receiver.full_name }}</span></div>
+            <div class="field" style="margin-bottom:6px;"><label>Email</label><span>{{ shipment.receiver.email }}</span></div>
+            <div class="field" style="margin-bottom:6px;"><label>Phone</label><span>{{ shipment.receiver.phone }}</span></div>
+            <div class="field"><label>Address</label><span>{{ shipment.receiver.address }}, {{ shipment.receiver.city }} {{ shipment.receiver.country }}</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Transit Timeline -->
+    <div class="card" style="margin-bottom:14px;">
+      <div class="card-header">
+        <h3>Transit Timeline</h3>
+      </div>
+      <div class="card-body">
+        {% if map_points != '[]' %}<div id="map"></div>{% endif %}
+
+        {% if checkpoints %}
+        <div class="timeline" style="margin-top:20px;">
+          {% for cp in checkpoints %}
+          <div class="tl-item">
+            <div class="tl-dot done"></div>
+            <div class="tl-time">{{ cp.timestamp|date:"d M Y, H:i" }} — added by {{ cp.added_by.full_name|default:"Admin" }}</div>
+            <div class="tl-event">{{ cp.get_event_type_display }}</div>
+            <div class="tl-loc"><i class="fas fa-map-pin" style="font-size:11px;margin-right:4px;"></i>{{ cp.location }}</div>
+            {% if cp.description %}<div style="font-size:12px;color:var(--muted);margin-top:2px;">{{ cp.description }}</div>{% endif %}
+            <form method="post" action="{% url 'checkpoint-delete' cp.pk %}" style="margin-top:6px;" onsubmit="return confirm('Remove this checkpoint?')">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-ghost btn-sm" style="font-size:11px;color:var(--danger);">
+                <i class="fas fa-times"></i> Remove
+              </button>
+            </form>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p style="color:var(--muted);font-size:13px;margin-top:14px;">No checkpoints yet.</p>
+        {% endif %}
+
+        <!-- Add Checkpoint Form -->
+        <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">
+          <p style="font-size:13px;font-weight:500;margin-bottom:12px;">Add Checkpoint</p>
+          <form method="post" action="{% url 'checkpoint-add' shipment.pk %}">
+            {% csrf_token %}
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Event Type</label>
+                <select name="event_type" required>
+                  {% for val, label in event_types %}
+                  <option value="{{ val }}">{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Location *</label>
+                <input type="text" name="location" placeholder="e.g. Lagos Hub, Nigeria" required/>
+              </div>
+              <div class="form-group">
+                <label>City</label>
+                <input type="text" name="city"/>
+              </div>
+              <div class="form-group">
+                <label>Country</label>
+                <input type="text" name="country"/>
+              </div>
+              <div class="form-group">
+                <label>Latitude (for map)</label>
+                <input type="number" name="latitude" step="0.000001" placeholder="e.g. 6.455027"/>
+              </div>
+              <div class="form-group">
+                <label>Longitude (for map)</label>
+                <input type="number" name="longitude" step="0.000001" placeholder="e.g. 3.384082"/>
+              </div>
+              <div class="form-group">
+                <label>Timestamp</label>
+                <input type="datetime-local" name="timestamp"/>
+              </div>
+              <div class="form-group">
+                <label>Description (optional)</label>
+                <input type="text" name="description" placeholder="Extra info shown to client"/>
+              </div>
+            </div>
+            <div style="margin-top:10px;">
+              <button type="submit" class="btn btn-primary btn-sm">
+                <i class="fas fa-plus"></i> Add Checkpoint
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Images -->
+    <div class="card" style="margin-bottom:14px;">
+      <div class="card-header"><h3>Stock Images</h3></div>
+      <div class="card-body">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+          {% for img in shipment.images.all %}
+          <div style="text-align:center;">
+            <img src="{{ img.image.url }}" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:1px solid var(--border);display:block;margin-bottom:6px;"/>
+            {% if img.is_primary %}<span class="badge badge-green" style="font-size:10px;">Primary</span>{% endif %}
+            <div style="display:flex;gap:4px;margin-top:4px;justify-content:center;">
+              {% if not img.is_primary %}
+              <form method="post" action="{% url 'image-set-primary' img.pk %}">{% csrf_token %}<button type="submit" class="btn btn-ghost btn-sm" style="font-size:10px;">Set Primary</button></form>
+              {% endif %}
+              <form method="post" action="{% url 'image-delete' img.pk %}" onsubmit="return confirm('Delete?')">{% csrf_token %}<button type="submit" class="btn btn-danger btn-sm" style="font-size:10px;">Del</button></form>
+            </div>
+          </div>
+          {% empty %}
+          <p style="color:var(--muted);font-size:13px;">No images.</p>
+          {% endfor %}
+        </div>
+        <form method="post" action="{% url 'shipment-edit' shipment.pk %}" enctype="multipart/form-data">
+          {% csrf_token %}
+          <input type="hidden" name="_upload_only" value="1"/>
+          <div style="display:flex;gap:10px;align-items:center;">
+            <input type="file" name="images" multiple accept="image/*" style="font-size:13px;"/>
+            <button type="submit" class="btn btn-ghost btn-sm">Upload</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Email Log -->
+    <div class="card">
+      <div class="card-header">
+        <h3>Email History</h3>
+        <div class="card-actions">
+          <a href="{% url 'email-send-custom' %}" class="btn btn-ghost btn-sm">Send Custom Email</a>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Type</th><th>Recipient</th><th>Subject</th><th>Sent</th><th>Status</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for log in email_logs %}
+            <tr>
+              <td><span class="badge badge-gray" style="font-size:10px;">{{ log.get_email_type_display }}</span></td>
+              <td style="font-size:12px;">{{ log.recipient }}</td>
+              <td style="font-size:12px;">{{ log.subject|truncatechars:40 }}</td>
+              <td style="font-size:11px;color:var(--muted);">{{ log.sent_at|date:"d M, H:i" }}</td>
+              <td>
+                {% if log.is_success %}<span class="badge badge-green" style="font-size:10px;">Sent</span>
+                {% else %}<span class="badge badge-red" style="font-size:10px;">Failed</span>{% endif %}
+              </td>
+              <td>
+                <form method="post" action="{% url 'email-resend' log.pk %}">{% csrf_token %}
+                  <button type="submit" class="btn btn-ghost btn-sm" style="font-size:11px;">Resend</button>
+                </form>
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:1rem;">No emails sent yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- RIGHT COLUMN -->
+  <div>
+
+    <!-- Payment -->
+    <div class="card" style="margin-bottom:14px;">
+      <div class="card-header"><h3>Payment</h3></div>
+      <div class="card-body">
+        {% if shipment.payment %}
+        {% with p=shipment.payment %}
+        <div style="margin-bottom:12px;text-align:center;">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:2px;">Amount Due</div>
+          <div style="font-size:22px;font-weight:600;">{{ p.currency }} {{ p.amount }}</div>
+          {% if p.status == 'paid' %}<span class="badge badge-green">Paid</span>
+          {% elif p.status == 'unpaid' %}<span class="badge badge-red">Unpaid</span>
+          {% else %}<span class="badge badge-yellow">{{ p.get_status_display }}</span>{% endif %}
+        </div>
+        <table style="font-size:12px;width:100%;">
+          <tr><td style="color:var(--muted);padding:4px 0;">Paid so far</td><td>{{ p.currency }} {{ p.amount_paid }}</td></tr>
+          <tr><td style="color:var(--muted);padding:4px 0;">Balance</td><td>{{ p.currency }} {{ p.balance_due }}</td></tr>
+          <tr><td style="color:var(--muted);padding:4px 0;">Method</td><td>{{ p.get_method_display|default:"—" }}</td></tr>
+          <tr><td style="color:var(--muted);padding:4px 0;">Reason</td><td>{{ p.reason|default:"—" }}</td></tr>
+          {% if p.due_date %}<tr><td style="color:var(--muted);padding:4px 0;">Due</td><td>{{ p.due_date|date:"d M Y" }}</td></tr>{% endif %}
+          {% if p.payment_reference %}<tr><td style="color:var(--muted);padding:4px 0;">Ref</td><td style="font-family:monospace;font-size:11px;">{{ p.payment_reference }}</td></tr>{% endif %}
+        </table>
+        <form method="post" action="{% url 'payment-update' p.pk %}" style="margin-top:12px;">
+          {% csrf_token %}
+          <div class="form-group" style="margin-bottom:8px;">
+            <label>Update Status</label>
+            <select name="status">
+              {% for val, label in p.Status.choices %}
+              <option value="{{ val }}" {% if p.status == val %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:8px;">
+            <label>Amount Paid</label>
+            <input type="number" name="amount_paid" step="0.01" value="{{ p.amount_paid }}"/>
+          </div>
+          <div class="form-group" style="margin-bottom:10px;">
+            <label>Payment Reference</label>
+            <input type="text" name="payment_reference" value="{{ p.payment_reference }}"/>
+          </div>
+          <div style="display:flex;gap:6px;">
+            <button type="submit" class="btn btn-primary btn-sm" style="flex:1;">Update</button>
+          </div>
+        </form>
+        <form method="post" action="{% url 'payment-remind' p.pk %}" style="margin-top:6px;">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-ghost btn-sm" style="width:100%;">
+            <i class="fas fa-envelope"></i> Send Payment Reminder
+          </button>
+        </form>
+        {% endwith %}
+        {% else %}
+        <p style="color:var(--muted);font-size:13px;">No payment record.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Earnings -->
+    <div class="card">
+      <div class="card-header"><h3>Client Earnings</h3></div>
+      <div class="card-body">
+        {% if shipment.earning %}
+        {% with e=shipment.earning %}
+        <div style="text-align:center;margin-bottom:12px;">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:2px;">Net Profit</div>
+          <div style="font-size:22px;font-weight:600;color:#5ddba0;">{{ e.currency }} {{ e.net_profit }}</div>
+          {% if e.payout_status == 'paid' %}<span class="badge badge-green">Paid Out</span>
+          {% else %}<span class="badge badge-yellow">{{ e.payout_status|title }}</span>{% endif %}
+        </div>
+        <table style="font-size:12px;width:100%;">
+          <tr><td style="color:var(--muted);padding:4px 0;">Gross Profit</td><td>{{ e.currency }} {{ e.declared_profit }}</td></tr>
+          <tr><td style="color:var(--muted);padding:4px 0;">Commission ({{ e.commission_rate }}%)</td><td>— {{ e.currency }} {{ e.commission_amount }}</td></tr>
+          <tr><td style="color:var(--muted);padding:4px 0;">Net Profit</td><td><strong>{{ e.currency }} {{ e.net_profit }}</strong></td></tr>
+          {% if e.payout_date %}<tr><td style="color:var(--muted);padding:4px 0;">Payout Date</td><td>{{ e.payout_date|date:"d M Y" }}</td></tr>{% endif %}
+        </table>
+        <form method="post" action="{% url 'earning-update' e.pk %}" style="margin-top:12px;">
+          {% csrf_token %}
+          <div class="form-group" style="margin-bottom:8px;">
+            <label>Declared Profit</label>
+            <input type="number" name="declared_profit" step="0.01" value="{{ e.declared_profit }}"/>
+          </div>
+          <div class="form-group" style="margin-bottom:8px;">
+            <label>Commission Rate (%)</label>
+            <input type="number" name="commission_rate" step="0.01" value="{{ e.commission_rate }}"/>
+          </div>
+          <div class="form-group" style="margin-bottom:8px;">
+            <label>Payout Status</label>
+            <select name="payout_status">
+              <option value="pending"    {% if e.payout_status == 'pending' %}selected{% endif %}>Pending</option>
+              <option value="processing" {% if e.payout_status == 'processing' %}selected{% endif %}>Processing</option>
+              <option value="paid"       {% if e.payout_status == 'paid' %}selected{% endif %}>Paid Out</option>
+              <option value="on_hold"    {% if e.payout_status == 'on_hold' %}selected{% endif %}>On Hold</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:10px;">
+            <label>Payout Date</label>
+            <input type="date" name="payout_date" value="{{ e.payout_date|date:'Y-m-d'|default:'' }}"/>
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm" style="width:100%;">Update Earnings</button>
+        </form>
+        {% endwith %}
+        {% else %}
+        <p style="color:var(--muted);font-size:13px;">No earnings record.</p>
+        <a href="{% url 'shipment-edit' shipment.pk %}" class="btn btn-ghost btn-sm" style="margin-top:8px;width:100%;">Add Earnings</a>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  const pts = {{ map_points|safe }};
+  if (pts.length > 0 && document.getElementById('map')) {
+    const map = L.map('map').setView([pts[0].lat, pts[0].lng], 3);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    const ll = pts.map(p => { L.marker([p.lat,p.lng]).addTo(map).bindPopup('<b>'+p.event+'</b><br>'+p.loc); return [p.lat,p.lng]; });
+    if (ll.length > 1) L.polyline(ll,{color:'#4f8ef7',weight:2,dashArray:'5,5'}).addTo(map);
+    map.fitBounds(ll);
+  }
+</script>
+{% endblock %}

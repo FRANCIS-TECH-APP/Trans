@@ -1,0 +1,121 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  @page { size: A4; margin: 2cm; }
+  body { font-family: Helvetica, Arial, sans-serif; color: #0f172a; font-size: 11px; position: relative; }
+
+  .watermark {
+    position: absolute;
+    top: 260pt;
+    left: 50%;
+    margin-left: -180pt;
+    width: 360pt;
+    z-index: 0;
+  }
+  .content { position: relative; z-index: 1; }
+
+  .inv-top { border-bottom: 2px solid #c8e0f4; padding-bottom: 16px; margin-bottom: 24px; }
+  .inv-top table { width: 100%; }
+  .brand { font-size: 18px; font-weight: bold; }
+  .brand span { color: #0ea5e9; }
+  .inv-title { text-align: right; font-size: 20px; font-weight: bold; color: #0ea5e9; }
+  .inv-num { text-align: right; font-size: 11px; color: #64748b; }
+  .parties { width: 100%; margin-bottom: 20px; }
+  .parties td { width: 50%; vertical-align: top; padding-right: 20px; }
+  .label { font-size: 9px; font-weight: bold; letter-spacing: 1px; text-transform: uppercase; color: #64748b; }
+  .name { font-weight: bold; font-size: 12px; }
+  .dates { margin-bottom: 20px; }
+  .dates td { padding-right: 30px; }
+  table.items { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+  table.items th { text-align: left; font-size: 9px; text-transform: uppercase; color: #64748b; border-bottom: 2px solid #c8e0f4; padding: 6px; }
+  table.items th.num, table.items td.num { text-align: right; }
+  table.items td { padding: 8px 6px; border-bottom: 1px solid #e2e8f0; }
+  .totals { width: 260px; margin-left: auto; }
+  .totals td { padding: 4px 0; font-size: 11px; }
+  .totals td.val { text-align: right; }
+  .totals tr.grand td { border-top: 2px solid #c8e0f4; padding-top: 10px; font-size: 15px; font-weight: bold; color: #0ea5e9; }
+  .notes { margin-top: 20px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 10px; color: #64748b; }
+  .footer { margin-top: 30px; padding-top: 14px; border-top: 1px solid #e2e8f0; font-size: 9px; color: #94a3b8; text-align: center; }
+</style>
+</head>
+<body>
+  <img class="watermark" src="{% static 'business/img/invoice_watermark.png' %}">
+
+  <div class="content">
+    <table class="inv-top">
+      <tr>
+        <td><span class="brand">Trans<span>Edge</span></span></td>
+        <td>
+          <div class="inv-title">INVOICE</div>
+          <div class="inv-num">{{ invoice.invoice_number }}</div>
+        </td>
+      </tr>
+    </table>
+
+    <table class="parties">
+      <tr>
+        <td>
+          <div class="label">From</div>
+          <div class="name">{{ invoice.shipment.sender.full_name }}</div>
+          <div>{{ invoice.shipment.sender.address }}{% if invoice.shipment.sender.city %}, {{ invoice.shipment.sender.city }}{% endif %}{% if invoice.shipment.sender.country %}, {{ invoice.shipment.sender.country }}{% endif %}</div>
+          <div>{{ invoice.shipment.sender.email }}</div>
+          <div>{{ invoice.shipment.sender.phone }}</div>
+        </td>
+        <td>
+          <div class="label">Bill To</div>
+          <div class="name">{{ invoice.bill_to_name }}</div>
+          <div>{{ invoice.bill_to_address }}</div>
+          <div>{{ invoice.bill_to_email }}</div>
+        </td>
+      </tr>
+    </table>
+
+    <table class="dates">
+      <tr>
+        <td><div class="label">Issue Date</div>{{ invoice.issue_date|date:"d M Y" }}</td>
+        {% if invoice.due_date %}<td><div class="label">Due Date</div>{{ invoice.due_date|date:"d M Y" }}</td>{% endif %}
+        <td><div class="label">Tracking ID</div>{{ invoice.shipment.tracking_id }}</td>
+      </tr>
+    </table>
+
+    <table class="items">
+      <thead>
+        <tr><th>Description</th><th class="num">Qty</th><th class="num">Unit Price</th><th class="num">Amount</th></tr>
+      </thead>
+      <tbody>
+        {% for item in invoice.items.all %}
+        <tr>
+          <td>{{ item.description }}</td>
+          <td class="num">{{ item.quantity }}</td>
+          <td class="num">{{ invoice.currency }} {{ item.unit_price }}</td>
+          <td class="num">{{ invoice.currency }} {{ item.amount }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <table class="totals">
+      <tr><td>Subtotal</td><td class="val">{{ invoice.currency }} {{ invoice.subtotal }}</td></tr>
+      {% if invoice.tax_rate %}<tr><td>Tax ({{ invoice.tax_rate }}%)</td><td class="val">{{ invoice.currency }} {{ invoice.tax_amount }}</td></tr>{% endif %}
+      {% if invoice.discount_amount %}<tr><td>Discount</td><td class="val">-{{ invoice.currency }} {{ invoice.discount_amount }}</td></tr>{% endif %}
+      <tr class="grand"><td>Total</td><td class="val">{{ invoice.currency }} {{ invoice.total_amount }}</td></tr>
+      {% if invoice.amount_paid %}
+      <tr><td>Paid</td><td class="val">{{ invoice.currency }} {{ invoice.amount_paid }}</td></tr>
+      <tr><td>Balance Due</td><td class="val">{{ invoice.currency }} {{ invoice.balance_due }}</td></tr>
+      {% endif %}
+    </table>
+
+    {% if invoice.notes %}
+    <div class="notes"><div class="label">Notes</div>{{ invoice.notes }}</div>
+    {% endif %}
+    {% if invoice.terms %}
+    <div class="notes"><div class="label">Terms</div>{{ invoice.terms }}</div>
+    {% endif %}
+
+    <div class="footer">TransEdge Logistics &middot; This is a system-generated invoice</div>
+  </div>
+</body>
+</html>

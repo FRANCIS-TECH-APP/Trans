@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+{% block title %}Shipment Info — {{ shipment.tracking_id }} — SwiftTrack{% endblock %}
+
+{% block extra_css %}
+<link href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet"/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0c10; --surface: #14171e; --surface2: #1b1f28; --border: rgba(255,255,255,.08);
+    --text: #f1f3f5; --muted: #8b8f99;
+    --accent: #f97316; --accent-dim: rgba(249,115,22,.15);
+    --radius: 18px; --radius-sm: 12px;
+  }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; }
+  nav { background: var(--surface); border-bottom: 1px solid var(--border); }
+  nav a { color: var(--text); }
+  nav .brand a { color: var(--accent) !important; font-weight: 800; }
+  footer { color: var(--muted); border-top: 1px solid var(--border); }
+
+  .container { max-width: 640px; }
+
+  .back-link { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--muted); text-decoration: none; margin-bottom: 14px; }
+  .back-link:hover { color: var(--accent); }
+
+  h1 { font-size: 20px; font-weight: 800; margin-bottom: 16px; }
+
+  .block {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 20px; margin-bottom: 14px;
+  }
+  .block h2 {
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--muted); margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
+  }
+
+  /* Map */
+  #map { height: 280px; border-radius: var(--radius-sm); overflow: hidden; }
+  .map-empty {
+    padding: 40px 20px; text-align: center; background: var(--surface2);
+    border: 1px dashed var(--border); border-radius: var(--radius-sm); color: var(--muted); font-size: 13px;
+  }
+
+  /* Sender / Receiver */
+  .party-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+  .party-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; }
+  .party-card .tag { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--accent); margin-bottom: 8px; }
+  .party-card .name { font-size: 14.5px; font-weight: 700; margin-bottom: 10px; }
+  .party-card p { font-size: 12px; color: var(--muted); margin-bottom: 4px; line-height: 1.5; }
+
+  /* Shipment details grid */
+  .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .detail-cell { background: var(--surface2); border-radius: var(--radius-sm); padding: 12px 14px; }
+  .detail-cell.full { grid-column: span 2; }
+  .detail-cell .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-bottom: 4px; }
+  .detail-cell .val { font-size: 13.5px; font-weight: 700; }
+  .warn-cell {
+    grid-column: span 2; background: var(--accent-dim); border: 1px solid rgba(249,115,22,.3);
+    border-radius: var(--radius-sm); padding: 12px 14px;
+  }
+  .warn-cell .lbl { color: var(--accent); font-weight: 700; }
+  .warn-cell .val { font-weight: 500; font-size: 13px; color: var(--text); }
+
+  /* Images */
+  .img-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .img-grid img {
+    width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: var(--radius-sm);
+    border: 1px solid var(--border); cursor: pointer;
+  }
+
+  /* Lightbox */
+  #lightbox {
+    position: fixed; inset: 0; background: rgba(0,0,0,.92); z-index: 999;
+    align-items: center; justify-content: center; padding: 20px;
+  }
+  #lightbox img { max-width: 100%; max-height: 85vh; border-radius: 12px; display: block; margin: 0 auto; }
+  #lightbox button {
+    background: rgba(255,255,255,.12); border: 1px solid var(--border); color: #fff;
+    width: 36px; height: 36px; border-radius: 50%; margin-bottom: 12px; cursor: pointer; font-size: 16px;
+  }
+  #lb-caption { color: var(--muted); text-align: center; font-size: 12px; margin-top: 10px; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<a href="{% url 'tracking-detail' tracking_id=shipment.tracking_id %}" class="back-link">← Back to {{ shipment.tracking_id }}</a>
+<h1>Shipment Info</h1>
+
+<!-- Live map -->
+<div class="block">
+  <h2>Live Location</h2>
+  {% if map_points != '[]' %}
+  <div id="map"></div>
+  {% else %}
+  <div class="map-empty">No location data yet. Updates will appear here as your shipment moves.</div>
+  {% endif %}
+</div>
+
+<!-- Sender / Receiver -->
+<div class="party-grid">
+  <div class="party-card">
+    <div class="tag">Sender</div>
+    <div class="name">{{ shipment.sender.full_name }}</div>
+    <p>{{ shipment.sender.email }}</p>
+    <p>{{ shipment.sender.phone }}</p>
+    <p>{{ shipment.sender.address }}{% if shipment.sender.city %}, {{ shipment.sender.city }}{% endif %}{% if shipment.sender.country %}, {{ shipment.sender.country }}{% endif %}</p>
+  </div>
+  <div class="party-card">
+    <div class="tag">Receiver</div>
+    <div class="name">{{ shipment.receiver.full_name }}</div>
+    <p>{{ shipment.receiver.email }}</p>
+    <p>{{ shipment.receiver.phone }}</p>
+    <p>{{ shipment.receiver.address }}{% if shipment.receiver.city %}, {{ shipment.receiver.city }}{% endif %}{% if shipment.receiver.country %}, {{ shipment.receiver.country }}{% endif %}</p>
+  </div>
+</div>
+
+<!-- Shipment details -->
+<div class="block">
+  <h2>Shipment Details</h2>
+  <div class="detail-grid">
+    <div class="detail-cell"><div class="lbl">Type</div><div class="val">{{ shipment.get_shipment_type_display }}</div></div>
+    <div class="detail-cell"><div class="lbl">Quantity</div><div class="val">{{ shipment.quantity }} unit{{ shipment.quantity|pluralize }}</div></div>
+    {% if shipment.weight_kg %}<div class="detail-cell"><div class="lbl">Weight</div><div class="val">{{ shipment.weight_kg }} kg</div></div>{% endif %}
+    {% if shipment.dimensions %}<div class="detail-cell"><div class="lbl">Dimensions</div><div class="val">{{ shipment.dimensions }}</div></div>{% endif %}
+    <div class="detail-cell full"><div class="lbl">Description</div><div class="val">{{ shipment.description }}</div></div>
+    {% if shipment.special_instructions %}
+    <div class="warn-cell">
+      <div class="lbl">⚠ Special Instructions</div>
+      <div class="val">{{ shipment.special_instructions }}</div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Package images -->
+{% with imgs=shipment.images.all %}
+{% if imgs %}
+<div class="block">
+  <h2>Package Images ({{ imgs|length }})</h2>
+  <div class="img-grid">
+    {% for img in imgs %}
+    <img src="{{ img.image.url }}" alt="{{ img.caption|default:'Package image' }}"
+         onclick="openLightbox('{{ img.image.url }}', '{{ img.caption|default:'' }}')">
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+{% endwith %}
+
+<!-- Lightbox -->
+<div id="lightbox" style="display:none;" onclick="closeLightbox()">
+  <div onclick="event.stopPropagation()">
+    <button onclick="closeLightbox()">✕</button>
+    <img id="lb-img" src="" alt="Enlarged image">
+    <p id="lb-caption"></p>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  const points = {{ map_points|safe }};
+  if (points.length && document.getElementById('map')) {
+    const map = L.map('map', { scrollWheelZoom: false });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors', maxZoom: 18
+    }).addTo(map);
+
+    const lls = [];
+    points.forEach((p, i) => {
+      const latest = i === points.length - 1;
+      const ll = [p.lat, p.lng];
+      lls.push(ll);
+      const m = L.circleMarker(ll, {
+        radius: latest ? 14 : 8,
+        fillColor: latest ? '#f97316' : '#8b8f99',
+        color: '#0a0c10', weight: 3,
+        fillOpacity: latest ? 1 : .6,
+      }).addTo(map);
+      m.bindPopup(`<b>${latest ? 'Current Location' : 'Past Stop'}</b><br>${p.event}<br>${p.location}<br>${p.time}`);
+      if (latest) m.openPopup();
+    });
+
+    if (lls.length > 1) {
+      L.polyline(lls, { color: '#f97316', weight: 2.5, opacity: .6, dashArray: '8 6' }).addTo(map);
+      map.fitBounds(lls, { padding: [40, 40] });
+    } else {
+      map.setView(lls[0], 8);
+    }
+  }
+
+  function openLightbox(src, caption) {
+    document.getElementById('lb-img').src = src;
+    document.getElementById('lb-caption').textContent = caption || '';
+    document.getElementById('lightbox').style.display = 'flex';
+  }
+  function closeLightbox() {
+    document.getElementById('lightbox').style.display = 'none';
+  }
+</script>
+{% endblock %}

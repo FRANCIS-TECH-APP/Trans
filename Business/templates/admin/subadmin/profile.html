@@ -1,0 +1,229 @@
+
+{% extends "admin/subadmin/base.html" %}
+
+{% block title %}Profile Settings — TransEdge{% endblock %}
+{% block page_title %}Profile{% endblock %}
+
+{% block extra_css %}
+<style>
+  .card { background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:16px;transition:background .3s,border-color .3s; }
+  .card-header { display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border); }
+  .card-header h3 { font-size:14px;font-weight:600; }
+  .card-header p { font-size:12px;color:var(--muted);margin-top:2px; }
+  .card-header-text { display:flex;flex-direction:column;gap:2px; }
+  .card-body { padding:18px; }
+
+  .form-grid { display:grid;grid-template-columns:1fr 1fr;gap:14px; }
+  .span-2 { grid-column:span 2; }
+  .form-group { display:flex;flex-direction:column;gap:5px; }
+  .form-group label { font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.3px; }
+  .form-group input,.form-group select {
+    padding:9px 12px;background:var(--surface2);border:1.5px solid var(--border);
+    border-radius:8px;font-size:13.5px;color:var(--text);outline:none;
+    transition:border-color .2s;font-family:inherit;width:100%;
+  }
+  .form-group input:focus,.form-group select:focus { border-color:var(--sky); }
+  .form-group input:disabled { color:var(--muted);cursor:not-allowed; }
+  .form-hint { font-size:11.5px;color:var(--muted);margin-top:2px; }
+  .form-actions { display:flex;gap:10px;align-items:center;justify-content:flex-end;padding:14px 18px;border-top:1px solid var(--border); }
+
+  /* Identity */
+  .identity-body { display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center; }
+  .avatar-lg { width:88px;height:88px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;overflow:hidden;margin:0 auto; }
+  .avatar-lg img { width:100%;height:100%;object-fit:cover; }
+  .avatar-lg svg { color:var(--muted); }
+  .identity-name { font-size:16px;font-weight:700; }
+  .identity-handle { font-size:13px;color:var(--muted); }
+  .badge-row { display:flex;gap:8px;justify-content:center; }
+  .id-badge { font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:6px; }
+  .badge-active { background:var(--green-dim);color:var(--green); }
+  .badge-role { background:var(--surface2);color:var(--muted);border:1px solid var(--border); }
+  .avatar-upload-row { display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center;width:100%;padding-top:10px;border-top:1px solid var(--border); }
+
+  /* Stat list */
+  .stat-list { display:flex;flex-direction:column; }
+  .stat-row { display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border);font-size:13px; }
+  .stat-row:last-child { border-bottom:none; }
+  .stat-row .sl { color:var(--muted); }
+  .stat-row .sv { font-weight:600; }
+
+  /* Security */
+  .security-row { display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;margin-bottom:12px; }
+  .security-row:last-child { margin-bottom:0; }
+  .security-row strong { display:block;font-size:13px;margin-bottom:2px; }
+  .security-row span { font-size:12px;color:var(--muted); }
+  .section-divider-label { font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px; }
+
+  /* Referral */
+  .copy-row { display:flex;gap:8px; }
+  .copy-row input { flex:1; }
+  .referral-stats-row { display:flex;gap:24px;flex-wrap:wrap;padding-top:12px;border-top:1px solid var(--border); }
+  .rs-value { font-size:20px;font-weight:800;color:var(--sky); }
+  .rs-label { font-size:11.5px;color:var(--muted); }
+
+  /* Danger */
+  .danger-card { border-color:rgba(220,38,38,.35); }
+  .danger-card .card-header { border-bottom-color:rgba(220,38,38,.25); }
+  .danger-card .card-header h3 { color:var(--red); }
+  .danger-box { display:flex;align-items:center;justify-content:space-between;gap:14px;background:var(--red-dim);border:1px solid rgba(220,38,38,.3);border-radius:10px;padding:14px;flex-wrap:wrap; }
+  .danger-box strong { display:block;font-size:13.5px;color:var(--red);margin-bottom:3px; }
+  .danger-box span { font-size:12.5px;color:var(--muted); }
+
+  @media(max-width:768px) {
+    .form-grid { grid-template-columns:1fr; }
+    .span-2 { grid-column:span 1; }
+    .form-actions { flex-direction:column-reverse; }
+    .form-actions .btn { width:100%;justify-content:center; }
+    .copy-row { flex-direction:column; }
+    .danger-box { flex-direction:column;align-items:flex-start; }
+    .danger-box .btn { width:100%;justify-content:center; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Identity Card -->
+<div class="card">
+  <div class="card-header">
+    <div class="card-header-text">
+      <h3>Profile Settings</h3>
+      <p>Manage your account settings and profile information.</p>
+    </div>
+  </div>
+  <div class="card-body">
+    <div class="identity-body">
+      <div class="avatar-lg">
+        {% if profile.avatar %}
+          <img src="{{ profile.avatar.url }}" alt="Avatar">
+        {% else %}
+          <svg width="36" height="36" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        {% endif %}
+      </div>
+      <div>
+        <div class="identity-name">{{ request.user.full_name }}</div>
+        <div class="identity-handle">{{ request.user.email }}</div>
+      </div>
+      <div class="badge-row">
+        <span class="id-badge badge-active">{% if request.user.is_active %}Active{% else %}Inactive{% endif %}</span>
+        <span class="id-badge badge-role">{{ request.user.role|default:"User" }}</span>
+      </div>
+      <form method="post" enctype="multipart/form-data" class="avatar-upload-row">
+        {% csrf_token %}
+        <span style="font-size:12px;color:var(--muted);">Update Avatar</span>
+        <input type="file" name="avatar" accept="image/*" style="font-size:12px;">
+        <button type="submit" name="action" value="update_avatar" class="btn btn-primary btn-sm">Upload</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Account Overview -->
+<div class="card">
+  <div class="card-header"><div class="card-header-text"><h3>Account Overview</h3></div></div>
+  <div class="card-body">
+    <div class="stat-list">
+      <div class="stat-row"><span class="sl">Points Balance</span><span class="sv">{{ profile.points_balance }} pts</span></div>
+      <div class="stat-row"><span class="sl">Referrals</span><span class="sv">{{ profile.referral_count }}</span></div>
+      <div class="stat-row"><span class="sl">Shipments</span><span class="sv">{{ profile.shipment_count }}</span></div>
+      <div class="stat-row"><span class="sl">Transactions</span><span class="sv">{{ profile.transaction_count }}</span></div>
+      <div class="stat-row"><span class="sl">Member Since</span><span class="sv">{{ request.user.date_joined|date:"M d, Y" }}</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- Profile Information -->
+<form method="post">
+  {% csrf_token %}
+  <div class="card">
+    <div class="card-header">
+      <div class="card-header-text"><h3>Profile Information</h3><p>Update your account's profile information and email address.</p></div>
+    </div>
+    <div class="card-body">
+      <div class="form-grid">
+        <div class="form-group"><label>Full Name</label><input type="text" name="full_name" value="{{ request.user.full_name }}"></div>
+        <div class="form-group"><label>Role</label><input type="text" value="{{ request.user.role }}" disabled></div>
+        <div class="form-group span-2"><label>Email Address</label><input type="email" name="email" value="{{ request.user.email }}"></div>
+        <div class="form-group span-2"><label>WhatsApp Number</label><input type="tel" name="whatsapp_number" value="{{ profile.whatsapp_number }}" placeholder="+234 ..."></div>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button type="submit" name="action" value="update_profile" class="btn btn-primary">Save Changes</button>
+    </div>
+  </div>
+</form>
+
+<!-- Security -->
+<div class="card">
+  <div class="card-header"><div class="card-header-text"><h3>Security</h3><p>Manage your password and account security.</p></div></div>
+  <div class="card-body">
+    <div class="security-row">
+      <div><strong>Last Activity</strong><span>Your last recorded activity on the platform.</span></div>
+      <span style="font-size:13px;font-weight:600;">{% if profile.last_activity %}{{ profile.last_activity|date:"M d, Y, H:i" }}{% else %}—{% endif %}</span>
+    </div>
+    <div class="section-divider-label" style="margin-top:14px;">Change Password</div>
+    <form method="post">
+      {% csrf_token %}
+      <div class="form-grid">
+        <div class="form-group span-2"><label>Current Password</label><input type="password" name="old_password" required autocomplete="current-password"></div>
+        <div class="form-group"><label>New Password</label><input type="password" name="new_password" required minlength="8" autocomplete="new-password"><span class="form-hint">At least 8 characters.</span></div>
+        <div class="form-group"><label>Confirm New Password</label><input type="password" name="confirm_password" required minlength="8" autocomplete="new-password"></div>
+      </div>
+      <div style="margin-top:14px;text-align:right;">
+        <button type="submit" name="action" value="change_password" class="btn btn-primary">Update Password</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Referral Program -->
+<div class="card">
+  <div class="card-header"><div class="card-header-text"><h3>Referral Program</h3><p>Share your referral link and earn rewards when friends sign up.</p></div></div>
+  <div class="card-body">
+    <div style="margin-bottom:12px;">
+      <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;display:block;margin-bottom:8px;">Your Referral Link</label>
+      <div class="copy-row">
+        <input type="text" id="referralLink" value="{{ referral_link }}" readonly style="font-family:monospace;font-size:12px;">
+        <button type="button" class="btn btn-outline btn-sm" onclick="copyReferral(event)">
+          <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+          Copy
+        </button>
+      </div>
+    </div>
+    <div class="referral-stats-row">
+      <div><div class="rs-value">{{ profile.referral_count }}</div><div class="rs-label">Successful referrals</div></div>
+      <div><div class="rs-value">{{ profile.referral_code }}</div><div class="rs-label">Your referral code</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Danger Zone -->
+<div class="card danger-card">
+  <div class="card-header"><div class="card-header-text"><h3>Danger Zone</h3><p>Permanently delete your account. This cannot be undone.</p></div></div>
+  <div class="card-body">
+    <form method="post" onsubmit="return confirm('Are you sure? This action cannot be undone.');">
+      {% csrf_token %}
+      <div class="danger-box">
+        <div><strong>Delete Account</strong><span>Your data will be anonymized and your account permanently deleted.</span></div>
+        <button type="submit" name="action" value="delete_account" class="btn btn-danger">Delete Account</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function copyReferral(e) {
+  const input = document.getElementById('referralLink');
+  input.select();
+  navigator.clipboard.writeText(input.value).then(() => {
+    const btn = e.target.closest('button');
+    const orig = btn.innerHTML;
+    btn.innerHTML = 'Copied!';
+    setTimeout(() => { btn.innerHTML = orig; }, 1500);
+  });
+}
+</script>
+{% endblock %}

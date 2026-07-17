@@ -1,0 +1,327 @@
+{% extends "admin/subadmin/base.html" %}
+
+{% block title %}Buy Points — TransEdge{% endblock %}
+{% block page_title %}Buy Points{% endblock %}
+
+{% block extra_css %}
+/* ── BALANCE CARDS ───────────────────────── */
+.balance-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px; margin-bottom: 24px;
+}
+.bal-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  display: flex; flex-direction: column; gap: 6px;
+  transition: background .3s, border-color .3s;
+}
+.bal-card.highlight { border-color: rgba(59,130,246,.4); background: var(--sky-dim); }
+.bc-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
+.bc-value { font-size: 34px; font-weight: 800; line-height: 1; }
+.bc-sub   { font-size: 12px; color: var(--muted); }
+.c-sky    .bc-value { color: var(--sky); }
+.c-purple .bc-value { color: var(--purple); }
+
+/* ── RATE NOTICE ──────────────────────────── */
+.rate-notice {
+  display: flex; align-items: flex-start; gap: 12px;
+  font-size: 14px; font-weight: 600; color: var(--text);
+  margin-bottom: 20px; padding: 14px 16px;
+  background: var(--amber-dim);
+  border: 1.5px solid rgba(217,119,6,.35);
+  border-radius: 10px; line-height: 1.6;
+}
+.rate-notice .coin-icon {
+  flex-shrink: 0; width: 36px; height: 36px;
+  background: var(--amber); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  margin-top: 1px;
+}
+.rate-notice .coin-icon svg { color: #fff; }
+.rate-notice .rate-text { flex: 1; }
+.rate-notice .rate-highlight { color: var(--amber); font-size: 16px; font-weight: 800; }
+.rate-notice .rate-sub { display: block; font-size: 12px; font-weight: 400; color: var(--muted); margin-top: 2px; }
+
+/* ── BUY FORM CARD ───────────────────────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden; margin-bottom: 20px;
+  transition: background .3s, border-color .3s;
+}
+.card-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.card-header h3 { font-size: 14px; font-weight: 600; }
+.card-header span { font-size: 12px; color: var(--muted); }
+.card-body { padding: 20px; }
+
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-group label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .3px; }
+.form-group input, .form-group select {
+  padding: 10px 14px; background: var(--surface2); border: 1.5px solid var(--border);
+  border-radius: 8px; font-size: 14px; color: var(--text); outline: none;
+  transition: border-color .2s; width: 100%;
+}
+.form-group input:focus, .form-group select:focus { border-color: var(--sky); }
+
+.total-display {
+  padding: 10px 14px; background: var(--sky-dim); border: 1.5px solid rgba(59,130,246,.3);
+  border-radius: 8px; font-size: 16px; font-weight: 700; color: var(--sky);
+  min-height: 44px; display: flex; align-items: center;
+}
+
+.shipments-preview { font-size: 13px; color: var(--muted); margin-bottom: 20px; min-height: 20px; }
+.shipments-preview strong { color: var(--green); }
+
+.btn-primary.wide { width: 100%; justify-content: center; padding: 13px; box-shadow: 0 2px 8px rgba(59,130,246,.3); }
+
+/* ── QUICK BUY CHIPS ─────────────────────── */
+.quick-buy { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
+.quick-chip {
+  padding: 6px 14px; border-radius: 20px; border: 1px solid var(--border);
+  font-size: 13px; color: var(--muted); cursor: pointer; transition: all .15s; background: none;
+}
+.quick-chip:hover { border-color: var(--sky); color: var(--sky); background: var(--sky-dim); }
+.quick-chip.selected { border-color: var(--sky); color: var(--sky); background: var(--sky-dim); font-weight: 600; }
+
+/* ── TABLE / HISTORY ─────────────────────── */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+thead th {
+  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; color: var(--muted);
+  padding: 11px 16px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap;
+}
+tbody td { padding: 13px 16px; font-size: 13px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover { background: var(--surface2); }
+.tid {
+  font-family: 'Courier New', monospace; font-size: 11px; background: var(--sky-dim); color: var(--sky);
+  padding: 3px 7px; border-radius: 4px; white-space: nowrap;
+}
+.badge2 { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+.badge2::before { content:''; width:5px;height:5px;border-radius:50%;background:currentColor; }
+.b-success { background: var(--green-dim); color: var(--green); }
+.b-pending { background: var(--amber-dim); color: var(--amber); }
+.b-failed  { background: var(--red-dim);   color: var(--red); }
+
+.history-cards { display: none; }
+.history-card { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px; }
+.history-card:last-child { border-bottom: none; }
+.hc-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.hc-amount { font-size: 13px; font-weight: 700; }
+.hc-bottom { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11.5px; color: var(--muted); }
+
+/* ── MOBILE ──────────────────────────────── */
+@media (max-width: 768px) {
+  .balance-grid { grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+  .bal-card { padding: 12px 14px; border-radius: var(--radius-sm); gap: 3px; }
+  .bc-label { font-size: 10px; }
+  .bc-value { font-size: 22px; }
+  .bc-sub { font-size: 10.5px; }
+
+  .rate-notice { font-size: 13px; padding: 11px 12px; margin-bottom: 14px; gap: 10px; }
+  .rate-notice .coin-icon { width: 30px; height: 30px; }
+  .rate-notice .coin-icon svg { width: 14px; height: 14px; }
+  .rate-notice .rate-highlight { font-size: 14px; }
+  .rate-notice .rate-sub { font-size: 11px; }
+
+  .card { border-radius: var(--radius-sm); margin-bottom: 14px; }
+  .card-header { padding: 12px 14px; }
+  .card-header h3 { font-size: 13px; }
+  .card-header span { font-size: 11px; }
+  .card-body { padding: 14px; }
+
+  .form-row { grid-template-columns: 1fr; gap: 8px; margin-bottom: 8px; }
+  .form-group label { font-size: 11px; }
+  .form-group input, .form-group select { padding: 9px 11px; font-size: 13px; }
+  .total-display { font-size: 14px; min-height: 40px; padding: 9px 11px; }
+
+  .quick-buy { gap: 5px; margin-bottom: 14px; }
+  .quick-chip { padding: 5px 11px; font-size: 12px; }
+
+  .shipments-preview { font-size: 12px; margin-bottom: 14px; }
+  .btn-primary.wide { padding: 11px; font-size: 13px; }
+
+  .table-wrap { display: none; }
+  .history-cards { display: flex; flex-direction: column; }
+  .history-card { padding: 10px 13px; gap: 5px; }
+  .tid { font-size: 10px; padding: 2px 6px; }
+  .badge2 { font-size: 10.5px; padding: 2px 8px; }
+  .hc-bottom { font-size: 11px; }
+}
+{% endblock %}
+
+{% block content %}
+
+<!-- Balance cards -->
+<div class="balance-grid">
+  <div class="bal-card c-sky highlight">
+    <span class="bc-label">Your Balance</span>
+    <span class="bc-value">{{ profile.points_balance }}</span>
+    <span class="bc-sub">points available</span>
+  </div>
+  <div class="bal-card c-purple">
+    <span class="bc-label">Cost Per Shipment</span>
+    <span class="bc-value">{{ pricing.points_per_shipment }}</span>
+    <span class="bc-sub">point{{ pricing.points_per_shipment|pluralize }} per shipment</span>
+  </div>
+</div>
+
+<!-- Buy form -->
+<div class="card">
+  <div class="card-header">
+    <h3>Top Up Points</h3>
+    <span>Points never expire</span>
+  </div>
+  <div class="card-body">
+
+    <div class="rate-notice">
+      <div class="coin-icon">
+        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="white" stroke-width="2.5">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="1" x2="12" y2="23"/>
+          <path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>
+        </svg>
+      </div>
+      <div class="rate-text">
+        <span class="rate-highlight">{{ pricing.currency }} {{ pricing.price_per_point }} per point</span>
+        <span class="rate-sub">Pay securely via Paystack · Points added instantly after payment</span>
+      </div>
+    </div>
+
+    <div class="quick-buy" id="quickBuy">
+      <button type="button" class="quick-chip" onclick="setQty(5)">5 pts</button>
+      <button type="button" class="quick-chip selected" onclick="setQty(10)">10 pts</button>
+      <button type="button" class="quick-chip" onclick="setQty(20)">20 pts</button>
+      <button type="button" class="quick-chip" onclick="setQty(50)">50 pts</button>
+      <button type="button" class="quick-chip" onclick="setQty(100)">100 pts</button>
+    </div>
+
+    <form method="post" action="{% url 'sub-admin-points-pay' %}">
+      {% csrf_token %}
+      <div class="form-row">
+        <div class="form-group">
+          <label>Number of Points</label>
+          <input type="number" name="quantity" id="qty" value="10" min="1" oninput="calcTotal(); clearChips()">
+        </div>
+        <div class="form-group">
+          <label>Total Amount</label>
+          <div class="total-display">
+            {{ pricing.currency }} <span id="total-val" style="margin-left:4px;">—</span>
+          </div>
+        </div>
+      </div>
+
+      <p class="shipments-preview" id="ships-preview"></p>
+
+      <button type="submit" class="btn btn-primary wide">
+        <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <rect x="1" y="4" width="22" height="16" rx="2"/>
+          <line x1="1" y1="10" x2="23" y2="10"/>
+        </svg>
+        Pay via Paystack
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- History -->
+{% if history %}
+<div class="card">
+  <div class="card-header">
+    <h3>Purchase History</h3>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Reference</th>
+          <th>Points</th>
+          <th>Amount</th>
+          <th>Status</th>
+          <th>Date</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in history %}
+        <tr>
+          <td><span class="tid">{{ p.paystack_reference }}</span></td>
+          <td><strong>{{ p.points_bought }}</strong> pts</td>
+          <td>{{ p.currency }} {{ p.amount_paid }}</td>
+          <td>
+            {% if p.status == 'success' %}<span class="badge2 b-success">Paid</span>
+            {% elif p.status == 'pending' %}<span class="badge2 b-pending">Pending</span>
+            {% else %}<span class="badge2 b-failed">Failed</span>{% endif %}
+          </td>
+          <td style="font-size:12px;color:var(--muted);">
+            {% if p.paid_at %}{{ p.paid_at|date:"d M Y, H:i" }}{% else %}{{ p.created_at|date:"d M Y" }}{% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="empty-cell">No purchases yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="history-cards">
+    {% for p in history %}
+    <div class="history-card">
+      <div class="hc-top">
+        <span class="tid">{{ p.paystack_reference }}</span>
+        {% if p.status == 'success' %}<span class="badge2 b-success">Paid</span>
+        {% elif p.status == 'pending' %}<span class="badge2 b-pending">Pending</span>
+        {% else %}<span class="badge2 b-failed">Failed</span>{% endif %}
+      </div>
+      <div class="hc-bottom">
+        <span class="hc-amount">{{ p.currency }} {{ p.amount_paid }} · {{ p.points_bought }} pts</span>
+        <span>{% if p.paid_at %}{{ p.paid_at|date:"d M Y" }}{% else %}{{ p.created_at|date:"d M Y" }}{% endif %}</span>
+      </div>
+    </div>
+    {% empty %}
+    <div class="empty-cell">No purchases yet.</div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const pricePerPoint  = {{ pricing.price_per_point }};
+  const ptsPerShipment = {{ pricing.points_per_shipment }};
+  const currentBalance = {{ profile.points_balance }};
+
+  function calcTotal() {
+    const qty = parseInt(document.getElementById('qty').value) || 0;
+    const total = qty * pricePerPoint;
+    document.getElementById('total-val').textContent =
+      total.toLocaleString('en-NG', { minimumFractionDigits: 2 });
+    const newBal = currentBalance + qty;
+    const ships  = ptsPerShipment > 0 ? Math.floor(newBal / ptsPerShipment) : 0;
+    document.getElementById('ships-preview').innerHTML = qty > 0
+      ? `After purchase your balance will be <strong>${newBal} pts</strong> — enough for <strong>${ships} shipment${ships !== 1 ? 's' : ''}</strong>.`
+      : '';
+  }
+
+  function setQty(n) {
+    document.getElementById('qty').value = n;
+    calcTotal();
+    document.querySelectorAll('.quick-chip').forEach(c => {
+      c.classList.toggle('selected', parseInt(c.textContent) === n);
+    });
+  }
+
+  function clearChips() {
+    document.querySelectorAll('.quick-chip').forEach(c => c.classList.remove('selected'));
+  }
+
+  calcTotal();
+</script>
+{% endblock %}

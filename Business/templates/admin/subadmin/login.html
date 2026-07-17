@@ -1,0 +1,216 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login — TransEdge</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:         #f0f7ff;
+  --surface:    #ffffff;
+  --border:     #c8e0f4;
+  --accent:     #0ea5e9;
+  --accent-dark:#0284c7;
+  --accent-dim: #e0f2fe;
+  --accent-text:#0369a1;
+  --text:       #0f172a;
+  --text2:      #334155;
+  --muted:      #64748b;
+  --red:        #dc2626;
+  --red-dim:    #fee2e2;
+  --green:      #16a34a;
+  --green-dim:  #dcfce7;
+  --amber:      #d97706;
+  --amber-dim:  #fef3c7;
+  --radius:     10px;
+}
+[data-theme="dark"] {
+  --bg:         #0c1220;
+  --surface:    #131c2e;
+  --border:     #1e3050;
+  --accent:     #38bdf8;
+  --accent-dark:#0ea5e9;
+  --accent-dim: #0c2d4a;
+  --accent-text:#7dd3fc;
+  --text:       #e2e8f0;
+  --text2:      #cbd5e1;
+  --muted:      #64748b;
+  --red:        #f87171;
+  --red-dim:    #7f1d1d33;
+  --green:      #22c55e;
+  --green-dim:  #14532d33;
+  --amber:      #f59e0b;
+  --amber-dim:  #78350f33;
+}
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 16px;
+  transition: background .2s, color .2s;
+}
+.auth-wrap {
+  width: 100%; max-width: 420px;
+}
+.auth-logo {
+  display: flex; align-items: center; gap: 10px;
+  justify-content: center;
+  margin-bottom: 28px;
+}
+.logo-mark {
+  width: 40px; height: 40px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+}
+.logo-name { font-size: 20px; font-weight: 700; color: var(--text); letter-spacing: -.3px; }
+.logo-name span { color: var(--accent); }
+
+.auth-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 32px 28px;
+  box-shadow: 0 4px 24px rgba(14,165,233,.08);
+}
+.auth-card h1 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+.auth-card p  { font-size: 13.5px; color: var(--muted); margin-bottom: 24px; }
+
+.messages { margin-bottom: 16px; }
+.msg {
+  padding: 10px 14px; border-radius: 8px;
+  font-size: 13px; margin-bottom: 8px; border-left: 3px solid;
+}
+.msg.error   { background: var(--red-dim);   border-color: var(--red);   color: var(--red); }
+.msg.success { background: var(--green-dim); border-color: var(--green); color: var(--green); }
+.msg.warning { background: var(--amber-dim); border-color: var(--amber); color: var(--amber); }
+.msg.info    { background: var(--accent-dim); border-color: var(--accent); color: var(--accent-text); }
+
+.form-group { margin-bottom: 16px; }
+.form-group label { display: block; font-size: 13px; font-weight: 500; color: var(--text2); margin-bottom: 6px; }
+.form-group input {
+  width: 100%; padding: 11px 14px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 14px; color: var(--text);
+  outline: none; -webkit-appearance: none;
+  transition: border-color .2s, box-shadow .2s;
+}
+.form-group input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(14,165,233,.12);
+}
+.btn-submit {
+  width: 100%; padding: 12px;
+  background: var(--accent); color: #fff;
+  border: none; border-radius: var(--radius);
+  font-size: 15px; font-weight: 600; cursor: pointer;
+  transition: opacity .2s, transform .1s;
+  margin-top: 4px;
+}
+.btn-submit:hover { opacity: .9; transform: translateY(-1px); }
+
+.auth-footer { text-align: center; margin-top: 18px; font-size: 13px; color: var(--muted); }
+.auth-footer a { color: var(--accent-text); text-decoration: none; font-weight: 500; }
+.auth-footer a:hover { text-decoration: underline; }
+
+.divider { height: 1px; background: var(--border); margin: 16px 0; }
+
+.theme-toggle {
+  position: fixed; top: 16px; right: 16px;
+  width: 38px; height: 38px;
+  border-radius: 50%; background: var(--surface);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text2);
+}
+.icon-sun, .icon-moon { width: 18px; height: 18px; }
+[data-theme="light"] .icon-moon { display: none; }
+[data-theme="dark"]  .icon-sun  { display: none; }
+
+@media (max-width: 480px) {
+  .auth-card { padding: 24px 18px; }
+}
+</style>
+</head>
+<body>
+
+<button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode">
+  <svg class="icon-sun" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+    <circle cx="12" cy="12" r="5"/>
+    <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+    <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+  </svg>
+  <svg class="icon-moon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+    <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+  </svg>
+</button>
+
+<div class="auth-wrap">
+  <div class="auth-logo">
+    <div class="logo-mark">
+      <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="white" stroke-width="2.5">
+        <path d="M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h11a2 2 0 012 2v3"/>
+        <rect x="9" y="11" width="14" height="10" rx="2"/>
+        <circle cx="12" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+      </svg>
+    </div>
+    <span class="logo-name">Trans<span>Edge</span></span>
+  </div>
+
+  <div class="auth-card">
+    <h1>Welcome back</h1>
+    <p>Sign in to your sub-admin account</p>
+
+    {% if messages %}
+    <div class="messages">
+      {% for message in messages %}
+      <div class="msg {{ message.tags }}">{{ message }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <form method="post">
+      {% csrf_token %}
+      <div class="form-group">
+        <label for="email">Email address</label>
+        <input type="email" id="email" name="email" required autofocus autocomplete="email" placeholder="you@example.com">
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" required autocomplete="current-password" placeholder="••••••••">
+      </div>
+      <button type="submit" class="btn-submit">Sign in</button>
+    </form>
+
+    <div class="divider"></div>
+    <div class="auth-footer">
+      Don't have an account? <a href="{% url 'sub-admin-register' %}">Sign up here</a>
+    </div>
+    <div class="auth-footer" style="margin-top:10px;">
+      <small>Super admin? <a href="{% url 'admin-login' %}">Login here</a></small>
+    </div>
+  </div>
+</div>
+
+<script>
+  const html = document.documentElement;
+  html.setAttribute('data-theme', localStorage.getItem('te-theme') || 'light');
+  document.getElementById('themeToggle').addEventListener('click', () => {
+    const next = html.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+    html.setAttribute('data-theme', next);
+    localStorage.setItem('te-theme', next);
+  });
+</script>
+</body>
+</html>

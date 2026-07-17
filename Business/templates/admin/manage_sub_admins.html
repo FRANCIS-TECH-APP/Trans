@@ -1,0 +1,185 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Manage Sub-Admins{% endblock %}
+{% block page_title %}Sub-Admin Management{% endblock %}
+{% block breadcrumb %}<a href="{% url 'admin-dashboard' %}">Home</a> / Sub-Admins{% endblock %}
+
+{% block content %}
+
+<!-- POINTS PRICING -->
+<div class="card" style="margin-bottom:20px;">
+  <div class="card-header"><h3>Points Pricing</h3></div>
+  <div class="card-body">
+    <form method="post" action="{% url 'set-points-pricing' %}"
+          style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
+      {% csrf_token %}
+      <div class="form-group" style="margin:0;">
+        <label>Points per Shipment</label>
+        <input type="number" name="points_per_shipment" value="{{ pricing.points_per_shipment }}"
+               min="1" style="width:140px;" required/>
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>Price per Point</label>
+        <input type="number" name="price_per_point" value="{{ pricing.price_per_point }}"
+               step="0.01" min="0" style="width:140px;" required/>
+      </div>
+      <div class="form-group">
+        <label>Points per Support Link</label>
+        <input type="number" name="points_per_support_link" value="{{ pricing.points_per_support_link }}" min="1">
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>Currency</label>
+        <input type="text" name="currency" value="{{ pricing.currency }}"
+               maxlength="5" style="width:80px;"/>
+      </div>
+      <button type="submit" class="btn btn-primary">Update Pricing</button>
+    </form>
+    <p style="font-size:12px;color:var(--muted);margin-top:8px;">
+      Currently: <strong>{{ pricing.points_per_shipment }} pt{{ pricing.points_per_shipment|pluralize }}/shipment</strong>
+      at <strong>{{ pricing.currency }} {{ pricing.price_per_point }}/pt</strong>
+      {% if pricing.updated_at %}— last updated {{ pricing.updated_at|date:"d M Y" }}{% endif %}
+    </p>
+  </div>
+</div>
+
+<!-- FILTER -->
+<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+  <a href="?" class="btn {% if not status_filter %}btn-primary{% else %}btn-ghost{% endif %} btn-sm">All</a>
+  {% for val, label in status_choices %}
+  <a href="?status={{ val }}"
+     class="btn {% if status_filter == val %}btn-primary{% else %}btn-ghost{% endif %} btn-sm">
+    {{ label }}
+  </a>
+  {% endfor %}
+</div>
+
+<!-- TABLE -->
+<div class="card">
+  <div class="card-body" style="padding:0;">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Status</th>
+          <th>Points Balance</th>
+          <th>Shipments</th>
+          <th>Registered</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for profile in page_obj %}
+        <tr>
+          <td>
+            <a href="{% url 'sub-admin-detail' profile.pk %}" style="font-weight:500;">
+              {{ profile.user.full_name }}
+            </a>
+            {% if profile.company_name %}
+            <br><small style="color:var(--muted);">{{ profile.company_name }}</small>
+            {% endif %}
+          </td>
+          <td style="font-size:13px;">{{ profile.user.email }}</td>
+          <td>
+            {% if profile.approval_status == 'approved' %}
+              <span class="badge b-delivered">Approved</span>
+            {% elif profile.approval_status == 'pending' %}
+              <span class="badge b-pending">Pending</span>
+            {% elif profile.approval_status == 'rejected' %}
+              <span class="badge b-unpaid">Rejected</span>
+            {% else %}
+              <span class="badge b-held">Suspended</span>
+            {% endif %}
+          </td>
+          <td>
+            <strong>{{ profile.points_balance }}</strong> pts
+          </td>
+          <td>{{ profile.user.created_shipments.count }}</td>
+          <td style="font-size:12px;color:var(--muted);">{{ profile.created_at|date:"d M Y" }}</td>
+          <td>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              {% if profile.approval_status == 'pending' %}
+                <form method="post" action="{% url 'approve-sub-admin' profile.pk %}">
+                  {% csrf_token %}
+                  <button class="btn btn-primary btn-sm">Approve</button>
+                </form>
+                <button class="btn btn-danger btn-sm"
+                        onclick="document.getElementById('reject-{{ profile.pk }}').style.display='flex'">
+                  Reject
+                </button>
+              {% elif profile.approval_status == 'approved' %}
+                <form method="post" action="{% url 'suspend-sub-admin' profile.pk %}"
+                      onsubmit="return confirm('Suspend {{ profile.user.full_name }}?')">
+                  {% csrf_token %}
+                  <button class="btn btn-ghost btn-sm">Suspend</button>
+                </form>
+              {% elif profile.approval_status == 'suspended' %}
+                <form method="post" action="{% url 'reinstate-sub-admin' profile.pk %}">
+                  {% csrf_token %}
+                  <button class="btn btn-primary btn-sm">Reinstate</button>
+                </form>
+              {% elif profile.approval_status == 'rejected' %}
+                <form method="post" action="{% url 'approve-sub-admin' profile.pk %}">
+                  {% csrf_token %}
+                  <button class="btn btn-primary btn-sm">Approve Instead</button>
+                </form>
+              {% endif %}
+              <a href="{% url 'sub-admin-detail' profile.pk %}" class="btn btn-ghost btn-sm">View</a>
+            </div>
+          </td>
+        </tr>
+
+        <!-- Reject modal row -->
+        <tr id="reject-{{ profile.pk }}"
+            style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);
+                   z-index:999;align-items:center;justify-content:center;">
+          <td colspan="7" style="padding:0;">
+            <div style="background:white;border-radius:8px;padding:24px;width:400px;max-width:90vw;">
+              <h4 style="margin:0 0 12px;">Reject {{ profile.user.full_name }}</h4>
+              <form method="post" action="{% url 'reject-sub-admin' profile.pk %}">
+                {% csrf_token %}
+                <div class="form-group">
+                  <label>Reason (optional)</label>
+                  <textarea name="rejection_reason" rows="3"
+                            style="width:100%;box-sizing:border-box;"></textarea>
+                </div>
+                <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
+                  <button type="button" class="btn btn-ghost"
+                          onclick="document.getElementById('reject-{{ profile.pk }}').style.display='none'">
+                    Cancel
+                  </button>
+                  <button type="submit" class="btn btn-danger">Confirm Reject</button>
+                </div>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7" style="text-align:center;color:var(--muted);padding:30px;">
+            No sub-admins found.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- PAGINATION -->
+{% if page_obj.has_other_pages %}
+<div style="display:flex;gap:8px;margin-top:16px;justify-content:center;">
+  {% if page_obj.has_previous %}
+  <a href="?page={{ page_obj.previous_page_number }}&status={{ status_filter }}"
+     class="btn btn-ghost btn-sm">← Prev</a>
+  {% endif %}
+  <span style="padding:6px 12px;font-size:13px;color:var(--muted);">
+    Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+  </span>
+  {% if page_obj.has_next %}
+  <a href="?page={{ page_obj.next_page_number }}&status={{ status_filter }}"
+     class="btn btn-ghost btn-sm">Next →</a>
+  {% endif %}
+</div>
+{% endif %}
+
+{% endblock %}

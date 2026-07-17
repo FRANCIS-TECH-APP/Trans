@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Delivery Partner — {{ shipment.tracking_id }} — SwiftTrack{% endblock %}
+
+{% block extra_css %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0c10; --surface: #14171e; --surface2: #1b1f28; --border: rgba(255,255,255,.08);
+    --text: #f1f3f5; --muted: #8b8f99;
+    --accent: #f97316; --accent-dim: rgba(249,115,22,.15);
+    --green: #22c55e;
+    --radius: 18px; --radius-sm: 12px;
+  }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; }
+  nav { background: var(--surface); border-bottom: 1px solid var(--border); }
+  nav a { color: var(--text); }
+  nav .brand a { color: var(--accent) !important; font-weight: 800; }
+  footer { color: var(--muted); border-top: 1px solid var(--border); }
+
+  .container { max-width: 640px; }
+
+  .back-link { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--muted); text-decoration: none; margin-bottom: 14px; }
+  .back-link:hover { color: var(--accent); }
+
+  h1 { font-size: 20px; font-weight: 800; margin-bottom: 16px; }
+
+  /* Driver card */
+  .driver-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 22px; margin-bottom: 14px; text-align: center;
+  }
+  .driver-photo {
+    width: 76px; height: 76px; border-radius: 50%; object-fit: cover;
+    border: 3px solid var(--accent); margin: 0 auto 14px;
+    display: block;
+  }
+  .driver-photo-placeholder {
+    width: 76px; height: 76px; border-radius: 50%; background: var(--surface2);
+    border: 3px solid var(--accent); margin: 0 auto 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; font-weight: 700; color: var(--muted);
+  }
+  .driver-card h2 { font-size: 17px; font-weight: 800; margin-bottom: 3px; }
+  .driver-card .role { font-size: 12px; color: var(--muted); margin-bottom: 18px; }
+
+  .driver-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 18px; }
+  .driver-stat { background: var(--surface2); border-radius: var(--radius-sm); padding: 12px 8px; }
+  .driver-stat .lbl { font-size: 9.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-bottom: 4px; }
+  .driver-stat .val { font-size: 13px; font-weight: 700; }
+
+  .driver-actions { display: flex; gap: 10px; }
+  .btn-call, .btn-chat {
+    flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 12px; border-radius: 999px; font-size: 13px; font-weight: 700; text-decoration: none;
+  }
+  .btn-call { background: var(--accent); color: #fff; }
+  .btn-chat { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+
+  /* Empty state */
+  .empty-card {
+    background: var(--surface); border: 1px dashed var(--border); border-radius: var(--radius);
+    padding: 36px 20px; text-align: center; color: var(--muted); font-size: 13.5px; margin-bottom: 14px;
+  }
+
+  /* Route */
+  .route-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 20px;
+  }
+  .route-card h2 {
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--muted); margin-bottom: 14px;
+  }
+  .route-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .route-row:last-child { margin-bottom: 0; }
+  .route-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+  .route-row p { font-size: 13.5px; }
+  .route-row .city { color: var(--muted); font-size: 12px; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<a href="{% url 'tracking-detail' tracking_id=shipment.tracking_id %}" class="back-link">← Back to {{ shipment.tracking_id }}</a>
+<h1>Delivery Partner</h1>
+
+{% if driver %}
+<div class="driver-card">
+  {% if driver.photo_url %}
+  <img src="{{ driver.photo_url }}" alt="{{ driver.name }}" class="driver-photo">
+  {% else %}
+  <div class="driver-photo-placeholder">{{ driver.name|first|upper }}</div>
+  {% endif %}
+  <h2>{{ driver.name }}</h2>
+  <p class="role">Delivery Partner</p>
+
+  <div class="driver-stats">
+    <div class="driver-stat"><div class="lbl">Phone</div><div class="val">{{ driver.phone|default:"—" }}</div></div>
+    <div class="driver-stat"><div class="lbl">Vehicle</div><div class="val">{{ driver.vehicle_info|default:"—" }}</div></div>
+    <div class="driver-stat"><div class="lbl">Rating</div><div class="val">{{ driver.rating|default:"—" }}</div></div>
+  </div>
+
+  <div class="driver-actions">
+    <a href="tel:{{ driver.phone }}" class="btn-call">📞 Call Driver</a>
+    {% if driver.chat_url %}
+    <a href="{{ driver.chat_url }}" target="_blank" rel="noopener" class="btn-chat">💬 Message</a>
+    {% endif %}
+  </div>
+</div>
+{% else %}
+<div class="empty-card">No delivery partner has been assigned to this shipment yet.</div>
+{% endif %}
+
+<div class="route-card">
+  <h2>Current Route</h2>
+  <div class="route-row">
+    <span class="route-dot"></span>
+    <p>From: <strong>{{ shipment.origin_country }}</strong> <span class="city">{% if shipment.sender.city %}({{ shipment.sender.city }}){% endif %}</span></p>
+  </div>
+  <div class="route-row">
+    <span class="route-dot" style="background:var(--green);"></span>
+    <p>To: <strong>{{ shipment.destination_country }}</strong> <span class="city">{% if shipment.receiver.city %}({{ shipment.receiver.city }}){% endif %}</span></p>
+  </div>
+</div>
+
+{% endblock %}

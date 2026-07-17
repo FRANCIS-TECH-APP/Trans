@@ -1,0 +1,149 @@
+
+{% extends "admin/subadmin/base.html" %}
+
+{% block title %}Shipment Add-ons — TransEdge{% endblock %}
+{% block page_title %}Add-ons{% endblock %}
+
+{% block extra_css %}
+<style>
+  .back-link { display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--muted);text-decoration:none;margin-bottom:14px; }
+  .back-link:hover { color:var(--sky); }
+
+  .points-notice { display:flex;align-items:center;gap:12px;background:var(--purple-dim);border:1px solid rgba(124,58,237,.3);border-radius:var(--radius);padding:13px 16px;margin-bottom:16px;font-size:13.5px; }
+  .points-notice strong { color:var(--purple); }
+  .points-notice.charge-warning { background:var(--amber-dim);border-color:rgba(217,119,6,.3); }
+  .points-notice.charge-warning strong { color:var(--amber); }
+
+  .card { background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:14px;transition:background .3s,border-color .3s; }
+  .card-header { display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border); }
+  .ch-icon { width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0; }
+  .card-header h3 { font-size:14px;font-weight:600; }
+  .card-header span { font-size:12px;color:var(--muted);margin-left:auto; }
+  .card-body { padding:18px; }
+
+  .status-row { display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;padding:11px 13px;background:var(--surface2);border:1px solid var(--border);border-radius:8px; }
+  .status-row .label { font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.3px; }
+  .status-pill { display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px; }
+  .status-pill.active { background:var(--green-dim);color:var(--green); }
+  .status-pill.inactive { background:var(--red-dim);color:var(--red); }
+  .status-pill .dot { width:6px;height:6px;border-radius:50%;background:currentColor; }
+
+  .form-group { display:flex;flex-direction:column;gap:5px;margin-bottom:12px; }
+  .form-group label { font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.3px; }
+  .form-group .req { color:var(--red);margin-left:2px; }
+  .form-group .hint { font-size:11.5px;color:var(--muted);font-weight:400;text-transform:none;letter-spacing:normal; }
+  .form-group input { padding:9px 12px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;font-size:13.5px;color:var(--text);outline:none;transition:border-color .2s;font-family:inherit;width:100%; }
+  .form-group input:focus { border-color:var(--purple); }
+
+  .preview-box { border:1.5px dashed var(--border);border-radius:10px;padding:14px;background:var(--surface2);margin-top:4px; }
+  .preview-box .preview-label { font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:8px; }
+  .preview-btn { display:inline-flex;align-items:center;gap:8px;background:var(--green);color:#fff;font-weight:700;font-size:13px;padding:9px 16px;border-radius:20px;text-decoration:none; }
+  .preview-empty { font-size:13px;color:var(--muted);font-style:italic; }
+
+  .divider { height:1px;background:var(--border);margin:16px 0; }
+
+  @media(max-width:768px) {
+    .status-row { flex-direction:column;align-items:flex-start;gap:6px; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<a href="{% url 'sub-admin-shipment-detail' pk=shipment.pk %}" class="back-link">
+  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+  Back to {{ shipment.tracking_id }}
+</a>
+
+<div class="card">
+  <div class="card-header">
+    <div class="ch-icon" style="background:var(--purple-dim);">
+      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="color:var(--purple);"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
+    </div>
+    <h3>Support Contact Link</h3>
+    <span>{{ shipment.tracking_id }}</span>
+  </div>
+  <div class="card-body">
+
+    <div class="status-row">
+      <span class="label">Currently shown to client</span>
+      {% if shipment.support_link_active and shipment.support_link_url %}
+        <span class="status-pill active"><span class="dot"></span> Active</span>
+      {% else %}
+        <span class="status-pill inactive"><span class="dot"></span> Not shown</span>
+      {% endif %}
+    </div>
+
+    {% if shipment.support_link_url %}
+    <div class="points-notice charge-warning">
+      <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="color:var(--amber);flex-shrink:0;"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <span>A support link is already set. Saving changes will deduct <strong>{{ pricing.points_per_support_link }} point{{ pricing.points_per_support_link|pluralize }}</strong> again. You have <strong>{{ profile.points_balance }} points</strong>.</span>
+    </div>
+    {% else %}
+    <div class="points-notice">
+      <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="color:var(--purple);flex-shrink:0;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      <span>Adding a support link will deduct <strong>{{ pricing.points_per_support_link }} point{{ pricing.points_per_support_link|pluralize }}</strong>. You have <strong>{{ profile.points_balance }} points</strong>. If you don't add one, no support chat will appear on the client's tracking page.</span>
+    </div>
+    {% endif %}
+
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="save_support_link">
+      <div class="form-group">
+        <label>Support Link / URL <span class="req">*</span></label>
+        <input type="text" name="support_link_url" placeholder="https://wa.me/2348012345678" value="{{ shipment.support_link_url }}" required>
+        <span class="hint">Must start with http:// or https://</span>
+      </div>
+      <div class="form-group">
+        <label>Button Label <span class="hint">(shown to client)</span></label>
+        <input type="text" name="support_link_label" maxlength="100" placeholder="Chat with Support" value="{{ shipment.support_link_label|default:'Chat with Support' }}">
+      </div>
+
+      {% if shipment.support_link_url %}
+      <div class="preview-box" style="margin-bottom:14px;">
+        <div class="preview-label">Client sees</div>
+        <span class="preview-btn">
+          <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
+          {{ shipment.support_link_label|default:"Chat with Support" }}
+        </span>
+      </div>
+      {% else %}
+      <div class="preview-box" style="margin-bottom:14px;">
+        <div class="preview-label">Client sees</div>
+        <p class="preview-empty">Nothing — no support button will appear until you save a link.</p>
+      </div>
+      {% endif %}
+
+      <button type="submit" class="btn btn-primary">
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+        {% if shipment.support_link_url %}Save Changes &amp; Deduct{% else %}Add Support Link &amp; Deduct{% endif %}
+        {{ pricing.points_per_support_link }} pt{{ pricing.points_per_support_link|pluralize }}
+      </button>
+    </form>
+
+    {% if shipment.support_link_url %}
+    <div class="divider"></div>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="toggle_support_link">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+        <p style="font-size:13px;color:var(--muted);">
+          {% if shipment.support_link_active %}
+            Hide the support button from the client without losing your saved link. No points refunded — you can re-enable for free.
+          {% else %}
+            The support button is hidden. Re-enable it at no extra cost.
+          {% endif %}
+        </p>
+        {% if shipment.support_link_active %}
+          <button type="submit" class="btn btn-danger btn-sm">Disable</button>
+        {% else %}
+          <button type="submit" class="btn btn-success btn-sm">Enable</button>
+        {% endif %}
+      </div>
+    </form>
+    {% endif %}
+
+  </div>
+</div>
+
+{% endblock %}

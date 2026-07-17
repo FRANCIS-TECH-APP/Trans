@@ -1,0 +1,208 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Default Site Settings{% endblock %}
+{% block page_title %}Default Site Settings{% endblock %}
+{% block breadcrumb %}<a href="{% url 'admin-dashboard' %}">Home</a> / Default Site Settings{% endblock %}
+
+{% block content %}
+
+<div class="card" style="margin-bottom:14px;background:var(--accent-dim,rgba(59,130,246,.08));border:1px solid var(--accent,#3b82f6);">
+  <div class="card-body" style="display:flex;align-items:center;gap:10px;">
+    <i class="fas fa-circle-info" style="color:var(--accent,#3b82f6);"></i>
+    <span style="font-size:13px;">
+      This is the <strong>global default</strong> branding shown at <code>/site/</code> and used as a fallback
+      for any sub-admin who hasn't customized their own landing page.
+    </span>
+  </div>
+</div>
+
+<form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+
+  <!-- BRANDING -->
+  <div class="card" style="margin-bottom:14px;">
+    <div class="card-header"><h3><i class="fas fa-building" style="color:var(--accent);margin-right:6px;"></i>Branding</h3></div>
+    <div class="card-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Company / Site Name</label>
+          <input type="text" name="site_name" value="{{ settings.site_name }}"/>
+        </div>
+        <div class="form-group">
+          <label>Tagline</label>
+          <input type="text" name="site_tagline" value="{{ settings.site_tagline }}"/>
+        </div>
+        <div class="form-group">
+          <label>Logo</label>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div style="width:52px;height:52px;border-radius:10px;background:var(--surface2,#f8fafc);border:1px dashed var(--border,#e2e8f0);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">
+              {% if settings.get_logo %}
+                <img src="{{ settings.get_logo }}" alt="logo" style="width:100%;height:100%;object-fit:cover;">
+              {% else %}
+                <i class="fas fa-image" style="color:var(--muted);"></i>
+              {% endif %}
+            </div>
+            <input type="file" name="logo" accept="image/*">
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px;">Uploading a file overrides the logo URL below.</div>
+        </div>
+        <div class="form-group">
+          <label>Logo URL (optional)</label>
+          <input type="url" name="logo_url" value="{{ settings.logo_url }}" placeholder="https://..."/>
+        </div>
+        <div class="form-group">
+          <label>Favicon URL</label>
+          <input type="url" name="favicon_url" value="{{ settings.favicon_url }}" placeholder="https://..."/>
+        </div>
+        <div class="form-group">
+          <label>Primary Color</label>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <input type="color" name="primary_color_picker" value="{{ settings.primary_color|default:'#3b82f6' }}"
+                   style="width:40px;height:36px;border:1px solid var(--border,#e2e8f0);border-radius:8px;padding:2px;cursor:pointer;"
+                   oninput="document.getElementsByName('primary_color')[0].value=this.value">
+            <input type="text" name="primary_color" value="{{ settings.primary_color }}" placeholder="#3b82f6" style="flex:1;">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HERO / ABOUT -->
+  <div class="card" style="margin-bottom:14px;">
+    <div class="card-header"><h3><i class="fas fa-rocket" style="color:var(--green);margin-right:6px;"></i>Hero &amp; About</h3></div>
+    <div class="card-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Hero Title</label>
+          <input type="text" name="hero_title" value="{{ settings.hero_title }}"/>
+        </div>
+        <div class="form-group span-2">
+          <label>Hero Subtitle</label>
+          <textarea name="hero_subtitle">{{ settings.hero_subtitle }}</textarea>
+        </div>
+        <div class="form-group span-2">
+          <label>Hero Image URL</label>
+          <input type="url" name="hero_image_url" value="{{ settings.hero_image_url }}" placeholder="https://..."/>
+        </div>
+        <div class="form-group span-2">
+          <label>About Text</label>
+          <textarea name="about_text">{{ settings.about_text }}</textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="card" style="margin-bottom:14px;">
+    <div class="card-header"><h3><i class="fas fa-chart-bar" style="color:var(--yellow);margin-right:6px;"></i>Homepage Stats</h3></div>
+    <div class="card-body">
+      <div class="form-grid cols-3">
+        <div class="form-group">
+          <label>Deliveries Stat</label>
+          <input type="text" name="stat_deliveries" value="{{ settings.stat_deliveries }}" placeholder="15k+"/>
+        </div>
+        <div class="form-group">
+          <label>Satisfaction Stat</label>
+          <input type="text" name="stat_satisfaction" value="{{ settings.stat_satisfaction }}" placeholder="98%"/>
+        </div>
+        <div class="form-group">
+          <label>Support Stat</label>
+          <input type="text" name="stat_support" value="{{ settings.stat_support }}" placeholder="24/7"/>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONTACT -->
+  <div class="card" style="margin-bottom:14px;">
+    <div class="card-header"><h3><i class="fas fa-phone" style="color:var(--green);margin-right:6px;"></i>Contact Details</h3></div>
+    <div class="card-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Primary Phone</label>
+          <input type="text" name="phone_primary" value="{{ settings.phone_primary }}"/>
+        </div>
+        <div class="form-group">
+          <label>Secondary Phone</label>
+          <input type="text" name="phone_secondary" value="{{ settings.phone_secondary }}"/>
+        </div>
+        <div class="form-group">
+          <label>Support Email</label>
+          <input type="email" name="email_support" value="{{ settings.email_support }}"/>
+        </div>
+        <div class="form-group">
+          <label>Info Email</label>
+          <input type="email" name="email_info" value="{{ settings.email_info }}"/>
+        </div>
+        <div class="form-group">
+          <label>WhatsApp Number (with country code, no +)</label>
+          <input type="text" name="whatsapp_number" value="{{ settings.whatsapp_number }}" placeholder="2348012345678"/>
+        </div>
+        <div class="form-group">
+          <label>Google Maps URL</label>
+          <input type="url" name="google_maps_url" value="{{ settings.google_maps_url }}"/>
+        </div>
+        <div class="form-group span-2">
+          <label>Address</label>
+          <textarea name="address">{{ settings.address }}</textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SOCIAL -->
+  <div class="card" style="margin-bottom:14px;">
+    <div class="card-header"><h3><i class="fas fa-share-alt" style="color:var(--orange);margin-right:6px;"></i>Social Media</h3></div>
+    <div class="card-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Twitter / X URL</label>
+          <input type="url" name="twitter_url" value="{{ settings.twitter_url }}"/>
+        </div>
+        <div class="form-group">
+          <label>Instagram URL</label>
+          <input type="url" name="instagram_url" value="{{ settings.instagram_url }}"/>
+        </div>
+        <div class="form-group">
+          <label>Facebook URL</label>
+          <input type="url" name="facebook_url" value="{{ settings.facebook_url }}"/>
+        </div>
+        <div class="form-group">
+          <label>LinkedIn URL</label>
+          <input type="url" name="linkedin_url" value="{{ settings.linkedin_url }}"/>
+        </div>
+        <div class="form-group">
+          <label>TikTok URL</label>
+          <input type="url" name="tiktok_url" value="{{ settings.tiktok_url }}"/>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER / SEO -->
+  <div class="card" style="margin-bottom:14px;">
+    <div class="card-header"><h3><i class="fas fa-copyright" style="color:var(--muted);margin-right:6px;"></i>Footer &amp; SEO</h3></div>
+    <div class="card-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Copyright Text</label>
+          <input type="text" name="copyright_text" value="{{ settings.copyright_text }}"/>
+        </div>
+        <div class="form-group span-2">
+          <label>Meta Description</label>
+          <textarea name="meta_description">{{ settings.meta_description }}</textarea>
+        </div>
+        <div class="form-group span-2">
+          <label>Meta Keywords</label>
+          <input type="text" name="meta_keywords" value="{{ settings.meta_keywords }}" placeholder="logistics, shipping, tracking"/>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:10px;justify-content:flex-end;">
+    <button type="submit" class="btn btn-primary">
+      <i class="fas fa-save"></i> Save Default Settings
+    </button>
+  </div>
+</form>
+{% endblock %}

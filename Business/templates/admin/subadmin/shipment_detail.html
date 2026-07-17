@@ -1,0 +1,448 @@
+{% extends "admin/subadmin/base.html" %}
+
+{% block title %}{{ shipment.tracking_id }} — TransEdge{% endblock %}
+{% block page_title %}Shipment Detail{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* Page header */
+  .ph-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
+  .badge.b-picked_up { color: #0369a1; }
+  .badge.b-out_for_delivery { color: #15803d; }
+  .b-draft   { background: rgba(139,143,153,.15); color: var(--muted); }
+  .b-sent    { background: var(--sky-dim); color: var(--sky); }
+  .b-overdue { background: var(--red-dim); color: var(--red); }
+  .b-unpaid  { background: var(--red-dim); color: var(--red); }
+  .b-paid    { background: var(--green-dim); color: var(--green); }
+  .b-partial { background: var(--amber-dim); color: var(--amber); }
+
+  /* Tracking link box */
+  .track-link-box {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--sky-dim); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 12px 16px; margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+  .track-link-box .tl-label { font-size: 11.5px; font-weight: 600; color: var(--sky); white-space: nowrap; }
+  .track-link-box .tl-url { font-size: 12.5px; font-family: 'Courier New', monospace; color: var(--text); flex: 1; word-break: break-all; }
+  .copy-btn { padding: 6px 13px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--sky); font-size: 11.5px; cursor: pointer; transition: background .15s; white-space: nowrap; font-family: inherit; }
+  .copy-btn:hover { background: var(--sky-dim); }
+
+  .sh-icon { width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .section-body { padding: 16px; }
+
+  /* Info grid */
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .info-group { display: flex; flex-direction: column; gap: 3px; }
+  .info-group label { font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); }
+  .info-group span { font-size: 13px; color: var(--text); }
+
+  /* Party cards */
+  .party-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+  .party-card { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px; }
+  .party-label { font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+  .party-name { font-size: 14px; font-weight: 600; margin-bottom: 7px; }
+  .party-detail { font-size: 11.5px; color: var(--muted); margin-bottom: 3px; display: flex; align-items: center; gap: 6px; }
+
+  /* Map */
+  #shipment-map { height: 260px; width: 100%; border-radius: var(--radius-sm); border: 1px solid var(--border); margin-bottom: 14px; z-index: 0; }
+
+  /* Timeline */
+  .timeline { padding-left: 18px; border-left: 2px solid var(--border); }
+  .tl-item { position: relative; padding: 0 0 18px 18px; }
+  .tl-item:last-child { padding-bottom: 0; }
+  .tl-item::before { content: ''; position: absolute; left: -9px; top: 4px; width: 15px; height: 15px; border-radius: 50%; background: var(--surface2); border: 2px solid var(--border); }
+  .tl-item.latest::before { background: var(--sky); border-color: var(--sky); }
+  .tl-time { font-size: 10.5px; color: var(--muted); margin-bottom: 3px; }
+  .tl-event { font-size: 13.5px; font-weight: 600; margin-bottom: 2px; }
+  .tl-loc { font-size: 11.5px; color: var(--muted); }
+  .tl-desc { font-size: 11.5px; color: var(--muted); margin-top: 4px; font-style: italic; }
+
+  /* Checkpoint form */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .span-2 { grid-column: span 2; }
+  .form-group { display: flex; flex-direction: column; gap: 5px; }
+  .form-group label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .3px; }
+  .form-group input, .form-group select, .form-group textarea {
+    padding: 9px 12px; background: var(--surface2); border: 1.5px solid var(--border); border-radius: 8px;
+    font-size: 13px; color: var(--text); outline: none; transition: border-color .2s; font-family: inherit; width: 100%;
+  }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--sky); }
+  .form-group textarea { resize: vertical; min-height: 66px; }
+
+  #checkpoint-map { height: 260px; width: 100%; border-radius: var(--radius-sm); border: 1px solid var(--border); margin-bottom: 6px; z-index: 0; }
+  .map-search-row { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+  .map-search-row input { flex: 1; min-width: 160px; padding: 9px 13px; background: var(--surface2); border: 1.5px solid var(--border); border-radius: 8px; font-size: 12.5px; color: var(--text); outline: none; font-family: inherit; }
+  .map-search-row input:focus { border-color: var(--sky); }
+  .map-msg { font-size: 11.5px; color: var(--muted); align-self: center; }
+
+  /* Images */
+  .images-grid { display: flex; gap: 10px; flex-wrap: wrap; }
+  .img-thumb { width: 76px; height: 76px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); cursor: pointer; transition: transform .2s; }
+  .img-thumb:hover { transform: scale(1.06); }
+
+  /* Payment / invoice table */
+  .info-table { width: 100%; border-collapse: collapse; }
+  .info-table tbody td, .info-table tbody th { padding: 10px 0; font-size: 12.5px; border-bottom: 1px solid var(--border); }
+  .info-table tbody tr:last-child td, .info-table tbody tr:last-child th { border-bottom: none; }
+  .info-table tbody th { color: var(--muted); font-weight: 600; font-size: 10.5px; text-transform: uppercase; letter-spacing: .4px; width: 40%; }
+
+  /* Footer */
+  .page-footer { text-align: center; padding: 20px 16px 8px; font-size: 11px; color: var(--muted); border-top: 1px solid var(--border); margin-top: 8px; }
+  .page-footer a { color: var(--sky); text-decoration: none; }
+  .page-footer a:hover { text-decoration: underline; }
+
+  @media (max-width: 480px) {
+    .info-grid, .party-grid, .form-grid { grid-template-columns: 1fr; }
+    .span-2 { grid-column: span 1; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="ph-right">
+  <span class="badge b-{{ shipment.status }}">{{ shipment.get_status_display }}</span>
+  <a href="{% url 'sub-admin-shipment-amend-form' pk=shipment.pk %}" class="btn btn-outline btn-sm">
+    <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+    Edit
+  </a>
+  <a href="{% url 'sub-admin-shipment-addons' pk=shipment.pk %}" class="btn btn-outline btn-sm">
+    <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
+    Add-ons
+  </a>
+  <a href="{% url 'sub-admin-shipment-list' %}" class="btn btn-outline btn-sm">← Back</a>
+</div>
+
+<!-- Client tracking link -->
+<div class="track-link-box">
+  <span class="tl-label">Client Tracking Link</span>
+  <span class="tl-url" id="trackUrl">{{ request.scheme }}://{{ request.get_host }}/track/{{ shipment.tracking_id }}/</span>
+  <button class="copy-btn" onclick="copyLink('trackUrl', this)">Copy link</button>
+</div>
+
+<!-- Client tracking site -->
+<div class="track-link-box">
+  <span class="tl-label">Client Tracking Site</span>
+  <span class="tl-url" id="trackSiteUrl">{{ request.scheme }}://{{ request.get_host }}/shipping/</span>
+  <button class="copy-btn" onclick="copyLink('trackSiteUrl', this)">Copy link</button>
+</div>
+
+<!-- Shipment overview -->
+<div class="section">
+  <div class="section-header">
+    <div class="sh-icon" style="background:var(--amber-dim);">
+      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="color:var(--amber);"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+    </div>
+    <h3>Shipment Overview</h3>
+  </div>
+  <div class="section-body">
+    <div class="info-grid">
+      <div class="info-group"><label>Type</label><span>{{ shipment.get_shipment_type_display }}</span></div>
+      <div class="info-group"><label>Description</label><span>{{ shipment.description }}</span></div>
+      <div class="info-group"><label>Origin</label><span>{{ shipment.origin_country }}</span></div>
+      <div class="info-group"><label>Destination</label><span>{{ shipment.destination_country }}</span></div>
+      <div class="info-group"><label>Quantity</label><span>{{ shipment.quantity }}</span></div>
+      {% if shipment.weight_kg %}<div class="info-group"><label>Weight</label><span>{{ shipment.weight_kg }} kg</span></div>{% endif %}
+      {% if shipment.dimensions %}<div class="info-group"><label>Dimensions</label><span>{{ shipment.dimensions }}</span></div>{% endif %}
+      {% if shipment.estimated_delivery %}<div class="info-group"><label>Est. Delivery</label><span>{{ shipment.estimated_delivery|date:"d M Y" }}</span></div>{% endif %}
+      {% if shipment.special_instructions %}<div class="info-group span-2"><label>Special Instructions</label><span>{{ shipment.special_instructions }}</span></div>{% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Sender & Receiver -->
+<div class="party-grid">
+  <div class="party-card">
+    <div class="party-label">Sender</div>
+    <div class="party-name">{{ shipment.sender.full_name }}</div>
+    <div class="party-detail">
+      <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+      {{ shipment.sender.email }}
+    </div>
+    <div class="party-detail">
+      <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.11 1.18 2 2 0 012.11 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+      {{ shipment.sender.phone }}
+    </div>
+    <div class="party-detail">{{ shipment.sender.address }}{% if shipment.sender.city %}, {{ shipment.sender.city }}{% endif %}{% if shipment.sender.country %}, {{ shipment.sender.country }}{% endif %}</div>
+  </div>
+  <div class="party-card">
+    <div class="party-label">Receiver</div>
+    <div class="party-name">{{ shipment.receiver.full_name }}</div>
+    <div class="party-detail">
+      <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+      {{ shipment.receiver.email }}
+    </div>
+    <div class="party-detail">
+      <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.11 1.18 2 2 0 012.11 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+      {{ shipment.receiver.phone }}
+    </div>
+    <div class="party-detail">{{ shipment.receiver.address }}{% if shipment.receiver.city %}, {{ shipment.receiver.city }}{% endif %}{% if shipment.receiver.country %}, {{ shipment.receiver.country }}{% endif %}</div>
+  </div>
+</div>
+
+<!-- Map + Timeline -->
+<div class="section">
+  <div class="section-header">
+    <div class="sh-icon" style="background:var(--sky-dim);">
+      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="color:var(--sky);"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+    </div>
+    <h3>Live Location &amp; Timeline</h3>
+  </div>
+  <div class="section-body">
+    {% if map_points != '[]' %}
+    <div id="shipment-map"></div>
+    {% else %}
+    <div style="background:var(--surface2);border:1px dashed var(--border);border-radius:var(--radius-sm);padding:28px;text-align:center;margin-bottom:14px;">
+      <p style="color:var(--muted);font-size:13px;">No location data yet. Add a checkpoint below to start tracking.</p>
+    </div>
+    {% endif %}
+
+    {% if checkpoints %}
+    <div class="timeline">
+      {% for cp in checkpoints reversed %}
+      <div class="tl-item {% if forloop.first %}latest{% endif %}">
+        <div class="tl-time">{{ cp.timestamp|date:"d M Y, H:i" }}</div>
+        <div class="tl-event">{{ cp.get_event_type_display }}</div>
+        <div class="tl-loc">{{ cp.location }}{% if cp.city %}, {{ cp.city }}{% endif %}</div>
+        {% if cp.description %}<div class="tl-desc">{{ cp.description }}</div>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-cell">No checkpoints added yet.</div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Invoice -->
+<div class="section">
+  <div class="section-header">
+    <div class="sh-icon" style="background:var(--green-dim);">
+      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="color:var(--green);"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+    </div>
+    <h3>Invoice</h3>
+  </div>
+  <div class="section-body">
+    {% if shipment.invoice %}
+    <table class="info-table">
+      <tbody>
+        <tr><th>Invoice #</th><td>{{ shipment.invoice.invoice_number }}</td></tr>
+        <tr><th>Total</th><td><strong>{{ shipment.invoice.currency }} {{ shipment.invoice.total_amount }}</strong></td></tr>
+        <tr><th>Status</th><td><span class="badge b-{{ shipment.invoice.status }}">{{ shipment.invoice.get_status_display }}</span></td></tr>
+      </tbody>
+    </table>
+    <a href="{% url 'sub-admin-invoice-detail' pk=shipment.invoice.pk %}" class="btn btn-primary btn-sm" style="margin-top:12px;">View Invoice</a>
+    {% else %}
+    <p style="color:var(--muted);font-size:12.5px;margin-bottom:12px;">No invoice has been created for this shipment yet.</p>
+    <form method="post" action="{% url 'sub-admin-invoice-create' pk=shipment.pk %}">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-primary btn-sm">Create Invoice</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Payment -->
+{% if payment %}
+<div class="section">
+  <div class="section-header">
+    <div class="sh-icon" style="background:var(--purple-dim);">
+      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="color:var(--purple);"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+    </div>
+    <h3>Payment</h3>
+  </div>
+  <div class="section-body">
+    <table class="info-table">
+      <tbody>
+        <tr><th>Amount Due</th><td><strong>{{ payment.currency }} {{ payment.amount }}</strong></td></tr>
+        <tr><th>Amount Paid</th><td>{{ payment.currency }} {{ payment.amount_paid }}</td></tr>
+        <tr><th>Balance</th><td>{% if payment.balance_due == 0 %}<span style="color:var(--green);font-weight:600;">Cleared ✓</span>{% else %}<span style="color:var(--red);font-weight:600;">{{ payment.currency }} {{ payment.balance_due }}</span>{% endif %}</td></tr>
+        <tr><th>Status</th><td><span class="badge b-{{ payment.status }}">{{ payment.get_status_display }}</span></td></tr>
+        {% if payment.due_date %}<tr><th>Due Date</th><td>{{ payment.due_date|date:"d M Y" }}</td></tr>{% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- Images -->
+{% if shipment.images.all %}
+<div class="section">
+  <div class="section-header">
+    <div class="sh-icon" style="background:var(--sky-dim);">
+      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="color:var(--sky);"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+    </div>
+    <h3>Images</h3>
+  </div>
+  <div class="section-body">
+    <div class="images-grid">
+      {% for img in shipment.images.all %}
+      <img src="{{ img.image.url }}" alt="{{ img.caption|default:'Shipment image' }}" class="img-thumb"
+           onclick="this.requestFullscreen ? this.requestFullscreen() : this.webkitRequestFullscreen()" title="Click to enlarge">
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Add Checkpoint -->
+<div class="section">
+  <div class="section-header">
+    <div class="sh-icon" style="background:var(--green-dim);">
+      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="color:var(--green);"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+    </div>
+    <h3>Add Tracking Checkpoint</h3>
+  </div>
+  <div class="section-body">
+    <form method="post" action="{% url 'sub-admin-checkpoint-add' pk=shipment.pk %}">
+      {% csrf_token %}
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Event Type <span style="color:var(--red);">*</span></label>
+          <select name="event_type" required>
+            <option value="pickup">Package Picked Up</option>
+            <option value="departed">Departed Facility</option>
+            <option value="arrived">Arrived at Facility</option>
+            <option value="in_transit">In Transit</option>
+            <option value="customs_in">Entered Customs</option>
+            <option value="customs_cleared">Customs Cleared</option>
+            <option value="out_delivery">Out for Delivery</option>
+            <option value="delivered">Delivered</option>
+            <option value="attempted">Delivery Attempted</option>
+            <option value="held">Package on Hold</option>
+            <option value="exception">Exception / Alert</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Timestamp</label>
+          <input type="datetime-local" name="timestamp">
+        </div>
+        <div class="form-group"><label>Location Name <span style="color:var(--red);">*</span></label><input type="text" name="location" placeholder="e.g. Lagos Sorting Facility" required></div>
+        <div class="form-group"><label>City</label><input type="text" name="city" placeholder="e.g. Lagos"></div>
+        <div class="form-group"><label>Country</label><input type="text" name="country" placeholder="e.g. Nigeria"></div>
+        <div class="form-group span-2"><label>Description</label><textarea name="description" placeholder="Optional notes about this checkpoint…"></textarea></div>
+      </div>
+
+      <!-- Map picker -->
+      <div style="margin-top:8px;margin-bottom:6px;">
+        <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;display:block;margin-bottom:10px;">
+          Pin Location on Map
+        </label>
+        <div class="map-search-row">
+          <input type="text" id="map-search" placeholder="Search city or address…">
+          <button type="button" onclick="searchMap()" class="btn btn-outline btn-sm">Search</button>
+          <span class="map-msg" id="map-msg"></span>
+        </div>
+        <div id="checkpoint-map"></div>
+        <p style="font-size:11.5px;color:var(--muted);margin-bottom:12px;">Click the map or drag the marker to set coordinates.</p>
+      </div>
+
+      <div class="form-grid">
+        <div class="form-group"><label>Latitude</label><input type="text" name="latitude" id="lat-input" placeholder="Auto-filled from map"></div>
+        <div class="form-group"><label>Longitude</label><input type="text" name="longitude" id="lng-input" placeholder="Auto-filled from map"></div>
+      </div>
+
+      <div style="margin-top:14px;">
+        <button type="submit" class="btn btn-primary">
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          Add Checkpoint
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<footer class="page-footer">
+  © {% now "Y" %} TransEdge. All rights reserved.<br>
+  <a href="{% url 'sub-admin-dashboard' %}">Dashboard</a> ·
+  <a href="{% url 'sub-admin-shipment-list' %}">Shipments</a> ·
+  <a href="{% url 'sub-admin-buy-points' %}">Buy Points</a>
+</footer>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  function copyLink(elId, btn) {
+    const url = document.getElementById(elId).textContent.trim();
+    navigator.clipboard.writeText(url).then(() => {
+      const orig = btn.textContent;
+      btn.textContent = 'Copied!';
+      setTimeout(() => btn.textContent = orig, 2000);
+    });
+  }
+
+  /* ── Shipment map ── */
+  const mapPoints = {{ map_points|safe }};
+  if (mapPoints.length && document.getElementById('shipment-map')) {
+    const sMap = L.map('shipment-map', { scrollWheelZoom: false });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors', maxZoom: 18
+    }).addTo(sMap);
+    const latLngs = [];
+    mapPoints.forEach((p, i) => {
+      const isLatest = i === mapPoints.length - 1;
+      const ll = [p.lat, p.lng];
+      latLngs.push(ll);
+      const m = L.circleMarker(ll, {
+        radius: isLatest ? 11 : 8,
+        fillColor: isLatest ? '#0ea5e9' : '#64748b',
+        color: '#fff', weight: 2.5, fillOpacity: .95
+      }).addTo(sMap);
+      m.bindPopup(`<div style="font-family:sans-serif;min-width:160px;padding:4px 0;">
+        <div style="font-weight:600;font-size:13px;margin-bottom:4px;">${isLatest ? '📍 Current' : '✓ Past'}</div>
+        <div style="font-size:13px;">${p.event}</div>
+        <div style="font-size:12px;color:#64748b;">${p.location}</div>
+        <div style="font-size:11px;color:#94a3b8;">${p.time}</div>
+      </div>`);
+      if (isLatest) m.openPopup();
+    });
+    if (latLngs.length > 1) {
+      L.polyline(latLngs, { color: '#0ea5e9', weight: 2, opacity: .6, dashArray: '8 6' }).addTo(sMap);
+      sMap.fitBounds(latLngs, { padding: [40, 40] });
+    } else {
+      sMap.setView(latLngs[0], 8);
+    }
+  }
+
+  /* ── Checkpoint map picker ── */
+  const cpMap    = L.map('checkpoint-map').setView([20, 0], 2);
+  const cpMarker = L.marker([20, 0], { draggable: true }).addTo(cpMap);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, attribution: '© OpenStreetMap contributors'
+  }).addTo(cpMap);
+
+  function applyCoords(lat, lng) {
+    document.getElementById('lat-input').value = lat.toFixed(6);
+    document.getElementById('lng-input').value = lng.toFixed(6);
+    document.getElementById('map-msg').textContent = lat.toFixed(4) + ', ' + lng.toFixed(4);
+  }
+  cpMap.on('click', e => { cpMarker.setLatLng(e.latlng); applyCoords(e.latlng.lat, e.latlng.lng); });
+  cpMarker.on('dragend', () => { const ll = cpMarker.getLatLng(); applyCoords(ll.lat, ll.lng); });
+
+  function searchMap() {
+    const q = document.getElementById('map-search').value.trim();
+    if (!q) return;
+    document.getElementById('map-msg').textContent = 'Searching…';
+    fetch('https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(q) + '&format=json&limit=1')
+      .then(r => r.json())
+      .then(data => {
+        if (!data.length) { document.getElementById('map-msg').textContent = 'Not found.'; return; }
+        const lat = parseFloat(data[0].lat), lng = parseFloat(data[0].lon);
+        cpMap.setView([lat, lng], 13);
+        cpMarker.setLatLng([lat, lng]);
+        applyCoords(lat, lng);
+      })
+      .catch(() => { document.getElementById('map-msg').textContent = 'Network error.'; });
+  }
+  document.getElementById('map-search').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); searchMap(); }
+  });
+</script>
+{% endblock %}

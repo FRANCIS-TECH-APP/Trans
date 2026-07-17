@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}Dashboard — TransEdge{% endblock %}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --sky:        #3b82f6;
+  --sky2:       #2563eb;
+  --sky-dim:    rgba(59,130,246,.15);
+  --bg:         #f0f7ff;
+  --surface:    #ffffff;
+  --surface2:   #f8fafc;
+  --border:     #e2e8f0;
+  --text:       #0f172a;
+  --muted:      #64748b;
+  --green:      #16a34a;
+  --green-dim:  rgba(22,163,74,.12);
+  --amber:      #d97706;
+  --amber-dim:  rgba(217,119,6,.12);
+  --red:        #dc2626;
+  --red-dim:    rgba(220,38,38,.12);
+  --purple:     #7c3aed;
+  --purple-dim: rgba(124,58,237,.12);
+  --header-h:   56px;
+  --nav-h:      64px;
+  --radius:     14px;
+  --radius-sm:  10px;
+}
+
+[data-theme="dark"] {
+  --bg:         #15171c;
+  --surface:    #1d2027;
+  --surface2:   #26292f;
+  --border:     #2c2f37;
+  --text:       #f1f3f5;
+  --muted:      #8b8f99;
+  --sky-dim:    rgba(59,130,246,.18);
+  --green-dim:  rgba(22,163,74,.18);
+  --amber-dim:  rgba(217,119,6,.18);
+  --red-dim:    rgba(220,38,38,.18);
+  --purple-dim: rgba(124,58,237,.18);
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  transition: background .3s, color .3s;
+  font-size: 14px;
+}
+
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  width: 100%;
+}
+
+/* TOPBAR — logo left, avatar / bell / theme right, no wordmark, no hamburger */
+.topbar {
+  height: var(--header-h);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  transition: background .3s, border-color .3s;
+}
+.topbar-left { display: flex; align-items: center; gap: 10px; }
+
+.logo-inline { display: flex; align-items: center; gap: 8px; text-decoration: none; }
+.logo-mark-sm {
+  width: 30px;
+  height: 30px;
+  background: linear-gradient(135deg, var(--sky), var(--sky2));
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.topbar-right { display: flex; align-items: center; gap: 8px; }
+
+.icon-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  text-decoration: none;
+  position: relative;
+  transition: background .15s, color .15s;
+}
+.icon-btn:hover { background: var(--sky-dim); color: var(--sky); }
+.icon-btn .notif-dot {
+  position: absolute;
+  top: 5px;
+  right: 6px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--red);
+  border: 1.5px solid var(--surface);
+}
+[data-theme="light"] .icon-moon { display: none; }
+[data-theme="dark"]  .icon-sun  { display: none; }
+
+.avatar-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--sky-dim);
+  color: var(--sky);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12.5px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.content {
+  padding: 16px;
+  max-width: 720px;
+  margin: 0 auto;
+  width: 100%;
+  padding-bottom: 108px; /* clears the floating bottom nav */
+}
+
+.messages { margin-bottom: 12px; }
+.msg {
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  margin-bottom: 6px;
+  border-left: 3px solid;
+}
+.msg.success { background: var(--green-dim); border-color: var(--green); color: var(--green); }
+.msg.error   { background: var(--red-dim);   border-color: var(--red);   color: var(--red); }
+.msg.warning { background: var(--amber-dim); border-color: var(--amber); color: var(--amber); }
+.msg.info    { background: var(--sky-dim);   border-color: var(--sky);   color: var(--sky); }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 500;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  transition: opacity .15s, transform .1s;
+  font-family: inherit;
+}
+.btn:hover { opacity: .88; transform: translateY(-1px); }
+.btn-primary { background: var(--sky); color: #fff; }
+.btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
+.btn-sm { padding: 6px 12px; font-size: 11.5px; }
+
+.section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 12px;
+  transition: background .3s, border-color .3s;
+}
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.section-header h3 { font-size: 13px; font-weight: 600; }
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 9px;
+  border-radius: 20px;
+  font-size: 10.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.badge::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.b-created          { background: var(--sky-dim);    color: var(--sky); }
+.b-in_transit       { background: var(--amber-dim);  color: var(--amber); }
+.b-delivered        { background: var(--green-dim);  color: var(--green); }
+.b-picked_up        { background: var(--sky-dim);    color: var(--sky); }
+.b-at_customs       { background: var(--purple-dim); color: var(--purple); }
+.b-out_for_delivery { background: var(--green-dim);  color: var(--green); }
+.b-held             { background: var(--red-dim);    color: var(--red); }
+.b-cancelled        { background: rgba(139,143,153,.15); color: var(--muted); }
+
+.empty-cell {
+  text-align: center;
+  color: var(--muted);
+  padding: 32px 16px;
+  font-size: 13px;
+}
+
+/* FLOATING BOTTOM NAV — replaces the sidebar entirely */
+.bottom-nav {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 7px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.18);
+  z-index: 180;
+}
+.bn-item {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  text-decoration: none;
+  transition: background .15s, color .15s, transform .15s;
+}
+.bn-item:hover { color: var(--text); }
+.bn-item.active {
+  background: var(--sky);
+  color: #fff;
+  transform: translateY(-3px);
+  box-shadow: 0 6px 16px rgba(59,130,246,.4);
+}
+
+@media (max-width: 380px) {
+  .bottom-nav { gap: 2px; padding: 6px; }
+  .bn-item { width: 42px; height: 42px; }
+}
+
+{% block extra_css %}{% endblock %}
+</style>
+{% block extra_head %}{% endblock %}
+</head>
+<body>
+
+<div class="main">
+
+  <header class="topbar">
+    <div class="topbar-left">
+      <a href="{% url 'sub-admin-dashboard' %}" class="logo-inline" aria-label="TransEdge home">
+        <div class="logo-mark-sm">
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="white" stroke-width="2.5">
+            <path d="M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h11a2 2 0 012 2v3"/>
+            <rect x="9" y="11" width="14" height="10" rx="2"/>
+            <circle cx="12" cy="21" r="1"/>
+            <circle cx="20" cy="21" r="1"/>
+          </svg>
+        </div>
+      </a>
+    </div>
+
+    <div class="topbar-right">
+      <button class="icon-btn theme-btn" id="themeToggle" aria-label="Toggle theme">
+        <svg class="icon-sun" width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="5"/>
+          <line x1="12" y1="1" x2="12" y2="3"/>
+          <line x1="12" y1="21" x2="12" y2="23"/>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+          <line x1="1" y1="12" x2="3" y2="12"/>
+          <line x1="21" y1="12" x2="23" y2="12"/>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+        <svg class="icon-moon" width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+        </svg>
+      </button>
+
+<div style="position:relative;">
+  <button type="button" class="icon-btn" id="notifBellBtn" aria-label="Notifications" aria-haspopup="true">
+    <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/>
+      <path d="M13.73 21a2 2 0 01-3.46 0"/>
+    </svg>
+    {% if unread_notifications %}<span class="notif-dot" id="notifDot"></span>{% endif %}
+  </button>
+
+  <div id="notifPanel" class="notif-panel">
+    <div class="notif-panel-head">Notifications</div>
+    <div id="notifPanelBody" class="notif-panel-body">
+      <div class="notif-empty">Loading…</div>
+    </div>
+  </div>
+</div>
+
+<style>
+.notif-panel {
+  display: none;
+  position: absolute;
+  top: 42px;
+  right: 0;
+  width: 300px;
+  max-height: 380px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 10px 30px rgba(0,0,0,.18);
+  overflow: hidden;
+  z-index: 200;
+}
+.notif-panel.open { display: flex; flex-direction: column; }
+.notif-panel-head {
+  padding: 10px 14px;
+  font-size: 12.5px;
+  font-weight: 700;
+  border-bottom: 1px solid var(--border);
+}
+.notif-panel-body { overflow-y: auto; }
+.notif-item {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background .12s;
+}
+.notif-item:last-child { border-bottom: none; }
+.notif-item:hover { background: var(--surface2); }
+.notif-item.unread { background: var(--sky-dim); }
+.notif-item-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 3px;
+}
+.notif-item-title .dot {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--sky); flex-shrink: 0;
+}
+.notif-item-body { font-size: 11.5px; color: var(--muted); line-height: 1.4; }
+.notif-item-time { font-size: 10px; color: var(--muted); margin-top: 4px; }
+.notif-empty { padding: 24px 14px; text-align: center; font-size: 12px; color: var(--muted); }
+</style>
+
+<script>
+(function () {
+  const FEED_URL = "{% url 'sub-admin-notifications-feed' %}";
+  const READ_URL = "{% url 'sub-admin-notification-mark-read' pk='00000000-0000-0000-0000-000000000000' %}".replace(
+    "00000000-0000-0000-0000-000000000000", "__ID__"
+  );
+  const btn   = document.getElementById("notifBellBtn");
+  const panel = document.getElementById("notifPanel");
+  const body  = document.getElementById("notifPanelBody");
+  const dot   = document.getElementById("notifDot");
+
+  const TYPE_COLORS = { info: "#0ea5e9", success: "#16a34a", warning: "#d97706", alert: "#dc2626" };
+
+  function getCookie(name) {
+    const match = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
+    return match ? decodeURIComponent(match[2]) : null;
+  }
+
+  function render(notifications) {
+    if (!notifications.length) {
+      body.innerHTML = '<div class="notif-empty">No notifications yet.</div>';
+      return;
+    }
+    body.innerHTML = "";
+    notifications.forEach((n) => {
+      const item = document.createElement("div");
+      item.className = "notif-item" + (n.is_read ? "" : " unread");
+      const color = TYPE_COLORS[n.type] || TYPE_COLORS.info;
+      item.innerHTML = `
+        <div class="notif-item-title">${!n.is_read ? '<span class="dot" style="background:' + color + '"></span>' : ""}${n.title}</div>
+        <div class="notif-item-body">${n.body}</div>
+        <div class="notif-item-time">${n.created_at}</div>
+      `;
+      item.addEventListener("click", () => {
+        if (!n.is_read) {
+          fetch(READ_URL.replace("__ID__", n.id), {
+            method: "POST",
+            headers: { "X-CSRFToken": getCookie("csrftoken") },
+          }).then(() => {
+            item.classList.remove("unread");
+            item.querySelector(".dot")?.remove();
+            if (dot) dot.remove();
+          });
+        }
+        if (n.link) window.location.href = n.link;
+      });
+      body.appendChild(item);
+    });
+  }
+
+  function loadFeed() {
+    body.innerHTML = '<div class="notif-empty">Loading…</div>';
+    fetch(FEED_URL)
+      .then((r) => r.json())
+      .then((data) => render(data.notifications || []))
+      .catch(() => { body.innerHTML = '<div class="notif-empty">Couldn\u2019t load notifications.</div>'; });
+  }
+
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const isOpen = panel.classList.contains("open");
+    panel.classList.toggle("open", !isOpen);
+    if (!isOpen) loadFeed();
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!panel.contains(e.target) && e.target !== btn) {
+      panel.classList.remove("open");
+    }
+  });
+})();
+</script>
+
+
+      <a href="{% url 'sub-admin-profile' %}" class="avatar-btn" aria-label="Profile">
+        {{ request.user.full_name|default:"?"|first|upper }}
+      </a>
+    </div>
+  </header>
+
+  <div class="content">
+    {% if messages %}
+    <div class="messages">
+      {% for message in messages %}
+      <div class="msg {{ message.tags }}">{{ message }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% block content %}{% endblock %}
+  </div>
+
+</div>
+
+<nav class="bottom-nav">
+  <a href="{% url 'sub-admin-dashboard' %}"
+     class="bn-item {% if request.resolver_match.url_name == 'sub-admin-dashboard' %}active{% endif %}"
+     aria-label="Dashboard">
+    <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+      <polyline points="9 22 9 12 15 12 15 22"/>
+    </svg>
+  </a>
+  <a href="{% url 'sub-admin-buy-foreign-number' %}"
+     class="bn-item {% if request.resolver_match.url_name == 'sub-admin-buy-foreign-number' %}active{% endif %}"
+     aria-label="phone">
+    <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
+    </svg>
+  </a>
+  <a href="{% url 'sub-admin-shipment-list' %}"
+     class="bn-item {% if request.resolver_match.url_name == 'sub-admin-shipment-list' %}active{% endif %}"
+     aria-label="Create Shipment">
+    <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <rect x="1" y="3" width="15" height="13" rx="1.5"/>
+      <path d="M16 8h4l3 3v5h-7V8z"/>
+      <circle cx="5.5" cy="18.5" r="1.8"/>
+      <circle cx="18.5" cy="18.5" r="1.8"/>
+    </svg>
+  </a>
+  <a href="{% url 'sub-admin-site-settings' %}"
+     class="bn-item {% if request.resolver_match.url_name == 'sub-admin-site-settings' %}active{% endif %}"
+     aria-label="Settings">
+    <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+    </svg>
+  </a>
+</nav>
+
+<script>
+  const html = document.documentElement;
+  html.setAttribute('data-theme', localStorage.getItem('te-theme') || 'dark');
+
+  document.getElementById('themeToggle').addEventListener('click', () => {
+    const next = html.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+    html.setAttribute('data-theme', next);
+    localStorage.setItem('te-theme', next);
+  });
+</script>
+
+{% block extra_js %}{% endblock %}
+</body>
+</html>

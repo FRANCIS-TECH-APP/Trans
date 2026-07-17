@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head><title>Application Pending</title></head>
+<body>
+
+<h1>Application Status</h1>
+
+{% if messages %}
+  {% for message in messages %}
+    <p><strong>{{ message }}</strong></p>
+  {% endfor %}
+{% endif %}
+
+{% if profile %}
+
+  <p>Name: {{ profile.user.full_name }}</p>
+  <p>Email: {{ profile.user.email }}</p>
+  <p>Approval Status: {{ profile.get_approval_status_display }}</p>
+  <p>Payment Status: {{ profile.get_payment_status_display }}</p>
+
+  {% if profile.approval_status == 'approved' and profile.payment_status == 'awaiting' %}
+    <h2>Payment Required</h2>
+    <p>Activation Fee: {{ profile.activation_fee }} NGN</p>
+    <p>Please complete payment to activate your account.</p>
+    <p>
+      <a href="{% url 'sub-admin-pay' pk=profile.pk %}">Pay Now</a>
+    </p>
+
+  {% elif profile.approval_status == 'pending' %}
+    <p>Your application is under review. You will be notified by email once a decision is made.</p>
+
+  {% elif profile.approval_status == 'rejected' %}
+    <p>Your application was not approved.</p>
+    {% if profile.rejection_reason %}
+      <p>Reason: {{ profile.rejection_reason }}</p>
+    {% endif %}
+
+  {% elif profile.is_fully_activated %}
+    <p>Your account is active. <a href="{% url 'sub-admin-dashboard' %}">Go to Dashboard</a></p>
+  {% endif %}
+
+{% else %}
+  <p>Your application is being processed. Check your email for updates.</p>
+{% endif %}
+
+<p><a href="{% url 'admin-login' %}">Back to Login</a></p>
+
+</body>
+</html>

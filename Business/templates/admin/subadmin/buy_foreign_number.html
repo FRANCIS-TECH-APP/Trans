@@ -1,0 +1,399 @@
+{% extends "admin/subadmin/base.html" %}
+{% load business_extras %}
+
+{% block title %}Foreign Numbers — TransEdge{% endblock %}
+{% block page_title %}Foreign Numbers{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* Wallet hero — same gradient language as the dashboard's promo card */
+  .wallet-hero {
+    background: linear-gradient(135deg, #1e3a5f 0%, #2d5a8c 60%, #3b6ea5 100%);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    margin-bottom: 14px;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    position: relative;
+    overflow: hidden;
+  }
+  .wallet-hero::after { content: ''; position: absolute; right: -30px; top: -30px; width: 140px; height: 140px; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.08), transparent 70%); }
+  .wh-label { font-size: 10.5px; font-weight: 600; letter-spacing: .5px; text-transform: uppercase; opacity: .8; margin-bottom: 4px; }
+  .wh-amount { font-size: 26px; font-weight: 800; letter-spacing: -.3px; }
+  .wh-note { font-size: 11px; opacity: .75; margin-top: 3px; }
+  .wh-fund-btn { background: #fff; color: #1e3a5f; padding: 8px 16px; border-radius: 20px; font-size: 12px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; z-index: 1; }
+
+  /* Section header extension — icon + subtitle + count, on top of base's .section-header */
+  .section-header.with-icon { align-items: flex-start; gap: 10px; }
+  .sh-icon { width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .sh-titles p { font-size: 11.5px; color: var(--muted); margin-top: 2px; font-weight: 400; }
+  .sh-count { font-size: 11.5px; color: var(--muted); margin-left: auto; flex-shrink: 0; }
+  .section-body { padding: 16px; }
+
+  /* Server pill */
+  .server-pill { display: flex; align-items: center; justify-content: center; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 14px; font-size: 12.5px; font-weight: 600; margin-bottom: 12px; color: var(--text); gap: 8px; }
+  .server-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+
+  /* Inputs */
+  .search-wrap { position: relative; margin-bottom: 10px; }
+  .search-wrap svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+  .fn-input, .fn-select, .filter-input {
+    width: 100%; padding: 10px 13px; background: var(--surface2); border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm); font-size: 13px; color: var(--text); outline: none;
+    transition: border-color .2s; font-family: inherit;
+  }
+  .fn-input:focus, .fn-select:focus, .filter-input:focus { border-color: var(--sky); }
+  .fn-input-search { padding-left: 38px; }
+  .fn-select { margin-bottom: 10px; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 36px; }
+  .filter-input { border-radius: 20px; margin-bottom: 12px; }
+
+  /* Area section */
+  .area-section { background: var(--surface2); border: 1.5px solid var(--border); border-radius: var(--radius-sm); padding: 14px; margin-bottom: 12px; }
+  .area-label { font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+  .area-note { font-size: 11.5px; color: var(--red); font-weight: 500; margin-top: 8px; }
+
+  /* Prices table */
+  .prices-wrap { margin: 12px 0; background: var(--surface2); border-radius: var(--radius-sm); overflow: hidden; border: 1px solid var(--border); }
+  .prices-wrap table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .prices-wrap thead th { padding: 9px 12px; text-align: left; font-size: 10px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--border); }
+  .prices-wrap thead th.r { text-align: right; }
+  .prices-wrap tbody td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  .prices-wrap tbody td.r { text-align: right; font-weight: 600; }
+  .prices-wrap tbody tr:last-child td { border-bottom: none; }
+
+  .rent-btn { width: 100%; padding: 13px; font-size: 13.5px; font-weight: 700; justify-content: center; margin-top: 4px; }
+  .rent-btn:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+
+  .active-banner { background: var(--green-dim); border-left: 3px solid var(--green); border-radius: 0 8px 8px 0; padding: 10px 14px; font-size: 12px; color: var(--green); font-weight: 500; margin-bottom: 14px; }
+
+  /* Number card — mirrors dashboard's list-row density but needs multi-field body */
+  .num-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; margin-bottom: 10px; }
+  .num-card-header { display: flex; align-items: center; justify-content: space-between; padding: 11px 14px; border-bottom: 1px solid var(--border); }
+  .num-card-service { font-size: 12.5px; font-weight: 600; }
+  .num-card-body { padding: 4px 14px 12px; }
+
+  .num-row { display: flex; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .num-row:last-child { border-bottom: none; }
+  .num-row-label { font-size: 10px; font-weight: 700; letter-spacing: .7px; text-transform: uppercase; color: var(--muted); width: 82px; flex-shrink: 0; padding-top: 1px; }
+  .num-row-val { flex: 1; font-size: 13px; font-weight: 500; }
+
+  .num-phone-link { color: var(--sky); font-family: 'Courier New', monospace; font-size: 13.5px; font-weight: 700; text-decoration: none; display: flex; align-items: center; gap: 8px; }
+  .copy-btn { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; color: var(--muted); transition: background .15s; }
+  .copy-btn:hover { background: var(--sky-dim); color: var(--sky); }
+
+  .sms-code { font-size: 17px; font-weight: 800; color: var(--green); font-family: 'Courier New', monospace; display: flex; align-items: center; gap: 8px; }
+  .sms-full { font-size: 11.5px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+
+  /* Status dot-badges — same visual formula as base's .badge, extra color variants */
+  .b-pending   { background: var(--amber-dim); color: var(--amber); }
+  .b-received, .b-completed { background: var(--green-dim); color: var(--green); }
+  .b-cancelled { background: rgba(139,143,153,.15); color: var(--muted); }
+  .b-finished  { background: var(--sky-dim); color: var(--sky); }
+
+  .btn-check { background: var(--sky-dim); color: var(--sky); border: 1px solid rgba(59,130,246,.3); }
+  .btn-cancel-num { background: transparent; color: var(--red); border: 1px solid rgba(220,38,38,.3); }
+  .num-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Wallet Hero -->
+<div class="wallet-hero">
+  <div>
+    <div class="wh-label">Wallet Balance</div>
+    <div class="wh-amount">₦{{ account.balance|floatformat:2 }}</div>
+    <div class="wh-note">Acct: {{ account.account_number }} · Used for number purchases</div>
+  </div>
+  <a href="{% url 'sub-admin-wallet-deposit' %}" class="wh-fund-btn">
+    <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    Fund
+  </a>
+</div>
+
+<!-- Order Card -->
+<div class="section">
+  <div class="section-header with-icon">
+    <div class="sh-titles">
+      <h3>Order a number</h3>
+      <p>Search for a service then select a country to get a virtual number.</p>
+    </div>
+  </div>
+  <div class="section-body">
+
+    <div class="server-pill">
+      <span class="server-dot"></span>
+      Ordering on <strong style="margin-left:4px;">5SIM Server 1</strong>
+    </div>
+
+    <form method="get" action="{% url 'sub-admin-buy-foreign-number' %}" id="search-form">
+      <div class="search-wrap">
+        <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input type="text" id="service-search" class="fn-input fn-input-search" placeholder="Search for a service..." autocomplete="off"/>
+      </div>
+
+      <select name="service" id="service-select" class="fn-select" required onchange="this.form.submit()">
+        <option value="">— Select a service —</option>
+        {% for s in services %}
+        {% with sinfo=service_display|get_item:s %}
+        <option value="{{ s }}" {% if selected_service == s %}selected{% endif %}>{{ sinfo.1 }} {{ sinfo.0 }}</option>
+        {% endwith %}
+        {% endfor %}
+      </select>
+
+      <div class="area-section">
+        <div class="area-label">Country</div>
+        <select name="country" class="fn-select" style="margin-bottom:0;" onchange="this.form.submit()">
+          <option value="">— Select Country —</option>
+          {% for c in countries %}
+          {% with info=country_display|get_item:c %}
+          <option value="{{ c }}" {% if selected_country == c %}selected{% endif %}>{{ info.2 }} {{ info.0 }}</option>
+          {% endwith %}
+          {% endfor %}
+        </select>
+        <div class="area-note">⚠ Optional area code may add about 20% to the price.</div>
+      </div>
+    </form>
+
+    {% if selected_country and selected_service %}
+      {% if prices %}
+      <div class="prices-wrap">
+        <table>
+          <thead><tr><th>Operator</th><th class="r">Available</th><th class="r">Price</th></tr></thead>
+          <tbody>
+            {% for p in prices %}
+            <tr>
+              <td>{{ p.operator|capfirst }}</td>
+              <td class="r">{{ p.count }}</td>
+              <td class="r">₦{{ p.price_ngn|floatformat:0 }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <form method="post" action="{% url 'sub-admin-buy-foreign-number' %}">
+        {% csrf_token %}
+        <input type="hidden" name="country" value="{{ selected_country }}">
+        <input type="hidden" name="service" value="{{ selected_service }}">
+        <button type="submit" class="btn btn-primary rent-btn" {% if account.balance <= 0 %}disabled{% endif %}>
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 014.11 10a19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/>
+          </svg>
+          Rent number
+        </button>
+        {% if account.balance <= 0 %}
+        <p style="font-size:11.5px;color:var(--red);text-align:center;margin-top:8px;">Insufficient wallet balance. Please fund your wallet.</p>
+        {% endif %}
+      </form>
+      {% else %}
+      <div class="empty-cell">No numbers available for this combination. Try a different country or service.</div>
+      {% endif %}
+    {% endif %}
+
+  </div>
+</div>
+
+<!-- Verification requests -->
+<div class="section">
+  <div class="section-header with-icon">
+    <div class="sh-icon" style="background:var(--green-dim);">
+      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="color:var(--green);">
+        <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/>
+      </svg>
+    </div>
+    <div class="sh-titles">
+      <h3>Verification requests</h3>
+      <p>Codes update automatically. Tap a code to copy.</p>
+    </div>
+    <span class="sh-count">{{ numbers|length }} number{{ numbers|length|pluralize }}</span>
+  </div>
+  <div class="section-body">
+
+    {% if numbers %}
+    <div class="active-banner">
+      <strong>Active numbers</strong> — you do not need to refresh the page to receive codes.
+    </div>
+
+    <input type="text" class="filter-input" id="filter-input" placeholder="Filter table..."/>
+
+    <div id="numbers-list">
+      {% for n in numbers %}
+      {% with ninfo=country_display|get_item:n.country %}
+      <div class="num-card filterable" data-order-id="{{ n.order_id }}">
+        <div class="num-card-header">
+          <span class="num-card-service">{{ ninfo.2 }} {{ n.service|capfirst }}</span>
+          {% if n.status == "PENDING" %}<span class="badge b-pending">Waiting SMS</span>
+          {% elif n.status == "RECEIVED" %}<span class="badge b-completed">Completed</span>
+          {% elif n.status == "CANCELLED" %}<span class="badge b-cancelled">Cancelled</span>
+          {% else %}<span class="badge b-finished">{{ n.get_status_display }}</span>
+          {% endif %}
+        </div>
+        <div class="num-card-body">
+
+          <div class="num-row">
+            <span class="num-row-label">Service</span>
+            <span class="num-row-val">{{ n.service|capfirst }}</span>
+          </div>
+
+          <div class="num-row">
+            <span class="num-row-label">Phone</span>
+            <span class="num-row-val">
+              <a href="tel:{{ n.phone_number }}" class="num-phone-link">
+                {{ n.phone_number }}
+                <button type="button" class="copy-btn" onclick="copyText('{{ n.phone_number }}', this)">
+                  <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                </button>
+              </a>
+            </span>
+          </div>
+
+          {% if n.status == "RECEIVED" and n.sms_code %}
+          <div class="num-row">
+            <span class="num-row-label">Code</span>
+            <span class="num-row-val">
+              <div class="sms-code">
+                {{ n.sms_code }}
+                <button type="button" class="copy-btn" onclick="copyText('{{ n.sms_code }}', this)">
+                  <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                </button>
+              </div>
+              {% if n.sms_full_text %}<div class="sms-full">{{ n.sms_full_text }}</div>{% endif %}
+            </span>
+          </div>
+          {% endif %}
+
+          <div class="num-row">
+            <span class="num-row-label">Price</span>
+            <span class="num-row-val">₦{{ n.price|floatformat:0 }}</span>
+          </div>
+
+          <div class="num-row">
+            <span class="num-row-label">Status</span>
+            <span class="num-row-val">
+              {% if n.status == "PENDING" %}<span class="badge b-pending">Waiting for SMS</span>
+              {% elif n.status == "RECEIVED" %}<span class="badge b-completed">Completed</span>
+              {% elif n.status == "CANCELLED" %}<span class="badge b-cancelled">Cancelled</span>
+              {% else %}<span class="badge b-finished">{{ n.get_status_display }}</span>
+              {% endif %}
+            </span>
+          </div>
+
+          <div class="num-row">
+            <span class="num-row-label">Date</span>
+            <span class="num-row-val" style="font-size:11.5px;color:var(--muted);">{{ n.created_at|date:"d M Y, H:i" }}</span>
+          </div>
+
+          {% if n.status == "PENDING" %}
+          <div class="num-actions">
+            <button class="btn btn-check check-sms-btn"
+              data-order-id="{{ n.order_id }}"
+              data-url="{% url 'sub-admin-check-sms-5sim' order_id=n.order_id %}">
+              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+              Check SMS
+            </button>
+            <a href="{% url 'sub-admin-cancel-foreign-number' order_id=n.order_id %}"
+               class="btn btn-cancel-num"
+               onclick="return confirm('Cancel and refund ₦{{ n.price|floatformat:0 }}?')">
+              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+              Cancel &amp; Refund
+            </a>
+          </div>
+          {% endif %}
+
+        </div>
+      </div>
+      {% endwith %}
+      {% endfor %}
+    </div>
+
+    {% else %}
+    <div class="empty-cell">
+      <svg width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" style="color:var(--muted);margin:0 auto 10px;display:block;">
+        <rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>
+      </svg>
+      You haven't purchased any numbers yet.<br>
+      <span style="font-size:11.5px;">Use the form above to order your first number.</span>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const serviceSearch = document.getElementById('service-search');
+  const serviceSelect = document.getElementById('service-select');
+  if (serviceSearch && serviceSelect) {
+    const allOptions = Array.from(serviceSelect.options);
+    serviceSearch.addEventListener('input', function() {
+      const q = this.value.toLowerCase();
+      const cur = serviceSelect.value;
+      while (serviceSelect.options.length > 1) serviceSelect.remove(1);
+      allOptions.forEach(opt => {
+        if (opt.value === '') return;
+        if (!q || opt.text.toLowerCase().includes(q)) serviceSelect.add(opt.cloneNode(true));
+      });
+      serviceSelect.value = cur;
+    });
+  }
+
+  function copyText(text, btn) {
+    navigator.clipboard.writeText(text).then(() => {
+      const orig = btn.innerHTML;
+      btn.innerHTML = '<svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+      btn.style.color = 'var(--green)';
+      setTimeout(() => { btn.innerHTML = orig; btn.style.color = ''; }, 1500);
+    });
+  }
+
+  const filterInput = document.getElementById('filter-input');
+  if (filterInput) {
+    filterInput.addEventListener('input', function() {
+      const q = this.value.toLowerCase();
+      document.querySelectorAll('.filterable').forEach(card => {
+        card.style.display = card.textContent.toLowerCase().includes(q) ? '' : 'none';
+      });
+    });
+  }
+
+  function checkSms(btn) {
+    const url = btn.dataset.url;
+    const orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = 'Checking…';
+    fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(r => r.json())
+      .then(data => {
+        if (data.status === 'received' && data.sms_code) {
+          const card = btn.closest('.num-card');
+          const badge = card.querySelector('.badge');
+          if (badge) { badge.className = 'badge b-completed'; badge.textContent = 'Completed'; }
+          const rows = card.querySelectorAll('.num-row');
+          const phoneRow = rows[1];
+          const codeRow = document.createElement('div');
+          codeRow.className = 'num-row';
+          codeRow.innerHTML = `<span class="num-row-label">Code</span><span class="num-row-val"><div class="sms-code">${data.sms_code}<button type="button" class="copy-btn" onclick="copyText('${data.sms_code}',this)"><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button></div>${data.sms_full_text ? `<div class="sms-full">${data.sms_full_text}</div>` : ''}</span>`;
+          phoneRow.insertAdjacentElement('afterend', codeRow);
+          const actions = card.querySelector('.num-actions');
+          if (actions) actions.remove();
+        } else {
+          btn.disabled = false;
+          btn.innerHTML = orig;
+        }
+      })
+      .catch(() => { btn.disabled = false; btn.innerHTML = orig; });
+  }
+
+  document.querySelectorAll('.check-sms-btn').forEach(btn => btn.addEventListener('click', () => checkSms(btn)));
+  setInterval(() => {
+    document.querySelectorAll('.check-sms-btn:not([disabled])').forEach(btn => checkSms(btn));
+  }, 10000);
+</script>
+{% endblock %}
