@@ -30,6 +30,8 @@
   --purple-dim: rgba(124,58,237,.12);
   --header-h:   56px;
   --nav-h:      64px;
+  --sidebar-w:  260px;
+  --sidebar-w-collapsed: 76px;
   --radius:     14px;
   --radius-sm:  10px;
 }
@@ -58,12 +60,117 @@ body {
   font-size: 14px;
 }
 
+/* ── SIDEBAR — desktop only, mobile keeps the floating bottom nav ── */
+.sidebar {
+  display: none;
+  width: var(--sidebar-w);
+  flex-shrink: 0;
+  flex-direction: column;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  transition: width .22s ease, background .3s, border-color .3s;
+}
+@media (min-width: 900px) {
+  .sidebar { display: flex; }
+  .bottom-nav { display: none; }
+  .main { margin-left: 0; }
+}
+
+.sidebar-logo {
+  height: var(--header-h);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 18px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  cursor: pointer;
+  background: none;
+  border-left: none; border-top: none; border-right: none;
+  width: 100%;
+  font-family: inherit;
+  text-align: left;
+}
+.sidebar-logo:hover { background: var(--surface2); }
+.logo-mark-sb {
+  width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--sky), var(--sky2));
+  display: flex; align-items: center; justify-content: center;
+}
+.logo-text { min-width: 0; overflow: hidden; }
+.logo-text .name { font-size: 15px; font-weight: 800; letter-spacing: -.02em; color: var(--text); white-space: nowrap; }
+.logo-text .tag { font-size: 10.5px; color: var(--muted); white-space: nowrap; }
+.sidebar.collapsed .logo-text { display: none; }
+.sidebar.collapsed { width: var(--sidebar-w-collapsed); }
+.sidebar.collapsed .sidebar-logo { justify-content: center; padding: 0; }
+
+.sidebar-section { padding: 16px 12px 4px; }
+.sidebar-label {
+  font-size: 10px; font-weight: 700; letter-spacing: 1.1px; text-transform: uppercase;
+  color: var(--muted); padding: 0 10px; margin-bottom: 6px; white-space: nowrap; overflow: hidden;
+}
+.sidebar.collapsed .sidebar-label { display: none; }
+
+.sb-nav-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 12px; border-radius: 8px;
+  font-size: 13.5px; font-weight: 500; color: var(--muted);
+  text-decoration: none; margin-bottom: 2px; white-space: nowrap; overflow: hidden;
+  transition: background .15s, color .15s;
+}
+.sb-nav-item svg { flex-shrink: 0; opacity: .75; }
+.sb-nav-item:hover { background: var(--surface2); color: var(--text); }
+.sb-nav-item.active { background: var(--sky-dim); color: var(--sky); font-weight: 600; }
+.sb-nav-item.active svg { opacity: 1; }
+.sidebar.collapsed .sb-nav-item { justify-content: center; padding: 10px; }
+.sidebar.collapsed .sb-nav-item span.nav-text { display: none; }
+
+.sb-badge {
+  margin-left: auto; background: var(--red); color: #fff;
+  font-size: 10px; font-weight: 700; border-radius: 999px;
+  min-width: 17px; height: 17px; display: flex; align-items: center; justify-content: center; padding: 0 4px;
+  flex-shrink: 0;
+}
+.sidebar.collapsed .sb-badge { display: none; }
+
+.sidebar-footer {
+  margin-top: auto; padding: 12px; border-top: 1px solid var(--border); flex-shrink: 0;
+}
+.sb-user-card {
+  display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px;
+  background: var(--surface2); border: 1px solid var(--border); margin-bottom: 8px; overflow: hidden;
+}
+.sb-avatar {
+  width: 32px; height: 32px; border-radius: 50%; background: var(--sky-dim); color: var(--sky);
+  display: flex; align-items: center; justify-content: center; font-size: 12.5px; font-weight: 700; flex-shrink: 0;
+}
+.sb-user-info { min-width: 0; }
+.sb-user-name { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sb-user-role { font-size: 10.5px; color: var(--muted); }
+.sidebar.collapsed .sb-user-info { display: none; }
+.sidebar.collapsed .sb-user-card { justify-content: center; padding: 9px; }
+
+.sb-logout {
+  display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 8px;
+  font-size: 13px; font-weight: 600; color: var(--red); text-decoration: none;
+  transition: background .15s; white-space: nowrap; overflow: hidden;
+}
+.sb-logout:hover { background: var(--red-dim); }
+.sidebar.collapsed .sb-logout { justify-content: center; padding: 9px; }
+.sidebar.collapsed .sb-logout span.nav-text { display: none; }
+
 .main {
   flex: 1;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
   width: 100%;
+  min-width: 0;
 }
 
 /* TOPBAR — logo left, avatar / bell / theme right, no wordmark, no hamburger */
@@ -91,6 +198,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+@media (min-width: 900px) {
+  .topbar-left .logo-inline { display: none; }
 }
 
 .topbar-right { display: flex; align-items: center; gap: 8px; }
@@ -145,6 +255,9 @@ body {
   margin: 0 auto;
   width: 100%;
   padding-bottom: 108px; /* clears the floating bottom nav */
+}
+@media (min-width: 900px) {
+  .content { max-width: 1100px; padding: 24px 32px; }
 }
 
 .messages { margin-bottom: 12px; }
@@ -229,7 +342,7 @@ body {
   font-size: 13px;
 }
 
-/* FLOATING BOTTOM NAV — replaces the sidebar entirely */
+/* FLOATING BOTTOM NAV — mobile only, desktop uses the sidebar instead */
 .bottom-nav {
   position: fixed;
   left: 50%;
@@ -274,6 +387,86 @@ body {
 {% block extra_head %}{% endblock %}
 </head>
 <body>
+
+<!-- ── SIDEBAR (desktop) ──────────────────────────────── -->
+<aside class="sidebar" id="sidebar">
+  <button type="button" class="sidebar-logo" id="sidebarLogoToggle" aria-label="Toggle sidebar">
+    <div class="logo-mark-sb">
+      <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="white" stroke-width="2.5">
+        <path d="M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h11a2 2 0 012 2v3"/>
+        <rect x="9" y="11" width="14" height="10" rx="2"/>
+        <circle cx="12" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+      </svg>
+    </div>
+    <div class="logo-text">
+      <div class="name">TransEdge</div>
+      <div class="tag">Shipping Simplified</div>
+    </div>
+  </button>
+
+  <div class="sidebar-section">
+    <div class="sidebar-label">Main</div>
+    <a href="{% url 'sub-admin-dashboard' %}" class="sb-nav-item {% if request.resolver_match.url_name == 'sub-admin-dashboard' %}active{% endif %}">
+      <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <span class="nav-text">Dashboard</span>
+    </a>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-label">Shipments</div>
+    <a href="{% url 'sub-admin-shipment-create' %}" class="sb-nav-item {% if request.resolver_match.url_name == 'sub-admin-shipment-create' %}active{% endif %}">
+      <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+      <span class="nav-text">Create Shipment</span>
+    </a>
+    <a href="{% url 'sub-admin-shipment-list' %}" class="sb-nav-item {% if request.resolver_match.url_name == 'sub-admin-shipment-list' %}active{% endif %}">
+      <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+      <span class="nav-text">All Shipments</span>
+    </a>
+    <a href="{% url 'sub-admin-buy-foreign-number' %}" class="sb-nav-item {% if request.resolver_match.url_name == 'sub-admin-buy-foreign-number' %}active{% endif %}">
+      <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+      <span class="nav-text">Foreign Numbers</span>
+    </a>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-label">Management</div>
+    <a href="{% url 'sub-admin-buy-points' %}" class="sb-nav-item {% if request.resolver_match.url_name == 'sub-admin-buy-points' %}active{% endif %}">
+      <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+      <span class="nav-text">Buy Points</span>
+    </a>
+    <a href="{% url 'sub-admin-notifications' %}" class="sb-nav-item {% if request.resolver_match.url_name == 'sub-admin-notifications' %}active{% endif %}">
+      <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+      <span class="nav-text">Notifications</span>
+      {% if unread_notifications %}<span class="sb-badge">{{ unread_notifications }}</span>{% endif %}
+    </a>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-label">Account</div>
+    <a href="{% url 'sub-admin-profile' %}" class="sb-nav-item {% if request.resolver_match.url_name == 'sub-admin-profile' %}active{% endif %}">
+      <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <span class="nav-text">Profile</span>
+    </a>
+    <a href="{% url 'sub-admin-site-settings' %}" class="sb-nav-item {% if request.resolver_match.url_name == 'sub-admin-site-settings' %}active{% endif %}">
+      <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      <span class="nav-text">Settings</span>
+    </a>
+  </div>
+
+  <div class="sidebar-footer">
+    <div class="sb-user-card">
+      <div class="sb-avatar">{{ request.user.full_name|default:"?"|first|upper }}</div>
+      <div class="sb-user-info">
+        <div class="sb-user-name">{{ request.user.full_name|default:"Sub Admin" }}</div>
+        <div class="sb-user-role">Sub-Admin</div>
+      </div>
+    </div>
+    <a href="{% url 'sub-admin-logout' %}" class="sb-logout">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      <span class="nav-text">Sign out</span>
+    </a>
+  </div>
+</aside>
 
 <div class="main">
 
@@ -513,6 +706,21 @@ body {
     html.setAttribute('data-theme', next);
     localStorage.setItem('te-theme', next);
   });
+
+  // Sidebar collapse — toggled by clicking the TransEdge logo
+  (function () {
+    const sidebar = document.getElementById('sidebar');
+    const logoBtn = document.getElementById('sidebarLogoToggle');
+    if (!sidebar || !logoBtn) return;
+
+    if (localStorage.getItem('te-sidebar-collapsed') === 'true') {
+      sidebar.classList.add('collapsed');
+    }
+    logoBtn.addEventListener('click', () => {
+      sidebar.classList.toggle('collapsed');
+      localStorage.setItem('te-sidebar-collapsed', sidebar.classList.contains('collapsed'));
+    });
+  })();
 </script>
 
 {% block extra_js %}{% endblock %}
