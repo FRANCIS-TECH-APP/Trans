@@ -732,3 +732,145 @@ def admin_testimonial_delete(request, pk):
     t.delete()
     messages.success(request, f"Testimonial from {name} deleted.")
     return redirect("admin-testimonials")
+
+
+
+
+
+
+# ══════════════════════════════════════════════════════════════════
+#  ADD TO Business/views.py
+#
+#  Assumes:
+#   - request.user.sub_admin_profile is the SubAdminProfile
+#   - request.user.account is the Account NGN wallet (OneToOne)
+#   - You already have an approval check pattern elsewhere; the
+#     `sub_admin_required` decorator below is a self-contained
+#     version — delete it and import your existing one instead if
+#     you already have one in Business/decorators.py.
+# ══════════════════════════════════════════════════════════════════
+
+from functools import wraps
+from decimal import Decimal
+
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.db import transaction
+from django.shortcuts import render, redirect, get_object_or_404
+from django.utils import timezone
+
+from .models import BuyLogs, BuyLogDetails, Purchase, Account, SubAdminProfile
+
+
+def sub_admin_required(view_func):
+    """Only approved sub-admins may browse or buy logs."""
+    @wraps(view_func)
+    @login_required
+    def wrapper(request, *args, **kwargs):
+        profile = getattr(request.user, "sub_admin_profile", None)
+        if profile is None or profile.approval_status != SubAdminProfile.ApprovalStatus.APPROVED:
+            messages.error(request, "Your sub-admin account isn't approved yet.")
+            return redirect("sub-admin-dashboard")
+        return view_func(request, *args, **kwargs)
+    return wrapper
+
+
+@sub_admin_required
+def browse_logs(request):
+    """List active log products, optionally filtered by category."""
+    category = request.GET.get("category")
+
+    products = BuyLogs.objects.filter(active=True)
+    if category:
+        products = products.filter(category=category)
+
+    context = {
+        "products": products,
+        "categories": BuyLogs.Categories.choices,
+        "selected_category": category,
+        "wallet_balance": request.user.account.balance,
+    }
+    return render(request, "buy_logs/browse.html", context)
+
+
+@sub_admin_required
+def log_detail(request, pk):
+    product = get_object_or_404(BuyLogs, pk=pk, active=True)
+    context = {
+        "product": product,
+        "wallet_balance": request.user.account.balance,
+    }
+    return render(request, "buy_logs/detail.html", context)
+
+
+@sub_admin_required
+def purchase_log(request, pk):
+    """
+    POST-only. Atomically: lock the buyer's wallet, lock one unsold
+    log for this product, check balance, debit, mark sold, record
+    the Purchase — all or nothing.
+    """
+    if request.method != "POST":
+        return redirect("buy-logs-detail", pk=pk)
+
+    product = get_object_or_404(BuyLogs, pk=pk, active=True)
+
+    try:
+        with transaction.atomic():
+            account = Account.objects.select_for_update().get(user=request.user)
+
+            if account.balance < product.price:
+                messages.error(request, "Insufficient wallet balance for this purchase.")
+                return redirect("buy-logs-detail", pk=pk)
+
+            log = (
+                BuyLogDetails.objects
+                .select_for_update(skip_locked=True)
+                .filter(product=product, sold=False)
+                .order_by("created_at")
+                .first()
+            )
+            if log is None:
+                messages.error(request, "This product is out of stock right now.")
+                return redirect("buy-logs-detail", pk=pk)
+
+            account.balance -= product.price
+            account.save(update_fields=["balance", "updated_at"])
+
+            log.sold = True
+            log.sold_at = timezone.now()
+            log.save(update_fields=["sold", "sold_at"])
+
+            purchase = Purchase.objects.create(
+                buyer=request.user,
+                product=product,
+                log=log,
+                account=account,
+                amount=product.price,
+            )
+    except Account.DoesNotExist:
+        messages.error(request, "No wallet found on your account.")
+        return redirect("buy-logs-detail", pk=pk)
+
+    messages.success(request, f"Purchased {product.title}. Check your purchase history for credentials.")
+    return redirect("buy-logs-receipt", pk=purchase.pk)
+
+
+@sub_admin_required
+def my_purchases(request):
+    purchases = (
+        Purchase.objects
+        .filter(buyer=request.user)
+        .select_related("product", "log")
+    )
+    return render(request, "buy_logs/my_purchases.html", {"purchases": purchases})
+
+
+@sub_admin_required
+def purchase_receipt(request, pk):
+    """Reveal the credentials for one purchase — buyer-only."""
+    purchase = get_object_or_404(
+        Purchase.objects.select_related("product", "log"),
+        pk=pk, buyer=request.user,
+    )
+    return render(request, "buy_logs/receipt.html", {"purchase": purchase})

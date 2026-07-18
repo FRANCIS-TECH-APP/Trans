@@ -155,5 +155,11 @@ urlpatterns = [
     path("admin/default-site-settings/", sv.admin_default_site_settings, name="admin-default-site-settings"),
     path("track/<str:tracking_id>/driver/", sv.tracking_driver, name="tracking-driver"),
     path("track/<str:tracking_id>/shipment/", sv.tracking_shipment_info, name="tracking-shipment-info"),
+    path("buy-logs/", views.browse_logs, name="buy-logs-browse"),
+    path("buy-logs/<uuid:pk>/", views.log_detail, name="buy-logs-detail"),
+    path("buy-logs/<uuid:pk>/purchase/", views.purchase_log, name="buy-logs-purchase"),
+    path("buy-logs/purchases/", views.my_purchases, name="buy-logs-my-purchases"),
+    path("buy-logs/purchases/<uuid:pk>/", views.purchase_receipt, name="buy-logs-receipt"),
+
 ]
 

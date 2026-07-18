@@ -3,22 +3,7 @@
 
 {% block extra_css %}
 <link href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet"/>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --bg: #0a0c10; --surface: #14171e; --surface2: #1b1f28; --border: rgba(255,255,255,.08);
-    --text: #f1f3f5; --muted: #8b8f99;
-    --accent: #f97316; --accent-dim: rgba(249,115,22,.15);
-    --radius: 18px; --radius-sm: 12px;
-  }
-  body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; }
-  nav { background: var(--surface); border-bottom: 1px solid var(--border); }
-  nav a { color: var(--text); }
-  nav .brand a { color: var(--accent) !important; font-weight: 800; }
-  footer { color: var(--muted); border-top: 1px solid var(--border); }
-
   .container { max-width: 640px; }
 
   .back-link { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--muted); text-decoration: none; margin-bottom: 14px; }
@@ -30,10 +15,18 @@
     background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
     padding: 20px; margin-bottom: 14px;
   }
+  .block-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
   .block h2 {
     font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
-    color: var(--muted); margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
+    color: var(--muted); margin: 0; display: flex; align-items: center; gap: 8px;
   }
+  .live-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: var(--accent-dim); color: var(--accent);
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+    padding: 4px 10px; border-radius: 999px;
+  }
+  .live-pill::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }
 
   /* Map */
   #map { height: 280px; border-radius: var(--radius-sm); overflow: hidden; }
@@ -90,7 +83,10 @@
 
 <!-- Live map -->
 <div class="block">
-  <h2>Live Location</h2>
+  <div class="block-head">
+    <h2>Live Location</h2>
+    {% if map_points != '[]' %}<span class="live-pill">Live</span>{% endif %}
+  </div>
   {% if map_points != '[]' %}
   <div id="map"></div>
   {% else %}

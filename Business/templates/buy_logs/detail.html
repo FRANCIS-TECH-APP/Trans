@@ -1,0 +1,91 @@
+{% extends "admin/subadmin/base.html" %}
+{% block title %}{{ product.title }} — Buy Logs — TransEdge{% endblock %}
+
+{% block extra_css %}
+<style>
+  .back-link { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--muted); text-decoration: none; margin-bottom: 14px; }
+  .back-link:hover { color: var(--sky); }
+
+  .product-section img { width: 100%; aspect-ratio: 16/9; object-fit: cover; background: var(--surface2); display: block; }
+  .product-body { padding: 18px 16px; }
+
+  .cat-pill {
+    display: inline-flex; font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em;
+    color: var(--sky); background: var(--sky-dim); font-weight: 700;
+    padding: 4px 10px; border-radius: 999px; margin-bottom: 12px;
+  }
+  .product-body h1 { font-size: 17px; font-weight: 800; margin: 0 0 10px; }
+  .product-body .desc { font-size: 13px; color: var(--muted); line-height: 1.6; margin-bottom: 18px; }
+
+  .price-row {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 14px 16px; margin-bottom: 14px;
+  }
+  .price-row .price { font-size: 19px; font-weight: 800; color: var(--sky); }
+
+  .wallet-line {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 12.5px; color: var(--muted); margin-bottom: 16px;
+  }
+  .wallet-line strong { color: var(--text); }
+
+  .btn-buy { display: block; width: 100%; text-align: center; }
+  .btn-buy:disabled { background: var(--surface2); color: var(--muted); cursor: not-allowed; opacity: 1; }
+
+  .warn-note {
+    background: var(--amber-dim); border: 1px solid var(--amber);
+    border-radius: var(--radius-sm); padding: 12px 14px; font-size: 12px; color: var(--text);
+    margin-top: 14px; line-height: 1.5;
+  }
+  .warn-note a { color: var(--sky); font-weight: 700; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<a href="{% url 'buy-logs-browse' %}" class="back-link">← Back to Buy Logs</a>
+
+<div class="section product-section">
+  {% if product.image %}
+  <img src="{{ product.image.url }}" alt="{{ product.title }}">
+  {% endif %}
+  <div class="product-body">
+    <span class="cat-pill">{{ product.get_category_display }}</span>
+    <h1>{{ product.title }}</h1>
+    <p class="desc">{{ product.description }}</p>
+
+    <div class="price-row">
+      <span class="price">₦{{ product.price|floatformat:2 }}</span>
+      {% if product.in_stock %}
+      <span class="badge b-delivered">{{ product.stock_count }} in stock</span>
+      {% else %}
+      <span class="badge b-cancelled">Out of stock</span>
+      {% endif %}
+    </div>
+
+    <div class="wallet-line">
+      <span>Wallet Balance</span>
+      <strong>₦{{ wallet_balance|floatformat:2 }}</strong>
+    </div>
+
+    <form method="post" action="{% url 'buy-logs-purchase' pk=product.pk %}">
+      {% csrf_token %}
+      {% if not product.in_stock %}
+      <button type="button" class="btn btn-primary btn-buy" disabled>Out of Stock</button>
+      {% elif wallet_balance < product.price %}
+      <button type="button" class="btn btn-primary btn-buy" disabled>Insufficient Balance</button>
+      {% else %}
+      <button type="submit" class="btn btn-primary btn-buy">Buy Now — ₦{{ product.price|floatformat:2 }}</button>
+      {% endif %}
+    </form>
+
+    {% if not product.in_stock %}
+    <div class="warn-note">This product is currently sold out. Check back soon or try another product.</div>
+    {% elif wallet_balance < product.price %}
+    <div class="warn-note">Your wallet balance is too low for this purchase. <a href="{% url 'wallet-fund' %}">Fund your wallet</a> to continue.</div>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

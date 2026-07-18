@@ -2494,3 +2494,5 @@ def tracking_shipment_info(request, tracking_id):
         for cp in checkpoints if cp.latitude and cp.longitude
     ])
     return render(request, "public/tracking_shipment_info.html", {"shipment": shipment, "map_points": map_points})
+
+

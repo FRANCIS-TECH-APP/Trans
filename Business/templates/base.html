@@ -1,30 +1,68 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>{% block title %}SwiftTrack{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
-    body { font-family: sans-serif; margin: 0; padding: 0; background: #f5f5f5; color: #222; }
-    nav { background: #1a1a2e; color: white; padding: 12px 20px; display: flex; align-items: center; gap: 20px; }
-    nav a { color: white; text-decoration: none; font-size: 14px; }
-    nav .brand { font-weight: bold; font-size: 18px; }
-    .container { max-width: 960px; margin: 0 auto; padding: 20px; }
-    .messages { margin-bottom: 16px; }
-    .messages li { list-style: none; padding: 10px 14px; border-radius: 4px; margin-bottom: 6px; font-size: 14px; }
-    .messages li.success { background: #d4edda; color: #155724; }
-    .messages li.error   { background: #f8d7da; color: #721c24; }
-    .messages li.info    { background: #d1ecf1; color: #0c5460; }
-    footer { text-align: center; padding: 20px; font-size: 12px; color: #888; border-top: 1px solid #ddd; margin-top: 40px; }
+    :root {
+      --bg: #0a0c10; --surface: #14171e; --surface2: #1b1f28; --border: rgba(255,255,255,.08);
+      --text: #f1f3f5; --muted: #8b8f99;
+      --accent: #f97316; --accent-dim: rgba(249,115,22,.15);
+      --green: #22c55e; --green-dim: rgba(34,197,94,.15);
+      --radius: 18px; --radius-sm: 12px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif;
+      margin: 0; padding: 0; -webkit-font-smoothing: antialiased;
+    }
+    a { color: inherit; }
+
+    nav {
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 14px 20px; display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 50;
+    }
+    nav .brand a {
+      color: var(--accent); text-decoration: none; font-weight: 800; font-size: 17px;
+      letter-spacing: -.01em; display: flex; align-items: center; gap: 6px;
+    }
+    nav .links { display: flex; align-items: center; gap: 18px; }
+    nav .links a {
+      color: var(--muted); text-decoration: none; font-size: 13.5px; font-weight: 600;
+      transition: color .15s;
+    }
+    nav .links a:hover { color: var(--text); }
+
+    .container { max-width: 640px; margin: 0 auto; padding: 20px 16px 40px; }
+
+    .messages { margin-bottom: 16px; list-style: none; padding: 0; }
+    .messages li {
+      padding: 12px 16px; border-radius: var(--radius-sm); margin-bottom: 8px;
+      font-size: 13.5px; font-weight: 500; border: 1px solid var(--border);
+    }
+    .messages li.success { background: var(--green-dim); color: var(--green); border-color: rgba(34,197,94,.3); }
+    .messages li.error   { background: rgba(239,68,68,.12); color: #ef4444; border-color: rgba(239,68,68,.3); }
+    .messages li.info    { background: var(--accent-dim); color: var(--accent); border-color: rgba(249,115,22,.3); }
+
+    footer {
+      text-align: center; padding: 24px 20px; font-size: 11.5px;
+      color: var(--muted); border-top: 1px solid var(--border); margin-top: 20px;
+    }
   </style>
   {% block extra_css %}{% endblock %}
 </head>
 <body>
 
 <nav>
-  <span class="brand"><a href="{% url 'home' %}" style="color:white;text-decoration:none">SwiftTrack</a></span>
-  <a href="{% url 'tracking-search' %}">Track Shipment</a>
+  <span class="brand"><a href="{% url 'home' %}">📦 SwiftTrack</a></span>
+  <span class="links">
+    <a href="{% url 'tracking-search' %}">Track Shipment</a>
+  </span>
 </nav>
 
 <div class="container">

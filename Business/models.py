@@ -1035,3 +1035,110 @@ class SubAdminSiteSettings(models.Model):
         profile = user.sub_admin_profile
         obj, _  = cls.objects.get_or_create(sub_admin=profile)
         return obj
+
+
+
+# ══════════════════════════════════════════════════════════════════
+#  ADD TO Business/models.py — REPLACES your draft BuyLogs /
+#  BuyLogDetails / Purchase classes below with this version.
+#
+#  Wired to the SAME `Account` NGN wallet your ForeignNumber
+#  purchases already use — no separate points system.
+# ══════════════════════════════════════════════════════════════════
+
+class BuyLogs(models.Model):
+    class Categories(models.TextChoices):
+        FACEBOOK      = "facebook",      "Facebook"
+        SNAPCHAT      = "snapchat",      "Snapchat"
+        WORKING_TOOLS = "working_tools", "Working Tools"
+        TIKTOK        = "tiktok",        "TikTok"
+
+    id          = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    category    = models.CharField(max_length=30, choices=Categories.choices)
+    title       = models.CharField(max_length=200)
+    image       = models.ImageField(upload_to="categories/")
+    description = models.TextField()
+    price       = models.DecimalField(max_digits=10, decimal_places=2)
+    active      = models.BooleanField(default=True)
+    created_at  = models.DateTimeField(auto_now_add=True)
+    updated_at  = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["category", "title"]
+        verbose_name = "Log Product"
+        verbose_name_plural = "Log Products"
+
+    def __str__(self):
+        return self.title
+
+    @property
+    def stock_count(self):
+        return self.details.filter(sold=False).count()
+
+    @property
+    def in_stock(self):
+        return self.stock_count > 0
+
+
+class BuyLogDetails(models.Model):
+    """
+    The actual credential stock. Only ever created/edited from the
+    Django admin by an ADMIN-role user (enforced in admin.py) —
+    sub-admins never see this model directly, only the Purchase
+    it produces once bought.
+    """
+    id              = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    product         = models.ForeignKey(
+        BuyLogs, on_delete=models.CASCADE, related_name="details"
+    )
+    email           = models.CharField(max_length=200)
+    password        = models.CharField(max_length=200)
+    recovery_email  = models.CharField(max_length=200, blank=True)
+    two_factor_code = models.CharField(max_length=100, blank=True)
+
+    sold       = models.BooleanField(default=False)
+    added_by   = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True,
+        related_name="buy_logs_added",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    sold_at    = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["created_at"]
+        verbose_name = "Log Stock Item"
+        verbose_name_plural = "Log Stock Items"
+
+    def __str__(self):
+        return f"{self.email} — {'SOLD' if self.sold else 'AVAILABLE'}"
+
+
+class Purchase(models.Model):
+    """
+    A completed sub-admin purchase of one log. Deducts from the same
+    `Account` wallet used for ForeignNumber (5sim) purchases.
+    """
+    id        = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    buyer     = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name="log_purchases",
+    )
+    product   = models.ForeignKey(
+        BuyLogs, on_delete=models.CASCADE, related_name="purchases"
+    )
+    log       = models.OneToOneField(
+        BuyLogDetails, on_delete=models.CASCADE, related_name="purchase"
+    )
+    account   = models.ForeignKey(
+        Account, on_delete=models.SET_NULL, null=True,
+        related_name="log_purchases",
+        help_text="Wallet the purchase was debited from.",
+    )
+    amount        = models.DecimalField(max_digits=10, decimal_places=2)
+    purchased_at  = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-purchased_at"]
+
+    def __str__(self):
+        return f"{self.buyer} - {self.product.title}"

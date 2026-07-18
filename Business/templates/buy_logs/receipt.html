@@ -1,0 +1,101 @@
+{% extends "admin/subadmin/base.html" %}
+{% block title %}Receipt — {{ purchase.product.title }} — TransEdge{% endblock %}
+
+{% block extra_css %}
+<style>
+  .back-link { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--muted); text-decoration: none; margin-bottom: 14px; }
+  .back-link:hover { color: var(--sky); }
+
+  .receipt-head { padding: 16px; display: flex; align-items: center; justify-content: space-between; }
+  .receipt-head .name { font-size: 15px; font-weight: 800; margin-bottom: 3px; }
+  .receipt-head .meta { font-size: 11.5px; color: var(--muted); }
+  .receipt-head .amount { font-size: 15px; font-weight: 800; color: var(--sky); }
+
+  .cred-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 12px 16px; border-top: 1px solid var(--border);
+  }
+  .cred-row .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-bottom: 3px; }
+  .cred-row .val { font-size: 13px; font-weight: 600; font-family: 'SFMono-Regular', Consolas, monospace; word-break: break-all; }
+  .copy-btn {
+    flex-shrink: 0; background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+    font-size: 11px; font-weight: 700; padding: 6px 12px; border-radius: 8px; cursor: pointer;
+  }
+  .copy-btn:hover { background: var(--sky-dim); color: var(--sky); }
+
+  .warn-note {
+    background: var(--amber-dim); border: 1px solid var(--amber);
+    border-radius: var(--radius-sm); padding: 12px 14px; font-size: 12px; color: var(--text);
+    margin-top: 14px; line-height: 1.5;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<a href="{% url 'buy-logs-my-purchases' %}" class="back-link">← Back to My Purchases</a>
+
+<div class="section">
+  <div class="receipt-head">
+    <div>
+      <div class="name">{{ purchase.product.title }}</div>
+      <div class="meta">{{ purchase.product.get_category_display }} · Purchased {{ purchase.purchased_at|date:"M d, Y H:i" }}</div>
+    </div>
+    <div class="amount">₦{{ purchase.amount|floatformat:2 }}</div>
+  </div>
+
+  <div class="cred-row">
+    <div>
+      <div class="lbl">Email</div>
+      <div class="val" id="cred-email">{{ purchase.log.email }}</div>
+    </div>
+    <button type="button" class="copy-btn" data-copy="cred-email">Copy</button>
+  </div>
+
+  <div class="cred-row">
+    <div>
+      <div class="lbl">Password</div>
+      <div class="val" id="cred-password">{{ purchase.log.password }}</div>
+    </div>
+    <button type="button" class="copy-btn" data-copy="cred-password">Copy</button>
+  </div>
+
+  {% if purchase.log.recovery_email %}
+  <div class="cred-row">
+    <div>
+      <div class="lbl">Recovery Email</div>
+      <div class="val" id="cred-recovery">{{ purchase.log.recovery_email }}</div>
+    </div>
+    <button type="button" class="copy-btn" data-copy="cred-recovery">Copy</button>
+  </div>
+  {% endif %}
+
+  {% if purchase.log.two_factor_code %}
+  <div class="cred-row">
+    <div>
+      <div class="lbl">2FA Code</div>
+      <div class="val" id="cred-2fa">{{ purchase.log.two_factor_code }}</div>
+    </div>
+    <button type="button" class="copy-btn" data-copy="cred-2fa">Copy</button>
+  </div>
+  {% endif %}
+</div>
+
+<div class="warn-note">Save these credentials now — change the password on first login to secure the account.</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.querySelectorAll('.copy-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const text = document.getElementById(btn.dataset.copy).textContent.trim();
+      navigator.clipboard.writeText(text).then(() => {
+        const original = btn.textContent;
+        btn.textContent = 'Copied';
+        setTimeout(() => { btn.textContent = original; }, 1500);
+      });
+    });
+  });
+</script>
+{% endblock %}

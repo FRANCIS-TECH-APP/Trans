@@ -500,3 +500,114 @@ class SubAdminSiteSettingsAdmin(admin.ModelAdmin):
             "fields": ["about_text", "copyright_text", "updated_at"]
         }),
     ]
+
+
+
+# ══════════════════════════════════════════════════════════════════
+#  ADD TO Business/admin.py
+#  Only ADMIN-role users can add/edit log stock (BuyLogDetails).
+#  Sub-admins never reach this at all — they don't have is_staff,
+#  so Django admin login already excludes them; this adds a second,
+#  explicit check so a STAFF user can't stock logs either — only
+#  users with role == User.Role.ADMIN can.
+# ══════════════════════════════════════════════════════════════════
+
+from django.contrib import admin
+from django.utils.html import format_html
+from .models import BuyLogs, BuyLogDetails, Purchase
+
+
+def _is_admin_role(request):
+    user = request.user
+    return user.is_superuser or getattr(user, "role", None) == "admin"
+
+
+class BuyLogDetailsInline(admin.TabularInline):
+    model = BuyLogDetails
+    extra = 0
+    fields = ("email", "password", "recovery_email", "two_factor_code", "sold", "sold_at")
+    readonly_fields = ("sold_at",)
+    show_change_link = False
+
+    def has_add_permission(self, request, obj=None):
+        return _is_admin_role(request)
+
+    def has_change_permission(self, request, obj=None):
+        return _is_admin_role(request)
+
+    def has_delete_permission(self, request, obj=None):
+        return _is_admin_role(request)
+
+
+@admin.register(BuyLogs)
+class BuyLogsAdmin(admin.ModelAdmin):
+    list_display = ("title", "category", "price", "stock_badge", "active", "created_at")
+    list_filter = ("category", "active")
+    search_fields = ("title", "description")
+    inlines = [BuyLogDetailsInline]
+
+    def stock_badge(self, obj):
+        count = obj.stock_count
+        color = "#22c55e" if count > 0 else "#ef4444"
+        return format_html('<b style="color:{}">{} in stock</b>', color, count)
+    stock_badge.short_description = "Stock"
+
+    def has_add_permission(self, request):
+        return _is_admin_role(request)
+
+    def has_change_permission(self, request, obj=None):
+        return _is_admin_role(request)
+
+    def has_delete_permission(self, request, obj=None):
+        return _is_admin_role(request)
+
+
+@admin.register(BuyLogDetails)
+class BuyLogDetailsAdmin(admin.ModelAdmin):
+    """
+    Standalone view of stock across all products — handy for bulk
+    stocking. Same admin-only restriction as the inline above.
+    """
+    list_display = ("email", "product", "sold", "sold_at", "added_by", "created_at")
+    list_filter = ("sold", "product__category", "product")
+    search_fields = ("email", "product__title")
+    readonly_fields = ("sold_at",)
+
+    def save_model(self, request, obj, form, change):
+        if not change:
+            obj.added_by = request.user
+        super().save_model(request, obj, form, change)
+
+    def has_module_permission(self, request):
+        return _is_admin_role(request)
+
+    def has_add_permission(self, request):
+        return _is_admin_role(request)
+
+    def has_change_permission(self, request, obj=None):
+        return _is_admin_role(request)
+
+    def has_delete_permission(self, request, obj=None):
+        return _is_admin_role(request)
+
+
+@admin.register(Purchase)
+class PurchaseAdmin(admin.ModelAdmin):
+    """
+    Read-only purchase history. Admin can see who bought what and
+    from which wallet, but can't edit or fabricate purchases here —
+    purchases only happen through the sub-admin-facing view.
+    """
+    list_display = ("buyer", "product", "amount", "account", "purchased_at")
+    list_filter = ("product__category",)
+    search_fields = ("buyer__email", "buyer__full_name", "product__title")
+    readonly_fields = ("buyer", "product", "log", "account", "amount", "purchased_at")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return _is_admin_role(request)

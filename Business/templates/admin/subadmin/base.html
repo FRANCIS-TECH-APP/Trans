@@ -60,25 +60,54 @@ body {
   font-size: 14px;
 }
 
-/* ── SIDEBAR — desktop only, mobile keeps the floating bottom nav ── */
+/* ── SIDEBAR — sticky panel on desktop, slide-in drawer on mobile ── */
 .sidebar {
-  display: none;
+  display: flex;
+  flex-direction: column;
   width: var(--sidebar-w);
   flex-shrink: 0;
-  flex-direction: column;
   background: var(--surface);
   border-right: 1px solid var(--border);
   height: 100vh;
-  position: sticky;
-  top: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  transition: width .22s ease, background .3s, border-color .3s;
+  transition: width .22s ease, background .3s, border-color .3s, transform .25s ease;
+
+  /* Mobile default: fixed off-canvas drawer, hidden until opened */
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 300;
+  transform: translateX(-100%);
+  box-shadow: 0 0 0 rgba(0,0,0,0);
 }
+.sidebar.mobile-open {
+  transform: translateX(0);
+  box-shadow: 8px 0 30px rgba(0,0,0,.25);
+}
+
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.5);
+  z-index: 250;
+}
+.sidebar-overlay.open { display: block; }
+
 @media (min-width: 900px) {
-  .sidebar { display: flex; }
+  .sidebar {
+    display: flex;
+    position: sticky;
+    top: 0;
+    left: auto;
+    transform: none !important;
+    box-shadow: none !important;
+  }
+  .sidebar-overlay { display: none !important; }
   .bottom-nav { display: none; }
   .main { margin-left: 0; }
+  .menu-btn { display: none; }
 }
 
 .sidebar-logo {
@@ -173,7 +202,7 @@ body {
   min-width: 0;
 }
 
-/* TOPBAR — logo left, avatar / bell / theme right, no wordmark, no hamburger */
+/* TOPBAR — hamburger + logo on mobile, avatar/bell/theme always on the right */
 .topbar {
   height: var(--header-h);
   background: var(--surface);
@@ -188,6 +217,22 @@ body {
   transition: background .3s, border-color .3s;
 }
 .topbar-left { display: flex; align-items: center; gap: 10px; }
+
+.menu-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text);
+  flex-shrink: 0;
+  transition: background .15s, color .15s;
+}
+.menu-btn:hover { background: var(--sky-dim); color: var(--sky); }
 
 .logo-inline { display: flex; align-items: center; gap: 8px; text-decoration: none; }
 .logo-mark-sm {
@@ -388,7 +433,10 @@ body {
 </head>
 <body>
 
-<!-- ── SIDEBAR (desktop) ──────────────────────────────── -->
+<!-- ── SIDEBAR OVERLAY (mobile backdrop) ─────────────── -->
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<!-- ── SIDEBAR (sticky on desktop, drawer on mobile) ─── -->
 <aside class="sidebar" id="sidebar">
   <button type="button" class="sidebar-logo" id="sidebarLogoToggle" aria-label="Toggle sidebar">
     <div class="logo-mark-sb">
@@ -425,6 +473,18 @@ body {
     <a href="{% url 'sub-admin-buy-foreign-number' %}" class="sb-nav-item {% if request.resolver_match.url_name == 'sub-admin-buy-foreign-number' %}active{% endif %}">
       <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
       <span class="nav-text">Foreign Numbers</span>
+    </a>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-label">Marketplace</div>
+    <a href="{% url 'buy-logs-browse' %}" class="sb-nav-item {% if request.resolver_match.url_name == 'buy-logs-browse' or request.resolver_match.url_name == 'buy-logs-detail' or request.resolver_match.url_name == 'buy-logs-purchase' %}active{% endif %}">
+      <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+      <span class="nav-text">Buy Logs</span>
+    </a>
+    <a href="{% url 'buy-logs-my-purchases' %}" class="sb-nav-item {% if request.resolver_match.url_name == 'buy-logs-my-purchases' or request.resolver_match.url_name == 'buy-logs-receipt' %}active{% endif %}">
+      <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+      <span class="nav-text">My Purchases</span>
     </a>
   </div>
 
@@ -472,6 +532,11 @@ body {
 
   <header class="topbar">
     <div class="topbar-left">
+      <button type="button" class="icon-btn menu-btn" id="mobileMenuBtn" aria-label="Open menu">
+        <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
       <a href="{% url 'sub-admin-dashboard' %}" class="logo-inline" aria-label="TransEdge home">
         <div class="logo-mark-sm">
           <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="white" stroke-width="2.5">
@@ -687,6 +752,15 @@ body {
       <circle cx="18.5" cy="18.5" r="1.8"/>
     </svg>
   </a>
+  <a href="{% url 'buy-logs-browse' %}"
+     class="bn-item {% if request.resolver_match.url_name == 'buy-logs-browse' or request.resolver_match.url_name == 'buy-logs-detail' or request.resolver_match.url_name == 'buy-logs-my-purchases' or request.resolver_match.url_name == 'buy-logs-receipt' %}active{% endif %}"
+     aria-label="Buy Logs">
+    <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>
+      <line x1="3" y1="6" x2="21" y2="6"/>
+      <path d="M16 10a4 4 0 01-8 0"/>
+    </svg>
+  </a>
   <a href="{% url 'sub-admin-site-settings' %}"
      class="bn-item {% if request.resolver_match.url_name == 'sub-admin-site-settings' %}active{% endif %}"
      aria-label="Settings">
@@ -707,7 +781,7 @@ body {
     localStorage.setItem('te-theme', next);
   });
 
-  // Sidebar collapse — toggled by clicking the TransEdge logo
+  // Sidebar collapse (desktop) — toggled by clicking the TransEdge logo
   (function () {
     const sidebar = document.getElementById('sidebar');
     const logoBtn = document.getElementById('sidebarLogoToggle');
@@ -717,8 +791,46 @@ body {
       sidebar.classList.add('collapsed');
     }
     logoBtn.addEventListener('click', () => {
+      // On mobile, tapping the logo just closes the drawer instead of collapsing it
+      if (window.innerWidth < 900) {
+        sidebar.classList.remove('mobile-open');
+        document.getElementById('sidebarOverlay').classList.remove('open');
+        return;
+      }
       sidebar.classList.toggle('collapsed');
       localStorage.setItem('te-sidebar-collapsed', sidebar.classList.contains('collapsed'));
+    });
+  })();
+
+  // Mobile sidebar drawer — hamburger opens, overlay/nav-link tap closes
+  (function () {
+    const sidebar   = document.getElementById('sidebar');
+    const menuBtn    = document.getElementById('mobileMenuBtn');
+    const overlay    = document.getElementById('sidebarOverlay');
+    if (!sidebar || !menuBtn || !overlay) return;
+
+    function openDrawer() {
+      sidebar.classList.add('mobile-open');
+      overlay.classList.add('open');
+    }
+    function closeDrawer() {
+      sidebar.classList.remove('mobile-open');
+      overlay.classList.remove('open');
+    }
+
+    menuBtn.addEventListener('click', openDrawer);
+    overlay.addEventListener('click', closeDrawer);
+
+    // Tapping any nav link inside the drawer closes it (mobile only)
+    sidebar.querySelectorAll('.sb-nav-item, .sb-logout').forEach((link) => {
+      link.addEventListener('click', () => {
+        if (window.innerWidth < 900) closeDrawer();
+      });
+    });
+
+    // If the viewport crosses into desktop while open, reset drawer state
+    window.addEventListener('resize', () => {
+      if (window.innerWidth >= 900) closeDrawer();
     });
   })();
 </script>
