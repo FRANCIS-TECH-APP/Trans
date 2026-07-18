@@ -19,7 +19,7 @@ from django.db.models import Q
 from .models import (
     User, Shipment, ContactInfo, ShipmentImage,
     TransitCheckpoint, Payment,
-    SubAdminProfile, PointsPurchase, PointsPricing,Account,ForeignNumber,Notification,NotificationRead,SubAdminSiteSettings
+    SubAdminProfile, PointsPurchase, PointsPricing,Account,ForeignNumber,Notification,NotificationRead,SubAdminSiteSettings,DashboardAdvert
 )
 
 
@@ -169,6 +169,8 @@ def sub_admin_logout(request):
 #  DASHBOARD
 # ════════════════════════════════════════════════════════
 
+
+
 @sub_admin_approved_required
 def sub_admin_dashboard(request):
     profile  = request.user.sub_admin_profile
@@ -176,6 +178,11 @@ def sub_admin_dashboard(request):
     recent   = Shipment.objects.filter(
         created_by=request.user
     ).select_related("sender", "receiver").order_by("-created_at")[:5]
+
+    adverts = [
+        a for a in DashboardAdvert.objects.filter(is_active=True)
+        if a.is_currently_active()
+    ]
 
     context = {
         "profile":       profile,
@@ -185,6 +192,7 @@ def sub_admin_dashboard(request):
         "delivered":     Shipment.objects.filter(created_by=request.user, status=Shipment.Status.DELIVERED).count(),
         "recent":        recent,
         "can_create":    profile.can_create_shipment(),
+        "adverts":       adverts,
     }
     return render(request, "admin/subadmin/dashboard.html", context)
 

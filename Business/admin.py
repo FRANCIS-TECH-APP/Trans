@@ -611,3 +611,26 @@ class PurchaseAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return _is_admin_role(request)
+    
+
+
+from django.contrib import admin
+from django.utils.html import format_html
+from .models import DashboardAdvert
+
+@admin.register(DashboardAdvert)
+class DashboardAdvertAdmin(admin.ModelAdmin):
+    list_display = ('title', 'is_active', 'order', 'start_date', 'end_date', 'preview')
+    list_editable = ('is_active', 'order')
+    ordering = ('order',)
+    fields = (
+        'title', 'subtitle', 'image', 'cta_text', 'cta_url',
+        'background_start', 'background_end',
+        'is_active', 'order', 'start_date', 'end_date',
+    )
+
+    def preview(self, obj):
+        if obj.image:
+            return format_html('<img src="{}" style="height:40px;border-radius:6px;" />', obj.image.url)
+        return "—"
+    preview.short_description = "Preview"

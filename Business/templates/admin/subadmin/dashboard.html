@@ -1,6 +1,7 @@
 {% extends "admin/subadmin/base.html" %}
 
 {% block title %}Dashboard — TransEdge{% endblock %}
+<p style="color:red;">DEBUG adverts: {{ adverts }}</p>
 {% block page_title %}Dashboard{% endblock %}
 
 {% block extra_css %}
@@ -74,6 +75,19 @@
     .promo-art { width: 78px; }
     .promo-desc { max-width: 170px; }
   }
+
+  /* ---------- Animated advert carousel (admin-managed) ---------- */
+  .ad-carousel { position: relative; border-radius: var(--radius); overflow: hidden; margin-bottom: 18px; height: 150px; }
+  .ad-track { display: flex; height: 100%; transition: transform .5s ease; }
+  .ad-slide { min-width: 100%; height: 100%; display: flex; align-items: center; padding: 20px; position: relative; text-decoration: none; }
+  .ad-slide-bg { position: absolute; inset: 0; z-index: 0; }
+  .ad-slide-content { position: relative; z-index: 1; color: #fff; }
+  .ad-slide-title { font-size: 17px; font-weight: 800; margin-bottom: 4px; }
+  .ad-slide-sub { font-size: 11.5px; opacity: .9; margin-bottom: 10px; max-width: 220px; }
+  .ad-slide-cta { display: inline-block; background: rgba(255,255,255,.2); backdrop-filter: blur(4px); padding: 7px 15px; border-radius: 999px; font-size: 11.5px; font-weight: 700; color: #fff; }
+  .ad-dots { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; z-index: 2; }
+  .ad-dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.4); transition: .3s; }
+  .ad-dot.active { width: 18px; background: #fff; }
 
   /* ---------- Main features ---------- */
   .section-label { font-size: 13.5px; font-weight: 700; margin-bottom: 10px; }
@@ -317,6 +331,29 @@
   </div>
 </div>
 
+<!-- ── ANIMATED ADVERT CAROUSEL (admin-managed via DashboardAdvert) ──────── -->
+{% if adverts %}
+<div class="ad-carousel" id="adCarousel">
+  <div class="ad-track" id="adTrack">
+    {% for ad in adverts %}
+    <a href="{{ ad.cta_url|default:'#' }}" class="ad-slide" style="background: linear-gradient(135deg, {{ ad.background_start }}, {{ ad.background_end }});">
+      {% if ad.image %}<div class="ad-slide-bg" style="background:url('{{ ad.image.url }}') center/cover;opacity:.25;"></div>{% endif %}
+      <div class="ad-slide-content">
+        <div class="ad-slide-title">{{ ad.title }}</div>
+        {% if ad.subtitle %}<div class="ad-slide-sub">{{ ad.subtitle }}</div>{% endif %}
+        {% if ad.cta_url %}<span class="ad-slide-cta">{{ ad.cta_text }}</span>{% endif %}
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  {% if adverts|length > 1 %}
+  <div class="ad-dots" id="adDots">
+    {% for ad in adverts %}<span class="ad-dot{% if forloop.first %} active{% endif %}"></span>{% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
 <!-- Main features -->
 <div class="section-label">Our Main Features</div>
 <div class="features-grid">
@@ -525,7 +562,57 @@
       sessionStorage.setItem('promo_dismissed', 'true');
     });
   })();
+
+  // Autoplay the admin-managed advert carousel
+  // Advert carousel — autoplay + swipe + dot navigation
+(function () {
+  const track = document.getElementById('adTrack');
+  const dots = document.querySelectorAll('#adDots .ad-dot');
+  if (!track || dots.length < 2) return;
+
+  let idx = 0;
+  let autoplayTimer;
+
+  function goTo(newIdx) {
+    idx = (newIdx + dots.length) % dots.length;
+    track.style.transform = `translateX(-${idx * 100}%)`;
+    dots.forEach((d, i) => d.classList.toggle('active', i === idx));
+  }
+
+  function startAutoplay() {
+    clearInterval(autoplayTimer);
+    autoplayTimer = setInterval(() => goTo(idx + 1), 4000);
+  }
+
+  // Tap a dot to jump straight to that slide
+  dots.forEach((dot, i) => {
+    dot.style.cursor = 'pointer';
+    dot.addEventListener('click', () => {
+      goTo(i);
+      startAutoplay(); // reset the timer so it doesn't jump again right away
+    });
+  });
+
+  // Swipe support (touch)
+  let startX = 0;
+  let isDragging = false;
+
+  track.addEventListener('touchstart', (e) => {
+    startX = e.touches[0].clientX;
+    isDragging = true;
+    clearInterval(autoplayTimer);
+  }, { passive: true });
+
+  track.addEventListener('touchend', (e) => {
+    if (!isDragging) return;
+    isDragging = false;
+    const deltaX = e.changedTouches[0].clientX - startX;
+    if (deltaX < -40) goTo(idx + 1);      // swiped left → next
+    else if (deltaX > 40) goTo(idx - 1);  // swiped right → previous
+    startAutoplay();
+  });
+
+  startAutoplay();
+})();
 </script>
 {% endblock %}
-
-

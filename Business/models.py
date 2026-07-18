@@ -1142,3 +1142,36 @@ class Purchase(models.Model):
 
     def __str__(self):
         return f"{self.buyer} - {self.product.title}"
+    
+
+
+
+class DashboardAdvert(models.Model):
+    title = models.CharField(max_length=100)
+    subtitle = models.CharField(max_length=200, blank=True)
+    image = models.ImageField(upload_to='dashboard_adverts/', blank=True, null=True)
+    cta_text = models.CharField(max_length=40, default="Learn More")
+    cta_url = models.URLField(blank=True)
+    background_start = models.CharField(max_length=20, default="#3B82F6", help_text="Gradient start hex color")
+    background_end = models.CharField(max_length=20, default="#1E3A8A", help_text="Gradient end hex color")
+    is_active = models.BooleanField(default=True)
+    order = models.PositiveIntegerField(default=0)
+    start_date = models.DateTimeField(null=True, blank=True)
+    end_date = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['order', '-created_at']
+
+    def __str__(self):
+        return self.title
+
+    def is_currently_active(self):
+        now = timezone.now()
+        if not self.is_active:
+            return False
+        if self.start_date and now < self.start_date:
+            return False
+        if self.end_date and now > self.end_date:
+            return False
+        return True
