@@ -1,0 +1,326 @@
+{% extends "admin/base.html" %}
+
+{% block title %}{{ shipment.tracking_id }}{% endblock %}
+{% block page_title %}Shipment — {{ shipment.tracking_id }}{% endblock %}
+{% block breadcrumb %}
+  <a href="{% url 'admin-dashboard' %}">Dashboard</a> <span>/</span>
+  <a href="{% url 'shipment-list' %}">Shipments</a> <span>/</span>
+  {{ shipment.tracking_id }}
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<style>
+  .detail-grid{display:grid;grid-template-columns:2fr 1fr;gap:1rem}
+  @media(max-width:1000px){.detail-grid{grid-template-columns:1fr}}
+  .info-row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px}
+  .info-row:last-child{border-bottom:none}
+  .info-row .k{color:var(--muted)}
+  .info-row .v{font-weight:500;text-align:right}
+  #trackMap{height:220px;border-radius:10px;margin-bottom:1rem}
+  .img-thumb{position:relative;border-radius:8px;overflow:hidden;border:1px solid var(--border)}
+  .img-thumb img{width:100%;height:80px;object-fit:cover;display:block}
+  .img-thumb-actions{position:absolute;bottom:0;left:0;right:0;display:flex;gap:2px;padding:3px;background:rgba(0,0,0,.55)}
+  .img-thumb-actions form{flex:1}
+  .img-thumb-actions button{width:100%;border:none;background:transparent;color:#fff;font-size:10px;padding:2px;cursor:pointer}
+  .primary-tag{position:absolute;top:3px;left:3px;background:var(--accent);color:#fff;font-size:8px;padding:1px 5px;border-radius:4px;}
+</style>
+{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{% url 'shipment-edit' pk=shipment.pk %}" class="btn btn-ghost"><i class="fas fa-pen"></i> Edit</a>
+  <a href="{% url 'tracking-detail' tracking_id=shipment.tracking_id %}" target="_blank" class="btn btn-ghost"><i class="fas fa-external-link-alt"></i> Public View</a>
+  <a href="{% url 'shipment-list' %}" class="btn btn-ghost"><i class="fas fa-arrow-left"></i> Back</a>
+{% endblock %}
+
+{% block content %}
+
+<div class="stat-grid">
+  <div class="stat-card">
+    <div class="stat-label">Status</div>
+    <div class="stat-value" style="font-size:16px;">
+      {% if shipment.status == 'delivered' %}<span class="badge b-green">Delivered</span>
+      {% elif shipment.status == 'in_transit' %}<span class="badge b-blue">In Transit</span>
+      {% elif shipment.status == 'held' %}<span class="badge b-red">On Hold</span>
+      {% elif shipment.status == 'at_customs' %}<span class="badge b-yellow">At Customs</span>
+      {% elif shipment.status == 'out_for_delivery' %}<span class="badge b-green">Out for Delivery</span>
+      {% elif shipment.status == 'picked_up' %}<span class="badge b-orange">Picked Up</span>
+      {% else %}<span class="badge b-gray">{{ shipment.get_status_display }}</span>{% endif %}
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Route</div>
+    <div class="stat-value" style="font-size:15px;">{{ shipment.origin_country }} → {{ shipment.destination_country }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Payment</div>
+    <div class="stat-value" style="font-size:16px;">
+      {% if payment.status == 'paid' %}<span class="badge b-green">Paid</span>
+      {% elif payment.status == 'partial' %}<span class="badge b-yellow">Partial</span>
+      {% elif payment.status == 'pending' %}<span class="badge b-blue">Pending</span>
+      {% else %}<span class="badge b-red">Unpaid</span>{% endif %}
+    </div>
+    <div class="stat-sub">{{ payment.currency|default:shipment.currency }} {{ payment.amount|default:"0" }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Est. Delivery</div>
+    <div class="stat-value" style="font-size:15px;">{{ shipment.estimated_delivery|date:"d M Y"|default:"—" }}</div>
+  </div>
+</div>
+
+<div class="detail-grid">
+
+  <!-- LEFT COLUMN -->
+  <div>
+    <!-- Map -->
+    <div class="card" style="margin-bottom:1rem;">
+      <div class="card-header"><h3>Route Map</h3></div>
+      <div class="card-body" style="padding-bottom:0;">
+        <div id="trackMap"></div>
+      </div>
+    </div>
+
+    <!-- Sender / Receiver -->
+    <div class="card" style="margin-bottom:1rem;">
+      <div class="card-header"><h3>Sender &amp; Receiver</h3></div>
+      <div class="card-body">
+        <div class="form-grid">
+          <div>
+            <div class="section-title" style="padding-top:0;border-top:none;margin-top:0;">Sender</div>
+            <div class="info-row"><span class="k">Name</span><span class="v">{{ shipment.sender.full_name }}</span></div>
+            <div class="info-row"><span class="k">Email</span><span class="v">{{ shipment.sender.email }}</span></div>
+            <div class="info-row"><span class="k">Phone</span><span class="v">{{ shipment.sender.phone }}</span></div>
+            <div class="info-row"><span class="k">Address</span><span class="v">{{ shipment.sender.address }}, {{ shipment.sender.city }}</span></div>
+            <div class="info-row"><span class="k">Country</span><span class="v">{{ shipment.sender.country }}</span></div>
+          </div>
+          <div>
+            <div class="section-title" style="padding-top:0;border-top:none;margin-top:0;">Receiver</div>
+            <div class="info-row"><span class="k">Name</span><span class="v">{{ shipment.receiver.full_name }}</span></div>
+            <div class="info-row"><span class="k">Email</span><span class="v">{{ shipment.receiver.email }}</span></div>
+            <div class="info-row"><span class="k">Phone</span><span class="v">{{ shipment.receiver.phone }}</span></div>
+            <div class="info-row"><span class="k">Address</span><span class="v">{{ shipment.receiver.address }}, {{ shipment.receiver.city }}</span></div>
+            <div class="info-row"><span class="k">Country</span><span class="v">{{ shipment.receiver.country }}</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Shipment details -->
+    <div class="card" style="margin-bottom:1rem;">
+      <div class="card-header"><h3>Shipment Details</h3></div>
+      <div class="card-body">
+        <div class="info-row"><span class="k">Type</span><span class="v">{{ shipment.get_shipment_type_display }}</span></div>
+        <div class="info-row"><span class="k">Description</span><span class="v">{{ shipment.description|default:"—" }}</span></div>
+        <div class="info-row"><span class="k">Weight</span><span class="v">{{ shipment.weight_kg|default:"—" }} kg</span></div>
+        <div class="info-row"><span class="k">Dimensions</span><span class="v">{{ shipment.dimensions|default:"—" }}</span></div>
+        <div class="info-row"><span class="k">Quantity</span><span class="v">{{ shipment.quantity }}</span></div>
+        <div class="info-row"><span class="k">Declared Value</span><span class="v">{{ shipment.currency }} {{ shipment.declared_value|default:"—" }}</span></div>
+        {% if shipment.special_instructions %}
+        <div class="info-row"><span class="k">Special Instructions</span><span class="v">{{ shipment.special_instructions }}</span></div>
+        {% endif %}
+        {% if shipment.internal_notes %}
+        <div class="info-row"><span class="k">Internal Notes</span><span class="v">{{ shipment.internal_notes }}</span></div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Images -->
+    <div class="card">
+      <div class="card-header"><h3>Images</h3></div>
+      <div class="card-body">
+        {% if shipment.images.all %}
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;">
+          {% for img in shipment.images.all %}
+          <div class="img-thumb">
+            {% if img.is_primary %}<span class="primary-tag">Primary</span>{% endif %}
+            <img src="{{ img.image.url }}" alt="{{ img.caption }}" />
+            <div class="img-thumb-actions">
+              {% if not img.is_primary %}
+              <form method="post" action="{% url 'image-set-primary' pk=img.pk %}">
+                {% csrf_token %}
+                <button type="submit" title="Set primary"><i class="fas fa-star"></i></button>
+              </form>
+              {% endif %}
+              <form method="post" action="{% url 'image-delete' pk=img.pk %}" onsubmit="return confirm('Delete this image?');">
+                {% csrf_token %}
+                <button type="submit" title="Delete"><i class="fas fa-trash"></i></button>
+              </form>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p style="color:var(--muted);font-size:12px;">No images uploaded. Add some from the <a href="{% url 'shipment-edit' pk=shipment.pk %}" style="color:var(--accent);">edit page</a>.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT COLUMN -->
+  <div>
+    <!-- Payment -->
+    <div class="card" style="margin-bottom:1rem;">
+      <div class="card-header"><h3>Payment</h3></div>
+      <div class="card-body">
+        {% if payment %}
+        <div class="info-row"><span class="k">Amount</span><span class="v">{{ payment.currency }} {{ payment.amount }}</span></div>
+        <div class="info-row"><span class="k">Amount Paid</span><span class="v">{{ payment.currency }} {{ payment.amount_paid|default:"0" }}</span></div>
+        <div class="info-row"><span class="k">Method</span><span class="v">{{ payment.get_method_display|default:"—" }}</span></div>
+        <div class="info-row"><span class="k">Status</span>
+          <span class="v">
+            {% if payment.status == 'paid' %}<span class="badge b-green">Paid</span>
+            {% elif payment.status == 'partial' %}<span class="badge b-yellow">Partial</span>
+            {% elif payment.status == 'pending' %}<span class="badge b-blue">Pending</span>
+            {% else %}<span class="badge b-red">Unpaid</span>{% endif %}
+          </span>
+        </div>
+        <div class="info-row"><span class="k">Reference</span><span class="v">{{ payment.payment_reference|default:"—" }}</span></div>
+        <div class="info-row"><span class="k">Due Date</span><span class="v">{{ payment.due_date|date:"d M Y"|default:"—" }}</span></div>
+        <div class="info-row"><span class="k">Paid At</span><span class="v">{{ payment.paid_at|date:"d M Y, H:i"|default:"—" }}</span></div>
+
+        <form method="post" action="{% url 'payment-update' pk=payment.pk %}" style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border);">
+          {% csrf_token %}
+          <div class="form-group" style="margin-bottom:8px;">
+            <label>Update Status</label>
+            <select name="status">
+              <option value="unpaid" {% if payment.status == 'unpaid' %}selected{% endif %}>Unpaid</option>
+              <option value="pending" {% if payment.status == 'pending' %}selected{% endif %}>Pending</option>
+              <option value="partial" {% if payment.status == 'partial' %}selected{% endif %}>Partial</option>
+              <option value="paid" {% if payment.status == 'paid' %}selected{% endif %}>Paid</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:8px;">
+            <label>Amount Paid</label>
+            <input type="number" step="0.01" name="amount_paid" value="{{ payment.amount_paid|default:'0' }}" />
+          </div>
+          <div class="form-group" style="margin-bottom:8px;">
+            <label>Payment Reference</label>
+            <input type="text" name="payment_reference" value="{{ payment.payment_reference|default:'' }}" />
+          </div>
+          <div class="form-group" style="margin-bottom:10px;">
+            <label>Notes</label>
+            <textarea name="notes" style="min-height:50px;">{{ payment.notes|default:'' }}</textarea>
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm" style="width:100%;justify-content:center;">Update Payment</button>
+        </form>
+        {% else %}
+        <p style="color:var(--muted);font-size:12px;">No payment record for this shipment.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Add checkpoint -->
+    <div class="card" style="margin-bottom:1rem;">
+      <div class="card-header"><h3>Add Checkpoint</h3></div>
+      <div class="card-body">
+        <form method="post" action="{% url 'checkpoint-add' shipment_pk=shipment.pk %}">
+          {% csrf_token %}
+          <div class="form-group" style="margin-bottom:8px;">
+            <label>Event</label>
+            <select name="event_type" required>
+              {% for value, label in event_types %}
+                <option value="{{ value }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:8px;">
+            <label>Location</label>
+            <input type="text" name="location" placeholder="Lagos Sorting Facility" required />
+          </div>
+          <div class="form-grid" style="margin-bottom:8px;">
+            <div class="form-group">
+              <label>City</label>
+              <input type="text" name="city" />
+            </div>
+            <div class="form-group">
+              <label>Country</label>
+              <input type="text" name="country" />
+            </div>
+            <div class="form-group">
+              <label>Latitude</label>
+              <input type="text" name="latitude" placeholder="6.5244" />
+            </div>
+            <div class="form-group">
+              <label>Longitude</label>
+              <input type="text" name="longitude" placeholder="3.3792" />
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:8px;">
+            <label>Timestamp (optional — defaults to now)</label>
+            <input type="datetime-local" name="timestamp" />
+          </div>
+          <div class="form-group" style="margin-bottom:10px;">
+            <label>Description (optional)</label>
+            <textarea name="description" style="min-height:50px;"></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm" style="width:100%;justify-content:center;"><i class="fas fa-plus"></i> Add Checkpoint</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Timeline -->
+    <div class="card">
+      <div class="card-header"><h3>Tracking Timeline</h3></div>
+      <div class="card-body">
+        {% if checkpoints %}
+        <div class="timeline">
+          {% for cp in checkpoints %}
+          <div class="tl-item">
+            <div class="tl-dot {% if cp.event_type == 'delivered' %}current{% elif cp.event_type == 'held' %}alert{% else %}done{% endif %}"></div>
+            <div class="tl-time">{{ cp.timestamp|date:"d M Y, H:i" }}</div>
+            <div class="tl-event">{{ cp.get_event_type_display }}</div>
+            <div class="tl-loc">{{ cp.location }}{% if cp.city %}, {{ cp.city }}{% endif %}</div>
+            <form method="post" action="{% url 'checkpoint-delete' pk=cp.pk %}" onsubmit="return confirm('Remove this checkpoint?');" style="margin-top:3px;">
+              {% csrf_token %}
+              <button type="submit" style="background:none;border:none;color:var(--red);font-size:10px;cursor:pointer;padding:0;">Remove</button>
+            </form>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p style="color:var(--muted);font-size:12px;">No checkpoints logged yet.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+  (function () {
+    const points = {{ map_points|safe }};
+    const mapEl = document.getElementById('trackMap');
+    if (!mapEl) return;
+
+    const center = points.length ? [points[points.length - 1].lat, points[points.length - 1].lng] : [9.0820, 8.6753];
+    const map = L.map('trackMap', { zoomControl: true }).setView(center, points.length ? 5 : 3);
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap &copy; CARTO',
+      maxZoom: 19,
+    }).addTo(map);
+
+    if (points.length) {
+      const latlngs = points.map(p => [p.lat, p.lng]);
+      L.polyline(latlngs, { color: '#38bdf8', weight: 3, opacity: 0.8 }).addTo(map);
+
+      points.forEach((p, i) => {
+        const isLast = i === points.length - 1;
+        L.circleMarker([p.lat, p.lng], {
+          radius: isLast ? 7 : 5,
+          fillColor: isLast ? '#22c55e' : '#38bdf8',
+          color: '#0f172a',
+          weight: 2,
+          fillOpacity: 1,
+        }).bindPopup(`<b>${p.event}</b><br>${p.location}<br>${p.time}`).addTo(map);
+      });
+
+      map.fitBounds(latlngs, { padding: [24, 24] });
+    }
+  })();
+</script>
+{% endblock %}

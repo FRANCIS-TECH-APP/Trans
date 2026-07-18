@@ -1,0 +1,100 @@
+{% extends "admin/base.html" %}
+
+{% block title %}{% if advert %}Edit Advert{% else %}New Advert{% endif %}{% endblock %}
+{% block page_title %}{% if advert %}Edit Advert{% else %}New Advert{% endif %}{% endblock %}
+{% block breadcrumb %}
+  <a href="{% url 'admin-dashboard' %}">Dashboard</a> <span>/</span>
+  <a href="{% url 'admin-advert-list' %}">Adverts</a> <span>/</span>
+  {% if advert %}Edit{% else %}New{% endif %}
+{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{% url 'admin-advert-list' %}" class="btn btn-ghost">
+    <i class="fas fa-arrow-left"></i> Back to list
+  </a>
+{% endblock %}
+
+{% block content %}
+
+<div class="card">
+  <div class="card-header">
+    <h3>{% if advert %}Edit "{{ advert.title }}"{% else %}Advert Details{% endif %}</h3>
+  </div>
+  <div class="card-body">
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+
+      <div class="section-title">Content</div>
+      <div class="form-grid" style="margin-bottom:1rem;">
+        <div class="form-group">
+          <label>Title</label>
+          <input type="text" name="title" value="{{ advert.title|default:'' }}" placeholder="Ship More, Save More!" required />
+        </div>
+        <div class="form-group">
+          <label>CTA Button Text</label>
+          <input type="text" name="cta_text" value="{{ advert.cta_text|default:'Learn More' }}" placeholder="Ship Now" />
+        </div>
+        <div class="form-group span-2">
+          <label>Subtitle</label>
+          <input type="text" name="subtitle" value="{{ advert.subtitle|default:'' }}" placeholder="Get up to 20% off on selected international shipments." />
+        </div>
+        <div class="form-group span-2">
+          <label>CTA Link (where the advert takes users when clicked)</label>
+          <input type="url" name="cta_url" value="{{ advert.cta_url|default:'' }}" placeholder="https://..." />
+        </div>
+      </div>
+
+      <div class="section-title">Image &amp; Colors</div>
+      <div class="form-grid" style="margin-bottom:1rem;">
+        <div class="form-group span-2">
+          <label>Advert Image (optional — shown faded over the gradient background)</label>
+          <input type="file" name="image" accept="image/*" />
+          {% if advert.image %}
+            <div style="margin-top:8px;display:flex;align-items:center;gap:10px;">
+              <img src="{{ advert.image.url }}" style="width:90px;height:50px;object-fit:cover;border-radius:6px;border:1px solid var(--border);" />
+              <span style="font-size:11px;color:var(--muted);">Current image — upload a new file to replace it</span>
+            </div>
+          {% endif %}
+        </div>
+        <div class="form-group">
+          <label>Background Gradient — Start Color</label>
+          <input type="color" name="background_start" value="{{ advert.background_start|default:'#3B82F6' }}" style="height:38px;padding:4px;" />
+        </div>
+        <div class="form-group">
+          <label>Background Gradient — End Color</label>
+          <input type="color" name="background_end" value="{{ advert.background_end|default:'#1E3A8A' }}" style="height:38px;padding:4px;" />
+        </div>
+      </div>
+
+      <div class="section-title">Scheduling &amp; Ordering</div>
+      <div class="form-grid cols-3" style="margin-bottom:1rem;">
+        <div class="form-group">
+          <label>Display Order (lower shows first)</label>
+          <input type="number" name="order" value="{{ advert.order|default:'0' }}" min="0" />
+        </div>
+        <div class="form-group">
+          <label>Start Date (optional)</label>
+          <input type="datetime-local" name="start_date" value="{{ advert.start_date|date:'Y-m-d\TH:i'|default:'' }}" />
+        </div>
+        <div class="form-group">
+          <label>End Date (optional)</label>
+          <input type="datetime-local" name="end_date" value="{{ advert.end_date|date:'Y-m-d\TH:i'|default:'' }}" />
+        </div>
+      </div>
+
+      <div class="form-group" style="flex-direction:row;align-items:center;gap:8px;margin-bottom:1.5rem;">
+        <input type="checkbox" name="is_active" id="is_active" style="width:auto;" {% if advert.is_active or not advert %}checked{% endif %} />
+        <label for="is_active" style="margin:0;color:var(--text);font-size:13px;">Active (advert can appear on dashboards)</label>
+      </div>
+
+      <div style="display:flex;gap:10px;">
+        <button type="submit" class="btn btn-primary">
+          <i class="fas fa-check"></i> {% if advert %}Save Changes{% else %}Create Advert{% endif %}
+        </button>
+        <a href="{% url 'admin-advert-list' %}" class="btn btn-ghost">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}

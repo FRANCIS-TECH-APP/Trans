@@ -874,3 +874,73 @@ def purchase_receipt(request, pk):
         pk=pk, buyer=request.user,
     )
     return render(request, "buy_logs/receipt.html", {"purchase": purchase})
+
+
+
+
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib import messages
+from .models import DashboardAdvert
+
+def admin_advert_list(request):
+    adverts = DashboardAdvert.objects.all()
+    active_count = sum(1 for a in adverts if a.is_currently_active())
+    context = {
+        "adverts": adverts,
+        "active_count": active_count,
+        "inactive_count": adverts.count() - active_count,
+    }
+    return render(request, "admin/advert_list.html", context)
+
+def _save_advert_from_post(request, advert=None):
+    advert = advert or DashboardAdvert()
+    advert.title = request.POST.get("title", "").strip()
+    advert.subtitle = request.POST.get("subtitle", "").strip()
+    advert.cta_text = request.POST.get("cta_text", "Learn More").strip()
+    advert.cta_url = request.POST.get("cta_url", "").strip()
+    advert.background_start = request.POST.get("background_start", "#3B82F6")
+    advert.background_end = request.POST.get("background_end", "#1E3A8A")
+    advert.order = int(request.POST.get("order") or 0)
+    advert.is_active = "is_active" in request.POST
+    advert.start_date = request.POST.get("start_date") or None
+    advert.end_date = request.POST.get("end_date") or None
+    if request.FILES.get("image"):
+        advert.image = request.FILES["image"]
+    advert.save()
+    return advert
+
+def admin_advert_create(request):
+    if request.method == "POST":
+        _save_advert_from_post(request)
+        messages.success(request, "Advert created.")
+        return redirect("admin-advert-list")
+    return render(request, "admin/advert_form.html", {"advert": None})
+
+def admin_advert_edit(request, pk):
+    advert = get_object_or_404(DashboardAdvert, pk=pk)
+    if request.method == "POST":
+        _save_advert_from_post(request, advert)
+        messages.success(request, "Advert updated.")
+        return redirect("admin-advert-list")
+    return render(request, "admin/advert_form.html", {"advert": advert})
+
+def admin_advert_toggle(request, pk):
+    advert = get_object_or_404(DashboardAdvert, pk=pk)
+    advert.is_active = not advert.is_active
+    advert.save()
+    messages.success(request, f"Advert {'activated' if advert.is_active else 'paused'}.")
+    return redirect("admin-advert-list")
+
+def admin_advert_delete(request, pk):
+    advert = get_object_or_404(DashboardAdvert, pk=pk)
+    advert.delete()
+    messages.success(request, "Advert deleted.")
+    return redirect("admin-advert-list")
+
+def admin_advert_edit(request, pk):
+    advert = get_object_or_404(DashboardAdvert, pk=pk)
+    if request.method == "POST":
+        _save_advert_from_post(request, advert)
+        messages.success(request, "Advert updated.")
+        return redirect("admin-advert-list")
+    return render(request, "admin/advert_form.html", {"advert": advert})

@@ -160,6 +160,12 @@ urlpatterns = [
     path("buy-logs/<uuid:pk>/purchase/", views.purchase_log, name="buy-logs-purchase"),
     path("buy-logs/purchases/", views.my_purchases, name="buy-logs-my-purchases"),
     path("buy-logs/purchases/<uuid:pk>/", views.purchase_receipt, name="buy-logs-receipt"),
+    path('adverts/', views.admin_advert_list, name='admin-advert-list'),
+    path('adverts/new/', views.admin_advert_create, name='admin-advert-create'),
+    path('adverts/<int:pk>/edit/', views.admin_advert_edit, name='admin-advert-edit'),
+    path('adverts/<int:pk>/toggle/', views.admin_advert_toggle, name='admin-advert-toggle'),
+    path('adverts/<int:pk>/delete/', views.admin_advert_delete, name='admin-advert-delete'),
+    path('adverts/<int:pk>/edit/', views.admin_advert_edit, name='admin-advert-edit'),
 
 ]
 

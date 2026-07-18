@@ -1,0 +1,273 @@
+{% extends "admin/base.html" %}
+
+{% block title %}{% if shipment %}Edit Shipment{% else %}New Shipment{% endif %}{% endblock %}
+{% block page_title %}{% if shipment %}Edit Shipment — {{ shipment.tracking_id }}{% else %}New Shipment{% endif %}{% endblock %}
+{% block breadcrumb %}
+  <a href="{% url 'admin-dashboard' %}">Dashboard</a> <span>/</span>
+  <a href="{% url 'shipment-list' %}">Shipments</a> <span>/</span>
+  {% if shipment %}Edit{% else %}New{% endif %}
+{% endblock %}
+
+{% block topbar_actions %}
+  {% if shipment %}
+    <a href="{% url 'shipment-detail' pk=shipment.pk %}" class="btn btn-ghost"><i class="fas fa-eye"></i> View</a>
+  {% endif %}
+  <a href="{% url 'shipment-list' %}" class="btn btn-ghost"><i class="fas fa-arrow-left"></i> Back to list</a>
+{% endblock %}
+
+{% block content %}
+
+<form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+
+  <!-- ── SENDER ─────────────────────────────── -->
+  <div class="card" style="margin-bottom:1rem;">
+    <div class="card-header"><h3><i class="fas fa-user" style="color:var(--accent);margin-right:6px;"></i> Sender</h3></div>
+    <div class="card-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Full Name</label>
+          <input type="text" name="sender_name" value="{{ shipment.sender.full_name|default:'' }}" required />
+        </div>
+        <div class="form-group">
+          <label>Company (optional)</label>
+          <input type="text" name="sender_company" value="{{ shipment.sender.company|default:'' }}" />
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" name="sender_email" value="{{ shipment.sender.email|default:'' }}" required />
+        </div>
+        <div class="form-group">
+          <label>Phone</label>
+          <input type="text" name="sender_phone" value="{{ shipment.sender.phone|default:'' }}" required />
+        </div>
+        <div class="form-group span-2">
+          <label>Address</label>
+          <input type="text" name="sender_address" value="{{ shipment.sender.address|default:'' }}" required />
+        </div>
+        <div class="form-group">
+          <label>City</label>
+          <input type="text" name="sender_city" value="{{ shipment.sender.city|default:'' }}" />
+        </div>
+        <div class="form-group">
+          <label>State / Province</label>
+          <input type="text" name="sender_state" value="{{ shipment.sender.state|default:'' }}" />
+        </div>
+        <div class="form-group">
+          <label>Country</label>
+          <input type="text" name="sender_country" value="{{ shipment.sender.country|default:'' }}" required />
+        </div>
+        <div class="form-group">
+          <label>Postal Code</label>
+          <input type="text" name="sender_postal" value="{{ shipment.sender.postal_code|default:'' }}" />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── RECEIVER ───────────────────────────── -->
+  <div class="card" style="margin-bottom:1rem;">
+    <div class="card-header"><h3><i class="fas fa-map-marker-alt" style="color:var(--green);margin-right:6px;"></i> Receiver</h3></div>
+    <div class="card-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Full Name</label>
+          <input type="text" name="receiver_name" value="{{ shipment.receiver.full_name|default:'' }}" required />
+        </div>
+        <div class="form-group">
+          <label>Company (optional)</label>
+          <input type="text" name="receiver_company" value="{{ shipment.receiver.company|default:'' }}" />
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" name="receiver_email" value="{{ shipment.receiver.email|default:'' }}" required />
+        </div>
+        <div class="form-group">
+          <label>Phone</label>
+          <input type="text" name="receiver_phone" value="{{ shipment.receiver.phone|default:'' }}" required />
+        </div>
+        <div class="form-group span-2">
+          <label>Address</label>
+          <input type="text" name="receiver_address" value="{{ shipment.receiver.address|default:'' }}" required />
+        </div>
+        <div class="form-group">
+          <label>City</label>
+          <input type="text" name="receiver_city" value="{{ shipment.receiver.city|default:'' }}" />
+        </div>
+        <div class="form-group">
+          <label>State / Province</label>
+          <input type="text" name="receiver_state" value="{{ shipment.receiver.state|default:'' }}" />
+        </div>
+        <div class="form-group">
+          <label>Country</label>
+          <input type="text" name="receiver_country" value="{{ shipment.receiver.country|default:'' }}" required />
+        </div>
+        <div class="form-group">
+          <label>Postal Code</label>
+          <input type="text" name="receiver_postal" value="{{ shipment.receiver.postal_code|default:'' }}" />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SHIPMENT DETAILS ───────────────────── -->
+  <div class="card" style="margin-bottom:1rem;">
+    <div class="card-header"><h3><i class="fas fa-box" style="color:var(--orange);margin-right:6px;"></i> Shipment Details</h3></div>
+    <div class="card-body">
+      <div class="form-grid cols-3">
+        <div class="form-group">
+          <label>Shipment Type</label>
+          <select name="shipment_type">
+            {% for value, label in shipment_types %}
+              <option value="{{ value }}" {% if shipment.shipment_type == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select name="status">
+            {% for value, label in shipment_statuses %}
+              <option value="{{ value }}" {% if shipment.status == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Quantity</label>
+          <input type="number" name="quantity" value="{{ shipment.quantity|default:'1' }}" min="1" />
+        </div>
+        <div class="form-group">
+          <label>Weight (kg)</label>
+          <input type="number" step="0.01" name="weight_kg" value="{{ shipment.weight_kg|default:'' }}" />
+        </div>
+        <div class="form-group">
+          <label>Dimensions (L×W×H cm)</label>
+          <input type="text" name="dimensions" value="{{ shipment.dimensions|default:'' }}" placeholder="30x20x15" />
+        </div>
+        <div class="form-group">
+          <label>Declared Value</label>
+          <input type="number" step="0.01" name="declared_value" value="{{ shipment.declared_value|default:'' }}" />
+        </div>
+        <div class="form-group">
+          <label>Currency</label>
+          <input type="text" name="currency" value="{{ shipment.currency|default:'NGN' }}" />
+        </div>
+        <div class="form-group">
+          <label>Origin Country</label>
+          <input type="text" name="origin_country" value="{{ shipment.origin_country|default:'' }}" required />
+        </div>
+        <div class="form-group">
+          <label>Destination Country</label>
+          <input type="text" name="destination_country" value="{{ shipment.destination_country|default:'' }}" required />
+        </div>
+        <div class="form-group">
+          <label>Estimated Delivery</label>
+          <input type="date" name="estimated_delivery" value="{{ shipment.estimated_delivery|date:'Y-m-d'|default:'' }}" />
+        </div>
+        {% if shipment %}
+        <div class="form-group">
+          <label>Actual Delivery</label>
+          <input type="date" name="actual_delivery" value="{{ shipment.actual_delivery|date:'Y-m-d'|default:'' }}" />
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="form-grid cols-1" style="margin-top:.9rem;">
+        <div class="form-group">
+          <label>Description</label>
+          <textarea name="description" placeholder="Contents of the shipment...">{{ shipment.description|default:'' }}</textarea>
+        </div>
+        <div class="form-group">
+          <label>Special Instructions (visible to customer on tracking page)</label>
+          <textarea name="special_instructions">{{ shipment.special_instructions|default:'' }}</textarea>
+        </div>
+        <div class="form-group">
+          <label>Internal Notes (admin-only)</label>
+          <textarea name="internal_notes">{{ shipment.internal_notes|default:'' }}</textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PAYMENT ────────────────────────────── -->
+  <div class="card" style="margin-bottom:1rem;">
+    <div class="card-header"><h3><i class="fas fa-credit-card" style="color:var(--yellow);margin-right:6px;"></i> Payment</h3></div>
+    <div class="card-body">
+      <div class="form-grid cols-3">
+        <div class="form-group">
+          <label>Amount</label>
+          <input type="number" step="0.01" name="payment_amount" value="{{ payment.amount|default:'0' }}" />
+        </div>
+        {% if not shipment %}
+        <div class="form-group">
+          <label>Currency</label>
+          <input type="text" name="payment_currency" value="NGN" />
+        </div>
+        {% else %}
+        <div class="form-group">
+          <label>Amount Paid</label>
+          <input type="number" step="0.01" name="amount_paid" value="{{ payment.amount_paid|default:'0' }}" />
+        </div>
+        {% endif %}
+        <div class="form-group">
+          <label>Payment Method</label>
+          <select name="payment_method">
+            <option value="">— Select —</option>
+            {% for value, label in payment_methods %}
+              <option value="{{ value }}" {% if payment.method == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Payment Status</label>
+          <select name="payment_status">
+            {% for value, label in payment_statuses %}
+              <option value="{{ value }}" {% if payment.status == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Due Date</label>
+          <input type="date" name="payment_due_date" value="{{ payment.due_date|date:'Y-m-d'|default:'' }}" />
+        </div>
+        <div class="form-group span-2">
+          <label>Reason (what this payment is for)</label>
+          <input type="text" name="payment_reason" value="{{ payment.reason|default:'' }}" placeholder="Shipping fee, customs duty, etc." />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── IMAGES ─────────────────────────────── -->
+  <div class="card" style="margin-bottom:1.5rem;">
+    <div class="card-header"><h3><i class="fas fa-images" style="color:var(--accent2);margin-right:6px;"></i> Shipment Images</h3></div>
+    <div class="card-body">
+      {% if shipment %}
+        {% if shipment.images.all %}
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:1rem;">
+          {% for img in shipment.images.all %}
+          <div style="position:relative;">
+            <img src="{{ img.image.url }}" style="width:90px;height:70px;object-fit:cover;border-radius:8px;border:1px solid var(--border);{% if img.is_primary %}outline:2px solid var(--accent);{% endif %}" />
+            {% if img.is_primary %}<span style="position:absolute;top:2px;left:2px;background:var(--accent);color:#fff;font-size:8px;padding:1px 5px;border-radius:4px;">Primary</span>{% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        <p style="font-size:11px;color:var(--muted);margin-bottom:1rem;">Manage individual images (set primary / delete) from the shipment detail page. Upload additional images below.</p>
+        {% endif %}
+      {% endif %}
+      <div class="form-group">
+        <label>Upload Images (you can select multiple)</label>
+        <input type="file" name="images" accept="image/*" multiple />
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:10px;">
+    <button type="submit" class="btn btn-primary">
+      <i class="fas fa-check"></i> {% if shipment %}Save Changes{% else %}Create Shipment{% endif %}
+    </button>
+    <a href="{% url 'shipment-list' %}" class="btn btn-ghost">Cancel</a>
+  </div>
+
+</form>
+
+{% endblock %}
