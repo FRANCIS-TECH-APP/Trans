@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
@@ -127,10 +128,13 @@ body {
 }
 .sidebar-logo:hover { background: var(--surface2); }
 .logo-mark-sb {
-  width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0;
-  background: linear-gradient(135deg, var(--sky), var(--sky2));
+  width: 36px; height: 36px; border-radius: 9px; flex-shrink: 0;
+  background: #fff;
   display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+  padding: 3px;
 }
+.logo-mark-sb img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .logo-text { min-width: 0; overflow: hidden; }
 .logo-text .name { font-size: 15px; font-weight: 800; letter-spacing: -.02em; color: var(--text); white-space: nowrap; }
 .logo-text .tag { font-size: 10.5px; color: var(--muted); white-space: nowrap; }
@@ -236,14 +240,18 @@ body {
 
 .logo-inline { display: flex; align-items: center; gap: 8px; text-decoration: none; }
 .logo-mark-sm {
-  width: 30px;
-  height: 30px;
-  background: linear-gradient(135deg, var(--sky), var(--sky2));
+  width: 32px;
+  height: 32px;
+  background: #fff;
   border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
+  padding: 3px;
+  flex-shrink: 0;
 }
+.logo-mark-sm img { width: 100%; height: 100%; object-fit: contain; display: block; }
 @media (min-width: 900px) {
   .topbar-left .logo-inline { display: none; }
 }
@@ -440,11 +448,7 @@ body {
 <aside class="sidebar" id="sidebar">
   <button type="button" class="sidebar-logo" id="sidebarLogoToggle" aria-label="Toggle sidebar">
     <div class="logo-mark-sb">
-      <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="white" stroke-width="2.5">
-        <path d="M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h11a2 2 0 012 2v3"/>
-        <rect x="9" y="11" width="14" height="10" rx="2"/>
-        <circle cx="12" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
-      </svg>
+      <img src="{% static 'images/transedge-logo.png' %}" alt="TransEdge">
     </div>
     <div class="logo-text">
       <div class="name">TransEdge</div>
@@ -539,12 +543,7 @@ body {
       </button>
       <a href="{% url 'sub-admin-dashboard' %}" class="logo-inline" aria-label="TransEdge home">
         <div class="logo-mark-sm">
-          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="white" stroke-width="2.5">
-            <path d="M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h11a2 2 0 012 2v3"/>
-            <rect x="9" y="11" width="14" height="10" rx="2"/>
-            <circle cx="12" cy="21" r="1"/>
-            <circle cx="20" cy="21" r="1"/>
-          </svg>
+          <img src="{% static 'images/transedge-logo.png' %}" alt="TransEdge">
         </div>
       </a>
     </div>
