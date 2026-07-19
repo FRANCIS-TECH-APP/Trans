@@ -239,10 +239,95 @@
     padding: 28px 16px;
     font-size: 12.5px;
   }
+
+  /* ---------- Announcement popup ---------- */
+  .announce-overlay {
+    position: fixed; inset: 0; z-index: 999;
+    background: rgba(20,20,25,.5);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px;
+  }
+  .announce-modal {
+    position: relative;
+    background: #fff;
+    border-radius: 22px;
+    padding: 22px 22px 24px;
+    max-width: 340px; width: 100%;
+    box-shadow: 0 20px 50px rgba(0,0,0,.25);
+    animation: announceIn .25s ease;
+  }
+  @keyframes announceIn {
+    from { opacity: 0; transform: translateY(10px) scale(.96); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .announce-close {
+    position: absolute; top: 16px; right: 16px;
+    width: 30px; height: 30px; border-radius: 9px;
+    background: #f0f1f5; border: none;
+    display: flex; align-items: center; justify-content: center;
+    color: #6b7280; cursor: pointer;
+  }
+  .announce-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: #eef1ff; color: #3b5bfd;
+    font-size: 11.5px; font-weight: 800; letter-spacing: .03em; text-transform: uppercase;
+    padding: 6px 12px; border-radius: 999px;
+    margin-bottom: 16px;
+  }
+  .announce-title {
+    font-size: 22px; font-weight: 800; color: #14141a;
+    line-height: 1.25; margin-bottom: 12px;
+  }
+  .announce-msg {
+    font-size: 14px; color: #6b7280; line-height: 1.5;
+    margin-bottom: 22px;
+  }
+  .announce-cta {
+    display: flex; align-items: center; justify-content: center;
+    width: 100%;
+    background: #3b5bfd; color: #fff; text-decoration: none;
+    font-size: 15px; font-weight: 700;
+    padding: 14px; border-radius: 999px;
+    border: none; cursor: pointer;
+  }
+  .announce-cta:hover { background: #2f4bdb; }
 </style>
 {% endblock %}
 
 {% block content %}
+
+<!-- Announcement popup -->
+{% if announcement %}
+<div class="announce-overlay" id="announceOverlay">
+  <div class="announce-modal">
+    <button type="button" class="announce-close" id="announceClose" aria-label="Close">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </button>
+
+    <span class="announce-badge">
+      <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path d="M3 11l18-5v12L3 13v-2z"/><path d="M11 17l1 4h2"/>
+      </svg>
+      Announcement
+    </span>
+
+    <div class="announce-title">{{ announcement.title }}</div>
+    <div class="announce-msg">{{ announcement.message|linebreaksbr }}</div>
+
+    {% if announcement.link_url %}
+    <a href="{{ announcement.link_url }}" target="_blank" rel="noopener" class="announce-cta">
+      {{ announcement.link_text|default:"Got it" }}
+    </a>
+    {% else %}
+    <button type="button" class="announce-cta" id="announceGotIt">Got it</button>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
 
 <!-- Greeting -->
 <div class="greet-block">
@@ -494,6 +579,31 @@
 {% endblock %}
 
 {% block extra_js %}
+{% if announcement %}
+<script>
+  // Announcement popup dismiss logic
+  (function () {
+    const overlay = document.getElementById('announceOverlay');
+    const closeBtn = document.getElementById('announceClose');
+    const gotItBtn = document.getElementById('announceGotIt');
+    if (!overlay || !closeBtn) return;
+
+    const key = 'announcement_dismissed_{{ announcement.id }}';
+    if (localStorage.getItem(key) === 'true') {
+      overlay.style.display = 'none';
+      return;
+    }
+
+    function dismiss() {
+      overlay.style.display = 'none';
+      localStorage.setItem(key, 'true');
+    }
+
+    closeBtn.addEventListener('click', dismiss);
+    if (gotItBtn) gotItBtn.addEventListener('click', dismiss);
+  })();
+</script>
+{% endif %}
 <script>
   // Time-of-day greeting for #greetTime
   (function () {

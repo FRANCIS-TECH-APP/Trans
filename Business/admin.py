@@ -5,7 +5,7 @@ from .models import (
     Shipment, ContactInfo, ShipmentImage,
     TransitCheckpoint, Payment, 
     User, SubAdminProfile, PointsPricing, PointsPurchase,NotificationRead, Notification, SubAdminSiteSettings,
-    Account, ForeignNumber, SiteSettings, Testimonial, Invoice, InvoiceItem
+    Account, ForeignNumber, SiteSettings, Testimonial, Invoice, InvoiceItem,DashboardAnnouncement
 )
 
 
@@ -658,3 +658,9 @@ class DashboardAdvertAdmin(admin.ModelAdmin):
             return format_html('<img src="{}" style="height:40px;border-radius:6px;" />', obj.image.url)
         return "—"
     preview.short_description = "Preview"
+
+
+
+@admin.register(DashboardAnnouncement)
+class DashboardAnnouncementAdmin(admin.ModelAdmin):
+    list_display = ("title", "is_active", "created_at")

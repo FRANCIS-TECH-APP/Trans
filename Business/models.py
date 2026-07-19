@@ -1194,3 +1194,15 @@ class DashboardAdvert(models.Model):
         if self.end_date and now > self.end_date:
             return False
         return True
+
+
+class DashboardAnnouncement(models.Model):
+    title = models.CharField(max_length=120)
+    message = models.TextField()
+    link_url = models.URLField(blank=True, null=True)
+    link_text = models.CharField(max_length=60, default="Join Group")
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.title
