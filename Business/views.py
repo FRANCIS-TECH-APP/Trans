@@ -775,22 +775,26 @@ def sub_admin_required(view_func):
     return wrapper
 
 
+from .models import BuyLogs, BuyLogDetails, Purchase, Account, SubAdminProfile, Category
+
+
 @sub_admin_required
 def browse_logs(request):
     """List active log products, optionally filtered by category."""
-    category = request.GET.get("category")
+    category_slug = request.GET.get("category")
 
-    products = BuyLogs.objects.filter(active=True)
-    if category:
-        products = products.filter(category=category)
+    products = BuyLogs.objects.filter(active=True).select_related("category")
+    if category_slug:
+        products = products.filter(category__slug=category_slug)
 
     context = {
         "products": products,
-        "categories": BuyLogs.Categories.choices,
-        "selected_category": category,
+        "categories": Category.objects.filter(is_active=True),
+        "selected_category": category_slug,
         "wallet_balance": request.user.account.balance,
     }
     return render(request, "buy_logs/browse.html", context)
+
 
 
 @sub_admin_required

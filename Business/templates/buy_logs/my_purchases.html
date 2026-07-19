@@ -40,7 +40,7 @@
   <a href="{% url 'buy-logs-receipt' pk=purchase.pk %}" class="purchase-row">
     <div class="purchase-main">
       <div class="purchase-title">{{ purchase.product.title }}</div>
-      <div class="purchase-meta">{{ purchase.product.get_category_display }} · {{ purchase.purchased_at|date:"M d, Y H:i" }}</div>
+      <div class="purchase-meta">{{ purchase.product.category.name }} · {{ purchase.purchased_at|date:"M d, Y H:i" }}</div>
     </div>
     <div class="purchase-right">
       <div class="purchase-amount">₦{{ purchase.amount|floatformat:2 }}</div>

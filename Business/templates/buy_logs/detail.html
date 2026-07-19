@@ -51,7 +51,7 @@
   <img src="{{ product.image.url }}" alt="{{ product.title }}">
   {% endif %}
   <div class="product-body">
-    <span class="cat-pill">{{ product.get_category_display }}</span>
+    <span class="cat-pill">{{ product.category.name }}</span>
     <h1>{{ product.title }}</h1>
     <p class="desc">{{ product.description }}</p>
 

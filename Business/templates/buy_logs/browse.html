@@ -73,8 +73,8 @@
 
 <div class="tabs">
   <a href="{% url 'buy-logs-browse' %}" class="{% if not selected_category %}active{% endif %}">All</a>
-  {% for value, label in categories %}
-  <a href="{% url 'buy-logs-browse' %}?category={{ value }}" class="{% if selected_category == value %}active{% endif %}">{{ label }}</a>
+  {% for cat in categories %}
+  <a href="{% url 'buy-logs-browse' %}?category={{ cat.slug }}" class="{% if selected_category == cat.slug %}active{% endif %}">{{ cat.name }}</a>
   {% endfor %}
 </div>
 
@@ -85,7 +85,7 @@
     <img src="{{ product.image.url }}" alt="{{ product.title }}" class="thumb">
     {% endif %}
     <div class="body">
-      <div class="cat">{{ product.get_category_display }}</div>
+      <div class="cat">{{ product.category.name }}</div>
       <div class="name">{{ product.title }}</div>
       <div class="foot">
         <span class="price">₦{{ product.price|floatformat:2 }}</span>

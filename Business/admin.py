@@ -544,6 +544,7 @@ class BuyLogsAdmin(admin.ModelAdmin):
     list_display = ("title", "category", "price", "stock_badge", "active", "created_at")
     list_filter = ("category", "active")
     search_fields = ("title", "description")
+    autocomplete_fields = ("category",) 
     inlines = [BuyLogDetailsInline]
 
     def stock_badge(self, obj):
@@ -560,6 +561,29 @@ class BuyLogsAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return _is_admin_role(request)
+
+from .models import BuyLogs, BuyLogDetails, Purchase, Category
+
+
+@admin.register(Category)
+class CategoryAdmin(admin.ModelAdmin):
+    list_display = ("name", "slug", "order", "is_active", "product_count")
+    list_editable = ("order", "is_active")
+    prepopulated_fields = {"slug": ("name",)}
+    search_fields = ("name",)
+
+    def has_add_permission(self, request):
+        return _is_admin_role(request)
+
+    def has_change_permission(self, request, obj=None):
+        return _is_admin_role(request)
+
+    def has_delete_permission(self, request, obj=None):
+        return _is_admin_role(request)
+
+    def product_count(self, obj):
+        return obj.products.count()
+    product_count.short_description = "Products"
 
 
 @admin.register(BuyLogDetails)

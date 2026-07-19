@@ -1046,15 +1046,33 @@ class SubAdminSiteSettings(models.Model):
 #  purchases already use — no separate points system.
 # ══════════════════════════════════════════════════════════════════
 
-class BuyLogs(models.Model):
-    class Categories(models.TextChoices):
-        FACEBOOK      = "facebook",      "Facebook"
-        SNAPCHAT      = "snapchat",      "Snapchat"
-        WORKING_TOOLS = "working_tools", "Working Tools"
-        TIKTOK        = "tiktok",        "TikTok"
+from django.utils.text import slugify
 
+class Category(models.Model):
+    name       = models.CharField(max_length=50, unique=True)
+    slug       = models.SlugField(max_length=60, unique=True, blank=True)
+    icon       = models.CharField(max_length=60, blank=True, help_text="Font Awesome class, e.g. 'fab fa-facebook'")
+    is_active  = models.BooleanField(default=True)
+    order      = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["order", "name"]
+        verbose_name_plural = "Categories"
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.name)
+        super().save(*args, **kwargs)
+
+
+
+class BuyLogs(models.Model):
     id          = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    category    = models.CharField(max_length=30, choices=Categories.choices)
+    category    = models.ForeignKey(Category, on_delete=models.PROTECT, related_name="products")
     title       = models.CharField(max_length=200)
     image       = models.ImageField(upload_to="categories/")
     description = models.TextField()
@@ -1078,8 +1096,9 @@ class BuyLogs(models.Model):
     @property
     def in_stock(self):
         return self.stock_count > 0
+    
 
-
+    
 class BuyLogDetails(models.Model):
     """
     The actual credential stock. Only ever created/edited from the
