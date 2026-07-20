@@ -1206,3 +1206,23 @@ class DashboardAnnouncement(models.Model):
 
     def __str__(self):
         return self.title
+
+
+
+class BrandGalleryImage(models.Model):
+    """
+    Admin-managed, platform-wide images shown on every sub-admin's public
+    landing page. Sub-admins have no CRUD access to this model at all —
+    it isn't exposed anywhere in the sub-admin views/templates, so there's
+    nothing for them to remove or override.
+    """
+    image = models.ImageField(upload_to="brand_gallery/")
+    caption = models.CharField(max_length=120, blank=True)
+    sort_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["sort_order"]
+
+    def __str__(self):
+        return self.caption or f"Gallery image #{self.pk}"

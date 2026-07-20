@@ -19,7 +19,7 @@ from django.db.models import Q
 from .models import (
     User, Shipment, ContactInfo, ShipmentImage,
     TransitCheckpoint, Payment,
-    SubAdminProfile, PointsPurchase, PointsPricing,Account,ForeignNumber,Notification,NotificationRead,SubAdminSiteSettings,DashboardAdvert,DashboardAnnouncement
+    SubAdminProfile, PointsPurchase, PointsPricing,Account,ForeignNumber,Notification,NotificationRead,SubAdminSiteSettings,DashboardAdvert,DashboardAnnouncement,Testimonial,BrandGalleryImage
 )
 
 
@@ -2455,7 +2455,6 @@ def _default_settings_context():
     ctx["logo"] = default.get_logo()
     return ctx
 
-
 def public_subadmin_landing(request, referral_code):
     """
     Public landing page for one sub-admin, reached via their referral
@@ -2466,19 +2465,29 @@ def public_subadmin_landing(request, referral_code):
     profile = get_object_or_404(SubAdminProfile, referral_code=referral_code.upper())
     settings_ctx = SubAdminSiteSettings.for_user(profile.user)
     return render(request, "public/landing.html", {
-        "settings": settings_ctx,
-        "profile": profile,
+        "settings":     settings_ctx,
+        "profile":      profile,
+        # Admin-owned, identical on every sub-admin's page — no per-user filtering
+        "testimonials": Testimonial.objects.filter(is_active=True).order_by("sort_order"),
+        # Fixed brand imagery — no sub-admin code path touches this table
+        "gallery_images": BrandGalleryImage.objects.filter(is_active=True).order_by("sort_order"),
     })
 
 
 def public_default_landing(request):
     """Plain landing page using only the admin's global default branding."""
     return render(request, "public/landing.html", {
-        "settings": _default_settings_context(),
-        "profile": None,
+        "settings":     _default_settings_context(),
+        "profile":      None,
+        "testimonials": Testimonial.objects.filter(is_active=True).order_by("sort_order"),
+        "gallery_images": BrandGalleryImage.objects.filter(is_active=True).order_by("sort_order"),
     })
 
-
+def _shared_landing_context():
+    return {
+        "testimonials": Testimonial.objects.filter(is_active=True).order_by("sort_order"),
+        "gallery_images": BrandGalleryImage.objects.filter(is_active=True).order_by("sort_order"),
+    }
 
 
 def tracking_driver(request, tracking_id):

@@ -1,384 +1,184 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+{% load static %}
+<html class="scroll-smooth" lang="en">
 <head>
-<meta charset="UTF-8">
+<meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{{ settings.site_name|default:"TransEdge" }}</title>
-{% if settings.meta_description %}<meta name="description" content="{{ settings.meta_description }}">{% endif %}
-{% if settings.meta_keywords %}<meta name="keywords" content="{{ settings.meta_keywords }}">{% endif %}
+<title>{{ settings.site_name|default:"Logistics" }} | {{ settings.site_tagline|default:"Shipping & Tracking" }}</title>
+<meta name="description" content="{{ settings.meta_description }}">
+<meta name="keywords" content="{{ settings.meta_keywords }}">
 {% if settings.favicon_url %}<link rel="icon" href="{{ settings.favicon_url }}">{% endif %}
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
 <style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-:root {
-  --sky: #3b82f6; --sky2: #2563eb; --sky-dim: rgba(59,130,246,.12);
-  --bg: #f0f7ff; --surface: #ffffff; --surface2: #f8fafc; --border: #e2e8f0;
-  --text: #0f172a; --muted: #64748b;
-  --green: #16a34a; --green-dim: rgba(22,163,74,.12);
-  --amber: #d97706; --amber-dim: rgba(217,119,6,.12);
-  --radius: 16px; --radius-sm: 10px; --header-h: 68px;
-}
-[data-theme="dark"] {
-  --bg: #15171c; --surface: #1d2027; --surface2: #26292f; --border: #2c2f37;
-  --text: #f1f3f5; --muted: #8b8f99;
-  --sky-dim: rgba(59,130,246,.18); --green-dim: rgba(22,163,74,.18); --amber-dim: rgba(217,119,6,.18);
-}
-
-body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-  background: var(--bg); color: var(--text);
-  transition: background .3s, color .3s;
-  line-height: 1.5;
-}
-
-a { color: inherit; }
-.container { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
-
-/* ── Header ── */
-.site-header {
-  height: var(--header-h);
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
-  position: sticky; top: 0; z-index: 100;
-  transition: background .3s, border-color .3s;
-}
-.site-header .container { height: 100%; display: flex; align-items: center; justify-content: space-between; }
-.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
-.brand-logo { width: 36px; height: 36px; border-radius: 9px; background: linear-gradient(135deg, var(--sky), var(--sky2)); display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; }
-.brand-logo img { width: 100%; height: 100%; object-fit: cover; }
-.brand-name { font-size: 17px; font-weight: 800; letter-spacing: -.02em; }
-.header-actions { display: flex; align-items: center; gap: 10px; }
-.theme-btn {
-  width: 38px; height: 38px; border-radius: 50%; background: var(--surface2); border: 1px solid var(--border);
-  cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--muted);
-}
-[data-theme="light"] .icon-moon { display: none; }
-[data-theme="dark"]  .icon-sun  { display: none; }
-.btn-cta {
-  display: inline-flex; align-items: center; gap: 6px;
-  background: var(--sky); color: #fff; padding: 10px 20px; border-radius: 999px;
-  font-size: 13.5px; font-weight: 700; text-decoration: none; border: none; cursor: pointer;
-  transition: opacity .15s, transform .1s; font-family: inherit;
-}
-.btn-cta:hover { opacity: .9; transform: translateY(-1px); }
-
-/* ── Hero ── */
-.hero {
-  padding: 64px 0 56px;
-  position: relative;
-  overflow: hidden;
-}
-.hero::before {
-  content: ''; position: absolute; top: -20%; right: -10%; width: 480px; height: 480px;
-  background: radial-gradient(circle, var(--sky-dim), transparent 70%); pointer-events: none;
-}
-.hero .container { position: relative; display: grid; grid-template-columns: 1.1fr .9fr; gap: 40px; align-items: center; }
-.hero-tag {
-  display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
-  color: var(--sky); background: var(--sky-dim); padding: 5px 14px; border-radius: 999px; margin-bottom: 16px;
-}
-.hero h1 { font-size: 40px; font-weight: 800; line-height: 1.15; letter-spacing: -.02em; margin-bottom: 16px; }
-.hero p.subtitle { font-size: 16px; color: var(--muted); line-height: 1.6; margin-bottom: 28px; max-width: 480px; }
-.hero-cta-row { display: flex; gap: 12px; flex-wrap: wrap; }
-.btn-secondary {
-  display: inline-flex; align-items: center; gap: 6px;
-  background: var(--surface); color: var(--text); border: 1px solid var(--border);
-  padding: 10px 20px; border-radius: 999px; font-size: 13.5px; font-weight: 700; text-decoration: none;
-}
-.hero-visual {
-  border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border);
-  background: var(--surface2); aspect-ratio: 4/3; display: flex; align-items: center; justify-content: center;
-}
-.hero-visual img { width: 100%; height: 100%; object-fit: cover; }
-.hero-visual svg { color: var(--muted); }
-
-@media (max-width: 760px) {
-  .hero .container { grid-template-columns: 1fr; }
-  .hero h1 { font-size: 30px; }
-  .hero-visual { order: -1; aspect-ratio: 16/9; }
-}
-
-/* ── Tracking widget ── */
-.track-section { padding: 0 0 56px; }
-.track-card {
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-  padding: 28px; display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
-  box-shadow: 0 8px 30px rgba(15,23,42,.05);
-}
-.track-card-icon {
-  width: 52px; height: 52px; border-radius: 12px; background: var(--sky-dim); color: var(--sky);
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-}
-.track-card-text { flex: 1; min-width: 200px; }
-.track-card-text h3 { font-size: 16px; font-weight: 700; margin-bottom: 3px; }
-.track-card-text p { font-size: 13px; color: var(--muted); }
-.track-form { display: flex; gap: 8px; flex: 1 1 320px; min-width: 260px; }
-.track-form input {
-  flex: 1; padding: 12px 16px; background: var(--surface2); border: 1.5px solid var(--border);
-  border-radius: 10px; font-size: 13.5px; color: var(--text); outline: none; font-family: inherit;
-  text-transform: uppercase; transition: border-color .2s;
-}
-.track-form input::placeholder { text-transform: none; }
-.track-form input:focus { border-color: var(--sky); }
-.track-form button {
-  background: var(--sky); color: #fff; border: none; border-radius: 10px; padding: 0 22px;
-  font-size: 13.5px; font-weight: 700; cursor: pointer; font-family: inherit; transition: opacity .15s;
-}
-.track-form button:hover { opacity: .9; }
-
-/* ── Stats ── */
-.stats-section { padding: 8px 0 56px; }
-.stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-.stat-block {
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-  padding: 24px; text-align: center;
-}
-.stat-block .num { font-size: 28px; font-weight: 800; color: var(--sky); margin-bottom: 4px; }
-.stat-block .lbl { font-size: 12.5px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
-@media (max-width: 640px) { .stats-grid { grid-template-columns: 1fr; } }
-
-/* ── About ── */
-.about-section { padding: 8px 0 56px; }
-.section-heading { font-size: 24px; font-weight: 800; letter-spacing: -.01em; margin-bottom: 14px; }
-.about-section p { font-size: 14.5px; color: var(--muted); line-height: 1.7; max-width: 720px; }
-
-/* ── Contact ── */
-.contact-section { padding: 8px 0 56px; }
-.contact-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-.contact-card {
-  display: flex; align-items: center; gap: 12px;
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm);
-  padding: 16px; text-decoration: none; color: var(--text);
-}
-.contact-icon { width: 38px; height: 38px; border-radius: 9px; background: var(--sky-dim); color: var(--sky); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.contact-card .lbl { font-size: 10.5px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 2px; }
-.contact-card .val { font-size: 13.5px; font-weight: 600; word-break: break-word; }
-@media (max-width: 640px) { .contact-grid { grid-template-columns: 1fr; } }
-
-/* ── Social ── */
-.social-section { padding: 8px 0 56px; }
-.social-row { display: flex; gap: 10px; flex-wrap: wrap; }
-.social-pill {
-  display: inline-flex; align-items: center; gap: 8px;
-  background: var(--surface); border: 1px solid var(--border); border-radius: 999px;
-  padding: 9px 18px; font-size: 13px; font-weight: 600; text-decoration: none; color: var(--text);
-  transition: background .15s;
-}
-.social-pill:hover { background: var(--surface2); }
-
-/* ── Footer ── */
-.site-footer {
-  border-top: 1px solid var(--border);
-  padding: 24px 0;
-  text-align: center;
-  font-size: 12.5px;
-  color: var(--muted);
-}
+  :root { --brand: {{ settings.primary_color|default:"#3b82f6" }}; }
+  .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+  .brand-bg { background-color: var(--brand); }
+  .brand-text { color: var(--brand); }
+  .brand-border { border-color: var(--brand); }
+  .hero-gradient { background: linear-gradient(to bottom, rgba(0,0,0,.35), rgba(0,0,0,.7)); }
+  .glass-card { background: rgba(255,255,255,.75); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
 </style>
 </head>
-<body>
+<body class="bg-white text-neutral-900">
 
-<header class="site-header">
-  <div class="container">
-    <a href="{% if profile %}{% url 'sub-admin-register' %}?ref={{ profile.referral_code }}{% else %}/{% endif %}" class="brand">
-      <div class="brand-logo">
-        {% if settings.logo %}
-        <img src="{{ settings.logo }}" alt="{{ settings.site_name }} logo">
-        {% else %}
-        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="white" stroke-width="2.5">
-          <path d="M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h11a2 2 0 012 2v3"/>
-          <rect x="9" y="11" width="14" height="10" rx="2"/>
-          <circle cx="12" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
-        </svg>
-        {% endif %}
-      </div>
-      <span class="brand-name">{{ settings.site_name|default:"TransEdge" }}</span>
-    </a>
-    <div class="header-actions">
-      <button class="theme-btn" id="themeToggle" aria-label="Toggle theme">
-        <svg class="icon-sun" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-        <svg class="icon-moon" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
-      </button>
-      {% if profile %}
-      <a href="{% url 'sub-admin-register' %}?ref={{ profile.referral_code }}" class="btn-cta">Get Started</a>
-      {% else %}
-      <a href="{% url 'sub-admin-register' %}" class="btn-cta">Get Started</a>
-      {% endif %}
-    </div>
+<!-- ================= TOP BAR ================= -->
+<header class="fixed top-0 left-0 w-full z-50 bg-white/90 backdrop-blur-md border-b border-neutral-200 flex justify-between items-center h-16 px-5">
+  <div class="flex items-center gap-3">
+    {% if settings.logo %}
+      <img src="{{ settings.logo }}" alt="{{ settings.site_name }}" class="h-8 w-auto">
+    {% else %}
+      <span class="material-symbols-outlined brand-text">local_shipping</span>
+    {% endif %}
+    <span class="font-bold text-lg tracking-tight">{{ settings.site_name|default:"Logistics" }}</span>
   </div>
+  <a href="#track" class="text-sm font-semibold brand-text">Track</a>
 </header>
 
-<!-- Hero -->
-<section class="hero">
-  <div class="container">
-    <div>
-      <span class="hero-tag">{{ settings.site_tagline|default:"Fast. Reliable. Global." }}</span>
-      <h1>{{ settings.hero_title|default:"Ship anywhere, track everything." }}</h1>
-      {% if settings.hero_subtitle %}<p class="subtitle">{{ settings.hero_subtitle }}</p>{% endif %}
-      <div class="hero-cta-row">
-        {% if profile %}
-        <a href="{% url 'sub-admin-register' %}?ref={{ profile.referral_code }}" class="btn-cta">
-          Get Started
-          <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-        </a>
-        {% else %}
-        <a href="{% url 'sub-admin-register' %}" class="btn-cta">
-          Get Started
-          <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-        </a>
-        {% endif %}
-        <a href="#track" class="btn-secondary">Track a Shipment</a>
-      </div>
-    </div>
-    <div class="hero-visual">
+<main class="pt-16">
+
+  <!-- ================= HERO ================= -->
+  <section class="relative min-h-[560px] flex items-center justify-center overflow-hidden">
+    <div class="absolute inset-0">
       {% if settings.hero_image_url %}
-      <img src="{{ settings.hero_image_url }}" alt="">
+        <img src="{{ settings.hero_image_url }}" class="w-full h-full object-cover" alt="">
       {% else %}
-      <svg width="120" height="120" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.4">
-        <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
-        <polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
-      </svg>
+        <!-- Fixed fallback: admin brand gallery cover shot, shown when a sub-admin has no custom hero image -->
+        {% with gallery_images|first as fallback %}
+          {% if fallback %}<img src="{{ fallback.image.url }}" class="w-full h-full object-cover" alt="">{% else %}
+          <div class="w-full h-full bg-neutral-900"></div>{% endif %}
+        {% endwith %}
       {% endif %}
     </div>
-  </div>
-</section>
+    <div class="absolute inset-0 hero-gradient"></div>
+    <div class="relative z-10 w-full px-6 text-center text-white">
+      <span class="inline-block px-4 py-1 rounded-full border border-white/30 bg-white/10 backdrop-blur-sm text-xs uppercase tracking-widest mb-6">
+        {{ settings.site_tagline|default:"Your Logistics Partner" }}
+      </span>
+      <h1 class="font-bold text-3xl md:text-5xl leading-tight mb-6">
+        {{ settings.hero_title|default:"Fast, Reliable Shipping — Every Time." }}
+      </h1>
+      {% if settings.hero_subtitle %}
+      <p class="max-w-xl mx-auto text-white/85 mb-8">{{ settings.hero_subtitle }}</p>
+      {% endif %}
+      <div class="flex flex-col sm:flex-row gap-4 justify-center mt-4">
+        <a href="#track" class="brand-bg text-white py-4 px-8 rounded-lg font-semibold shadow-lg">Track a Shipment</a>
+        <a href="#contact" class="bg-white/10 backdrop-blur-md border border-white/20 text-white py-4 px-8 rounded-lg font-semibold">Contact Us</a>
+      </div>
+    </div>
+  </section>
 
-<!-- Tracking -->
-<section class="track-section" id="track">
-  <div class="container">
-    <div class="track-card">
-      <div class="track-card-icon">
-        <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+  <!-- ================= STATS ================= -->
+  <section class="py-14 px-6 grid grid-cols-3 gap-4 text-center border-b border-neutral-100">
+    <div>
+      <p class="text-2xl md:text-3xl font-bold brand-text">{{ settings.stat_deliveries|default:"15k+" }}</p>
+      <p class="text-xs uppercase tracking-widest text-neutral-500 mt-1">Deliveries</p>
+    </div>
+    <div>
+      <p class="text-2xl md:text-3xl font-bold brand-text">{{ settings.stat_satisfaction|default:"98%" }}</p>
+      <p class="text-xs uppercase tracking-widest text-neutral-500 mt-1">Satisfaction</p>
+    </div>
+    <div>
+      <p class="text-2xl md:text-3xl font-bold brand-text">{{ settings.stat_support|default:"24/7" }}</p>
+      <p class="text-xs uppercase tracking-widest text-neutral-500 mt-1">Support</p>
+    </div>
+  </section>
+
+  <!-- ================= ABOUT ================= -->
+  {% if settings.about_text %}
+  <section class="py-16 px-6 max-w-2xl mx-auto text-center">
+    <h2 class="text-xl font-bold mb-4">About Us</h2>
+    <p class="text-neutral-600 leading-relaxed">{{ settings.about_text }}</p>
+  </section>
+  {% endif %}
+
+  <!-- ================= BRAND GALLERY (fixed — admin-managed, not editable per sub-admin) ================= -->
+  {% if gallery_images %}
+  <section class="py-16 bg-neutral-50">
+    <div class="px-6 mb-8 text-center">
+      <p class="text-xs uppercase tracking-widest text-neutral-500">In Action</p>
+      <h2 class="text-xl font-bold mt-2">How We Deliver</h2>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-3 gap-2 px-2">
+      {% for g in gallery_images %}
+      <div class="aspect-square overflow-hidden rounded-lg">
+        <img src="{{ g.image.url }}" alt="{{ g.caption }}" class="w-full h-full object-cover">
       </div>
-      <div class="track-card-text">
-        <h3>Track your shipment</h3>
-        <p>Enter your tracking ID to see live status and location.</p>
-      </div>
-      <form method="post" action="{% url 'tracking-search' %}" class="track-form">
-        {% csrf_token %}
-        <input type="text" id="tracking_id" name="tracking_id" placeholder="TRK-2026-XXXXXXXX"
-               oninput="this.value=this.value.toUpperCase()" autocomplete="off" required>
-        <button type="submit">Track</button>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- ================= QUOTE FORM ================= -->
+  <section class="py-16 px-6">
+    <div class="bg-neutral-50 rounded-2xl border border-neutral-200 p-8 max-w-xl mx-auto" id="track">
+      <h3 class="text-lg font-bold mb-6">Track Your Shipment</h3>
+      <form class="space-y-4">
+        <input type="text" placeholder="Tracking ID" class="w-full px-4 py-3 rounded-lg border border-neutral-300 focus:brand-border outline-none">
+        <button type="submit" class="w-full brand-bg text-white py-3 rounded-lg font-semibold">Track Now</button>
       </form>
     </div>
-  </div>
-</section>
+  </section>
 
-<!-- Stats -->
-{% if settings.stat_deliveries or settings.stat_satisfaction or settings.stat_support %}
-<section class="stats-section">
-  <div class="container">
-    <div class="stats-grid">
-      {% if settings.stat_deliveries %}
-      <div class="stat-block"><div class="num">{{ settings.stat_deliveries }}</div><div class="lbl">Deliveries</div></div>
-      {% endif %}
-      {% if settings.stat_satisfaction %}
-      <div class="stat-block"><div class="num">{{ settings.stat_satisfaction }}</div><div class="lbl">Satisfaction</div></div>
-      {% endif %}
-      {% if settings.stat_support %}
-      <div class="stat-block"><div class="num">{{ settings.stat_support }}</div><div class="lbl">Support</div></div>
-      {% endif %}
+  <!-- ================= TESTIMONIALS (admin-managed only — no sub-admin CRUD) ================= -->
+  {% if testimonials %}
+  <section class="py-16 px-6 bg-neutral-50">
+    <div class="text-center mb-10">
+      <p class="text-xs uppercase tracking-widest text-neutral-500">Client Feedback</p>
+      <h2 class="text-xl font-bold mt-2">What Our Partners Say</h2>
     </div>
-  </div>
-</section>
-{% endif %}
-
-<!-- About -->
-{% if settings.about_text %}
-<section class="about-section">
-  <div class="container">
-    <div class="section-heading">About {{ settings.site_name|default:"us" }}</div>
-    <p>{{ settings.about_text }}</p>
-  </div>
-</section>
-{% endif %}
-
-<!-- Contact -->
-{% if settings.phone_primary or settings.phone_secondary or settings.email_support or settings.email_info or settings.address or settings.google_maps_url or settings.whatsapp_number %}
-<section class="contact-section">
-  <div class="container">
-    <div class="section-heading">Get in touch</div>
-    <div class="contact-grid">
-      {% if settings.phone_primary %}
-      <a href="tel:{{ settings.phone_primary }}" class="contact-card">
-        <span class="contact-icon"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.11 1.18 2 2 0 012.11 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg></span>
-        <div><div class="lbl">Phone</div><div class="val">{{ settings.phone_primary }}</div></div>
-      </a>
-      {% endif %}
-      {% if settings.phone_secondary %}
-      <a href="tel:{{ settings.phone_secondary }}" class="contact-card">
-        <span class="contact-icon"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.11 1.18 2 2 0 012.11 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg></span>
-        <div><div class="lbl">Phone (alt)</div><div class="val">{{ settings.phone_secondary }}</div></div>
-      </a>
-      {% endif %}
-      {% if settings.email_support %}
-      <a href="mailto:{{ settings.email_support }}" class="contact-card">
-        <span class="contact-icon"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></span>
-        <div><div class="lbl">Support Email</div><div class="val">{{ settings.email_support }}</div></div>
-      </a>
-      {% endif %}
-      {% if settings.email_info %}
-      <a href="mailto:{{ settings.email_info }}" class="contact-card">
-        <span class="contact-icon"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></span>
-        <div><div class="lbl">Info Email</div><div class="val">{{ settings.email_info }}</div></div>
-      </a>
-      {% endif %}
-      {% if settings.address %}
-      <div class="contact-card">
-        <span class="contact-icon"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
-        <div><div class="lbl">Address</div><div class="val">{{ settings.address }}</div></div>
+    <div class="flex flex-col gap-6 max-w-xl mx-auto">
+      {% for t in testimonials %}
+      <div class="bg-white p-6 rounded-2xl border border-neutral-200 shadow-sm">
+        <div class="flex gap-1 mb-3 text-amber-400 text-sm">
+          {% for i in "12345" %}{% if forloop.counter <= t.rating %}★{% else %}☆{% endif %}{% endfor %}
+        </div>
+        <p class="text-neutral-600 italic mb-6 leading-relaxed">"{{ t.content }}"</p>
+        <div class="flex items-center gap-3">
+          {% if t.get_avatar %}
+            <img src="{{ t.get_avatar }}" class="w-10 h-10 rounded-full object-cover">
+          {% else %}
+            <div class="w-10 h-10 rounded-full bg-neutral-200 flex items-center justify-center text-xs font-bold">{{ t.name|slice:":1" }}</div>
+          {% endif %}
+          <div>
+            <p class="font-semibold text-sm">{{ t.name }}</p>
+            <p class="text-xs text-neutral-500 uppercase">{{ t.role }}</p>
+          </div>
+        </div>
       </div>
-      {% endif %}
-      {% if settings.google_maps_url %}
-      <a href="{{ settings.google_maps_url }}" target="_blank" rel="noopener" class="contact-card">
-        <span class="contact-icon"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg></span>
-        <div><div class="lbl">Map</div><div class="val">View on Google Maps</div></div>
-      </a>
-      {% endif %}
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- ================= CONTACT ================= -->
+  <section class="py-16 px-6 max-w-xl mx-auto" id="contact">
+    <h2 class="text-xl font-bold mb-6 text-center">Get In Touch</h2>
+    <div class="space-y-3 text-sm text-neutral-600">
+      {% if settings.phone_primary %}<p><span class="material-symbols-outlined align-middle text-base mr-2">call</span>{{ settings.phone_primary }}</p>{% endif %}
+      {% if settings.email_support %}<p><span class="material-symbols-outlined align-middle text-base mr-2">mail</span>{{ settings.email_support }}</p>{% endif %}
+      {% if settings.address %}<p><span class="material-symbols-outlined align-middle text-base mr-2">location_on</span>{{ settings.address }}</p>{% endif %}
       {% if settings.whatsapp_number %}
-      <a href="https://wa.me/{{ settings.whatsapp_number }}" target="_blank" rel="noopener" class="contact-card">
-        <span class="contact-icon"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg></span>
-        <div><div class="lbl">WhatsApp</div><div class="val">Chat with us</div></div>
+      <a href="https://wa.me/{{ settings.whatsapp_number }}" class="inline-flex items-center gap-2 brand-text font-semibold">
+        <span class="material-symbols-outlined text-base">chat</span> Chat on WhatsApp
       </a>
       {% endif %}
     </div>
-  </div>
-</section>
-{% endif %}
+  </section>
 
-<!-- Social -->
-{% if settings.twitter_url or settings.instagram_url or settings.facebook_url or settings.linkedin_url or settings.tiktok_url %}
-<section class="social-section">
-  <div class="container">
-    <div class="section-heading">Follow us</div>
-    <div class="social-row">
-      {% if settings.twitter_url %}<a href="{{ settings.twitter_url }}" target="_blank" rel="noopener" class="social-pill">Twitter / X</a>{% endif %}
-      {% if settings.instagram_url %}<a href="{{ settings.instagram_url }}" target="_blank" rel="noopener" class="social-pill">Instagram</a>{% endif %}
-      {% if settings.facebook_url %}<a href="{{ settings.facebook_url }}" target="_blank" rel="noopener" class="social-pill">Facebook</a>{% endif %}
-      {% if settings.linkedin_url %}<a href="{{ settings.linkedin_url }}" target="_blank" rel="noopener" class="social-pill">LinkedIn</a>{% endif %}
-      {% if settings.tiktok_url %}<a href="{{ settings.tiktok_url }}" target="_blank" rel="noopener" class="social-pill">TikTok</a>{% endif %}
-    </div>
-  </div>
-</section>
-{% endif %}
+</main>
 
-<footer class="site-footer">
-  <div class="container">
-    {{ settings.copyright_text|default:"© 2026 TransEdge. All rights reserved." }}
+<!-- ================= FOOTER ================= -->
+<footer class="bg-neutral-900 text-neutral-400 pt-12 pb-8 px-6 text-center">
+  <div class="flex justify-center gap-4 mb-6">
+    {% if settings.twitter_url %}<a href="{{ settings.twitter_url }}" class="hover:text-white"><span class="material-symbols-outlined">tag</span></a>{% endif %}
+    {% if settings.instagram_url %}<a href="{{ settings.instagram_url }}" class="hover:text-white"><span class="material-symbols-outlined">photo_camera</span></a>{% endif %}
+    {% if settings.facebook_url %}<a href="{{ settings.facebook_url }}" class="hover:text-white"><span class="material-symbols-outlined">public</span></a>{% endif %}
+    {% if settings.linkedin_url %}<a href="{{ settings.linkedin_url }}" class="hover:text-white"><span class="material-symbols-outlined">work</span></a>{% endif %}
   </div>
+  <p class="text-xs uppercase tracking-widest">{{ settings.copyright_text|default:"© All rights reserved." }}</p>
 </footer>
 
-<script>
-  const html = document.documentElement;
-  html.setAttribute('data-theme', localStorage.getItem('te-theme') || 'light');
-  document.getElementById('themeToggle').addEventListener('click', () => {
-    const next = html.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
-    html.setAttribute('data-theme', next);
-    localStorage.setItem('te-theme', next);
-  });
-</script>
 </body>
 </html>

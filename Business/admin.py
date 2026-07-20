@@ -5,7 +5,7 @@ from .models import (
     Shipment, ContactInfo, ShipmentImage,
     TransitCheckpoint, Payment, 
     User, SubAdminProfile, PointsPricing, PointsPurchase,NotificationRead, Notification, SubAdminSiteSettings,
-    Account, ForeignNumber, SiteSettings, Testimonial, Invoice, InvoiceItem,DashboardAnnouncement
+    Account, ForeignNumber, SiteSettings, Testimonial, Invoice, InvoiceItem,DashboardAnnouncement,BrandGalleryImage
 )
 
 
@@ -664,3 +664,9 @@ class DashboardAdvertAdmin(admin.ModelAdmin):
 @admin.register(DashboardAnnouncement)
 class DashboardAnnouncementAdmin(admin.ModelAdmin):
     list_display = ("title", "is_active", "created_at")
+
+
+# admin.py
+@admin.register(BrandGalleryImage)
+class BrandGalleryImageAdmin(admin.ModelAdmin):
+    list_display = ("caption", "sort_order", "is_active")
