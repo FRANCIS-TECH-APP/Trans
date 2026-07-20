@@ -36,7 +36,7 @@ ALLOWED_HOSTS = [
     "transedge.onrender.com",
     "localhost",
     "transedge.site",
-    "127.0.0.1"
+    "127.0.0.1",
     "trans-212s.onrender.com"
 ]
 
