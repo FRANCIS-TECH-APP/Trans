@@ -1,26 +1,44 @@
+import os
 import json
+import math
+import uuid
 import hmac
 import hashlib
+import logging
 import requests
-import uuid
+from io import BytesIO
+from datetime import timedelta
+from decimal import Decimal, InvalidOperation
 
-from django.shortcuts import render, get_object_or_404, redirect
-from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.decorators import login_required
-from django.contrib import messages
-from django.http import HttpResponse
-from django.views.decorators.http import require_POST
-from django.views.decorators.csrf import csrf_exempt
-from django.utils import timezone
-from django.core.paginator import Paginator
+from decouple import config
+from xhtml2pdf import pisa
+
 from django.conf import settings
+from django.contrib import messages
+from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
+from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
+from django.db import transaction as db_transaction
 from django.db.models import Q
+from django.http import HttpResponse, JsonResponse
+from django.shortcuts import render, get_object_or_404, redirect
+from django.template.loader import render_to_string
+from django.urls import reverse
+from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
 
 from .models import (
     User, Shipment, ContactInfo, ShipmentImage,
     TransitCheckpoint, Payment,
-    SubAdminProfile, PointsPurchase, PointsPricing,Account,ForeignNumber,Notification,NotificationRead,SubAdminSiteSettings,DashboardAdvert,DashboardAnnouncement,Testimonial,BrandGalleryImage
+    SubAdminProfile, PointsPurchase, PointsPricing,
+    Account, ForeignNumber, WalletDeposit,
+    Notification, NotificationRead, SubAdminSiteSettings,
+    DashboardAdvert, DashboardAnnouncement, Testimonial, BrandGalleryImage,
+    Invoice, InvoiceItem,
 )
+
+logger = logging.getLogger(__name__)
 
 
 # ════════════════════════════════════════════════════════
@@ -49,6 +67,7 @@ def sub_admin_approved_required(view_func):
             profile = request.user.sub_admin_profile
         except SubAdminProfile.DoesNotExist:
             return redirect("sub-admin-login")
+
         if profile.approval_status == SubAdminProfile.ApprovalStatus.PENDING:
             return render(request, "admin/subadmin/pending_approval.html", {"profile": profile})
         if profile.approval_status == SubAdminProfile.ApprovalStatus.REJECTED:
@@ -106,6 +125,10 @@ def sub_admin_register(request):
     if request.user.is_authenticated and request.user.role == User.Role.SUB_ADMIN:
         return redirect("sub-admin-dashboard")
 
+    # capture referral code from the link (?ref=A1B2C3D4), keep it
+    # through the form via a hidden input named "ref_code"
+    ref_code = request.GET.get("ref", "").strip().upper()
+
     if request.method == "POST":
         p         = request.POST
         email     = p.get("email", "").strip().lower()
@@ -115,14 +138,15 @@ def sub_admin_register(request):
         phone     = p.get("phone", "").strip()
         company   = p.get("company_name", "").strip()
         address   = p.get("address", "").strip()
+        ref_code  = p.get("ref_code", "").strip().upper()
 
         if password != password2:
             messages.error(request, "Passwords do not match.")
-            return render(request, "admin/subadmin/register.html", {"post": p})
+            return render(request, "admin/subadmin/register.html", {"post": p, "ref_code": ref_code})
 
         if User.objects.filter(email=email).exists():
             messages.error(request, "An account with this email already exists.")
-            return render(request, "admin/subadmin/register.html", {"post": p})
+            return render(request, "admin/subadmin/register.html", {"post": p, "ref_code": ref_code})
 
         user = User.objects.create_user(
             email     = email,
@@ -131,16 +155,23 @@ def sub_admin_register(request):
             role      = User.Role.SUB_ADMIN,
             is_active = True,
         )
+
+        # find referrer by code (if any)
+        referrer = None
+        if ref_code:
+            referrer = SubAdminProfile.objects.filter(referral_code=ref_code).first()
+
         SubAdminProfile.objects.create(
             user         = user,
             phone        = phone,
             company_name = company,
             address      = address,
+            referred_by  = referrer,
         )
         messages.success(request, "Registration successful! Awaiting admin approval.")
         return redirect("sub-admin-login")
 
-    return render(request, "admin/subadmin/register.html")
+    return render(request, "admin/subadmin/register.html", {"ref_code": ref_code})
 
 
 def sub_admin_login(request):
@@ -168,7 +199,6 @@ def sub_admin_logout(request):
 # ════════════════════════════════════════════════════════
 #  DASHBOARD
 # ════════════════════════════════════════════════════════
-
 
 @sub_admin_approved_required
 def sub_admin_dashboard(request):
@@ -321,36 +351,6 @@ def sub_admin_points_verify(request, reference):
     return redirect("sub-admin-buy-points")
 
 
-@csrf_exempt
-def sub_admin_paystack_webhook(request):
-    """Paystack webhook — handles charge.success for points purchases."""
-    if request.method != "POST":
-        return HttpResponse(status=405)
-
-    secret    = settings.PAYSTACK_SECRET_KEY.encode("utf-8")
-    signature = request.headers.get("x-paystack-signature", "")
-    computed  = hmac.new(secret, request.body, hashlib.sha512).hexdigest()
-
-    if not hmac.compare_digest(computed, signature):
-        return HttpResponse(status=400)
-
-    try:
-        payload = json.loads(request.body)
-    except json.JSONDecodeError:
-        return HttpResponse(status=400)
-
-    if payload.get("event") == "charge.success":
-        reference = payload["data"].get("reference", "")
-        try:
-            purchase = PointsPurchase.objects.get(paystack_reference=reference)
-            if purchase.status != PointsPurchase.Status.SUCCESS:
-                _credit_points(purchase)
-        except PointsPurchase.DoesNotExist:
-            pass
-
-    return HttpResponse(status=200)
-
-
 def _credit_points(purchase):
     """Mark purchase successful and add points to sub-admin wallet."""
     purchase.status  = PointsPurchase.Status.SUCCESS
@@ -458,14 +458,11 @@ def sub_admin_shipment_create(request):
             driver_name           = p.get("driver_name", ""),
             driver_phone          = p.get("driver_phone", ""),
             driver_vehicle_info   = p.get("driver_vehicle_info", ""),
-        
         )
 
-# ↓ AND ADD THIS RIGHT AFTER, before the images loop ↓
         if request.FILES.get("driver_photo"):
             shipment.driver_photo = request.FILES["driver_photo"]
             shipment.save()
-        
 
         Payment.objects.create(
             shipment = shipment,
@@ -604,19 +601,6 @@ def reinstate_sub_admin(request, pk):
     messages.success(request, f"{profile.user.full_name} reinstated.")
     return redirect("manage-sub-admins")
 
-from decimal import Decimal, InvalidOperation
-
-from decimal import Decimal, InvalidOperation
-
-from decimal import Decimal, InvalidOperation
-
-# ══════════════════════════════════════════════════════════════════
-#  REPLACE your existing set_points_pricing view in sub_admin_views.py
-#  with this version — adds points_per_site_customization handling.
-# ══════════════════════════════════════════════════════════════════
-
-from decimal import Decimal, InvalidOperation
-
 
 @super_admin_required
 @require_POST
@@ -645,8 +629,6 @@ def set_points_pricing(request):
     except (ValueError, TypeError, InvalidOperation):
         messages.error(request, "Invalid values.")
     return redirect("manage-sub-admins")
-
-
 
 
 @super_admin_required
@@ -687,10 +669,69 @@ def sub_admin_detail(request, pk):
     }
     return render(request, "admin/sub_admin_detail.html", context)
 
+
 def sub_admin_landing(request):
     if request.user.is_authenticated and request.user.role == User.Role.SUB_ADMIN:
         return redirect("sub-admin-dashboard")
     return render(request, "admin/subadmin/landing.html")
+
+
+# ════════════════════════════════════════════════════════
+#  CHECKPOINTS — sync shipment status from checkpoint events
+# ════════════════════════════════════════════════════════
+
+# Statuses that represent one of the 5 stepper stages shown on the
+# public tracking page.
+PROGRESS_STATUSES = {
+    Shipment.Status.CREATED,
+    Shipment.Status.PICKED_UP,
+    Shipment.Status.IN_TRANSIT,
+    Shipment.Status.AT_CUSTOMS,
+    Shipment.Status.OUT_FOR_DELIVERY,
+    Shipment.Status.DELIVERED,
+}
+
+# Same statuses, in stepper order — used to prevent status moving backward.
+PROGRESS_ORDER = [
+    Shipment.Status.CREATED,
+    Shipment.Status.PICKED_UP,
+    Shipment.Status.IN_TRANSIT,
+    Shipment.Status.AT_CUSTOMS,
+    Shipment.Status.OUT_FOR_DELIVERY,
+    Shipment.Status.DELIVERED,
+]
+
+CHECKPOINT_TO_STATUS = {
+    TransitCheckpoint.EventType.PICKUP:           Shipment.Status.PICKED_UP,
+    TransitCheckpoint.EventType.DEPARTED:         Shipment.Status.IN_TRANSIT,
+    TransitCheckpoint.EventType.ARRIVED:          Shipment.Status.IN_TRANSIT,
+    TransitCheckpoint.EventType.IN_TRANSIT:       Shipment.Status.IN_TRANSIT,
+    TransitCheckpoint.EventType.CUSTOMS_IN:       Shipment.Status.AT_CUSTOMS,
+    TransitCheckpoint.EventType.CUSTOMS_CLEARED:  Shipment.Status.AT_CUSTOMS,
+    TransitCheckpoint.EventType.OUT_FOR_DELIVERY: Shipment.Status.OUT_FOR_DELIVERY,
+    TransitCheckpoint.EventType.DELIVERED:        Shipment.Status.DELIVERED,
+    TransitCheckpoint.EventType.ATTEMPTED:        Shipment.Status.OUT_FOR_DELIVERY,
+    TransitCheckpoint.EventType.HELD:             Shipment.Status.HELD,
+    TransitCheckpoint.EventType.EXCEPTION:        None,  # no direct status mapping
+}
+
+
+def get_progress_status(shipment, checkpoints):
+    """
+    Returns the stepper-relevant status: the shipment's own status if
+    it's one of the five progress stages, otherwise (held/returned/
+    cancelled) falls back to the last progress stage reached, inferred
+    from checkpoint history.
+    """
+    if shipment.status in PROGRESS_STATUSES:
+        return shipment.status
+
+    for cp in checkpoints.order_by("-timestamp"):
+        mapped = CHECKPOINT_TO_STATUS.get(cp.event_type)
+        if mapped in PROGRESS_STATUSES:
+            return mapped
+
+    return Shipment.Status.CREATED
 
 
 @sub_admin_approved_required
@@ -711,385 +752,28 @@ def sub_admin_checkpoint_add(request, pk):
         timestamp   = p.get("timestamp") or timezone.now(),
         added_by    = request.user,
     )
+
+    # ── Sync shipment.status from the checkpoint event_type ──────
+    new_status = CHECKPOINT_TO_STATUS.get(p["event_type"])
+    if new_status:
+        if new_status in PROGRESS_STATUSES and shipment.status in PROGRESS_STATUSES:
+            # Only move forward along the stepper, never backward
+            if PROGRESS_ORDER.index(new_status) > PROGRESS_ORDER.index(shipment.status):
+                shipment.status = new_status
+                shipment.save(update_fields=["status"])
+        else:
+            # e.g. HELD — apply directly regardless of ordering
+            shipment.status = new_status
+            shipment.save(update_fields=["status"])
+    # ───────────────────────────────────────────────────────────
+
     messages.success(request, "Checkpoint added.")
     return redirect("sub-admin-shipment-detail", pk=pk)
 
 
-@require_POST
-@sub_admin_approved_required
-def sub_admin_shipment_amend(request, pk):
-    shipment = get_object_or_404(
-        Shipment.objects.select_related("sender", "receiver"),
-        pk=pk,
-        created_by=request.user
-    )
-
-    profile = request.user.sub_admin_profile
-    pricing = PointsPricing.get_current()
-    cost = pricing.points_per_amendment
-
-    # Check points balance
-    if profile.points_balance < cost:
-        messages.error(
-            request,
-            f"You need {cost} point(s) to amend this shipment. "
-            f"You have {profile.points_balance}."
-        )
-        return redirect("sub-admin-shipment-detail", pk=shipment.pk)
-
-    p = request.POST
-
-    try:
-        # =====================
-        # UPDATE SENDER
-        # =====================
-        sender = shipment.sender
-        sender.full_name = p.get("sender_name", "")
-        sender.email = p.get("sender_email", "")
-        sender.phone = p.get("sender_phone", "")
-        sender.state = p.get("sender_state", "")
-        sender.country = p.get("sender_country", "")
-        sender.save()
-
-        # =====================
-        # UPDATE RECEIVER
-        # =====================
-        receiver = shipment.receiver
-        receiver.full_name = p.get("receiver_name", "")
-        receiver.email = p.get("receiver_email", "")
-        receiver.phone = p.get("receiver_phone", "")
-        receiver.state = p.get("receiver_state", "")
-        receiver.country = p.get("receiver_country", "")
-        receiver.save()
-
-        # =====================
-        # UPDATE SHIPMENT
-        # =====================
-        shipment.shipment_type = p.get("shipment_type")
-        shipment.quantity = p.get("quantity") or 1
-        shipment.description = p.get("description")
-        shipment.origin_country = p.get("origin_country")
-        shipment.destination_country = p.get("destination_country")
-
-        shipment.weight_kg = (
-            p.get("weight_kg")
-            if p.get("weight_kg")
-            else None
-        )
-
-        shipment.estimated_delivery = (
-            p.get("estimated_delivery")
-            if p.get("estimated_delivery")
-            else None
-        )
-
-        shipment.special_instructions = p.get(
-            "special_instructions", ""
-        )
-
-        # Only if field exists in your model
-        if hasattr(shipment, "internal_notes"):
-            shipment.internal_notes = p.get(
-                "internal_notes", ""
-            )
-
-        # =====================
-        # OPTIONAL IMAGE UPDATE
-        # =====================
-        images = request.FILES.getlist("images")
-
-        if images:
-            # Remove old images if desired
-            shipment.images.all().delete()
-
-            for image in images:
-                ShipmentImage.objects.create(
-                    shipment=shipment,
-                    image=image
-                )
-
-        # =====================
-        # CHARGES
-        # =====================
-        profile.deduct_points(cost)
-
-        shipment.amendment_count += 1
-        shipment.points_spent += cost
-
-        shipment.save()
-
-        messages.success(
-            request,
-            f"Shipment updated successfully. "
-            f"{cost} point(s) deducted."
-        )
-
-    except Exception as e:
-        messages.error(
-            request,
-            f"Update failed: {str(e)}"
-        )
-
-    return redirect(
-        "sub-admin-shipment-detail",
-        pk=shipment.pk
-    )
-
-
-# ════════════════════════════════════════════════════════════════
-#  ADDITIONS TO sub_admin_views.py
-# ════════════════════════════════════════════════════════════════
-
-# ── Add this import near the top ──────────────────────────────────
-from django.contrib.auth import update_session_auth_hash
-
-
-# ════════════════════════════════════════════════════════════════
-#  1) UPDATED DECORATOR — tracks last_activity on every page view
-#     Replace your existing sub_admin_approved_required with this.
-# ════════════════════════════════════════════════════════════════
-
-def sub_admin_approved_required(view_func):
-    """Logged in + approved. Can browse but NOT create shipments."""
-    def wrapper(request, *args, **kwargs):
-        if not request.user.is_authenticated:
-            return redirect("sub-admin-login")
-        if request.user.role != User.Role.SUB_ADMIN:
-            return redirect("sub-admin-login")
-        try:
-            profile = request.user.sub_admin_profile
-        except SubAdminProfile.DoesNotExist:
-            return redirect("sub-admin-login")
-
-
-        if profile.approval_status == SubAdminProfile.ApprovalStatus.PENDING:
-            return render(request, "admin/subadmin/pending_approval.html", {"profile": profile})
-        if profile.approval_status == SubAdminProfile.ApprovalStatus.REJECTED:
-            return render(request, "admin/subadmin/rejected.html", {"profile": profile})
-        if profile.approval_status == SubAdminProfile.ApprovalStatus.SUSPENDED:
-            return render(request, "admin/subadmin/suspended.html", {"profile": profile})
-        return view_func(request, *args, **kwargs)
-    wrapper.__name__ = view_func.__name__
-    return wrapper
-
-
-# ════════════════════════════════════════════════════════════════
-#  2) UPDATED REGISTER VIEW — captures ?ref=CODE and links referrer
-#     Replace your existing sub_admin_register with this.
-# ════════════════════════════════════════════════════════════════
-
-def sub_admin_register(request):
-    if request.user.is_authenticated and request.user.role == User.Role.SUB_ADMIN:
-        return redirect("sub-admin-dashboard")
-
-    # capture referral code from the link (?ref=A1B2C3D4), keep it
-    # through the form via a hidden input named "ref_code"
-    ref_code = request.GET.get("ref", "").strip().upper()
-
-    if request.method == "POST":
-        p         = request.POST
-        email     = p.get("email", "").strip().lower()
-        password  = p.get("password", "")
-        password2 = p.get("password2", "")
-        full_name = p.get("full_name", "").strip()
-        phone     = p.get("phone", "").strip()
-        company   = p.get("company_name", "").strip()
-        address   = p.get("address", "").strip()
-        ref_code  = p.get("ref_code", "").strip().upper()
-
-        if password != password2:
-            messages.error(request, "Passwords do not match.")
-            return render(request, "admin/subadmin/register.html", {"post": p, "ref_code": ref_code})
-
-        if User.objects.filter(email=email).exists():
-            messages.error(request, "An account with this email already exists.")
-            return render(request, "admin/subadmin/register.html", {"post": p, "ref_code": ref_code})
-
-        user = User.objects.create_user(
-            email     = email,
-            password  = password,
-            full_name = full_name,
-            role      = User.Role.SUB_ADMIN,
-            is_active = True,
-        )
-
-        # find referrer by code (if any)
-        referrer = None
-        if ref_code:
-            referrer = SubAdminProfile.objects.filter(referral_code=ref_code).first()
-
-        SubAdminProfile.objects.create(
-            user         = user,
-            phone        = phone,
-            company_name = company,
-            address      = address,
-            referred_by  = referrer,
-        )
-        messages.success(request, "Registration successful! Awaiting admin approval.")
-        return redirect("sub-admin-login")
-
-    return render(request, "admin/subadmin/register.html", {"ref_code": ref_code})
-
-
-# ════════════════════════════════════════════════════════════════
-#  3) NEW VIEW — Profile page
-#     Add this anywhere in the file, then wire up the URL below.
-# ════════════════════════════════════════════════════════════════
-
-@sub_admin_approved_required
-def sub_admin_profile(request):
-    profile = request.user.sub_admin_profile
-    pricing = PointsPricing.get_current()
-
-    if request.method == "POST":
-        action = request.POST.get("action")
-
-        # ── Update profile info (name, email, whatsapp) ──────────
-        if action == "update_profile":
-            full_name = request.POST.get("full_name", "").strip()
-            email     = request.POST.get("email", "").strip().lower()
-            whatsapp  = request.POST.get("whatsapp_number", "").strip()
-
-            if email and email != request.user.email:
-                if User.objects.filter(email=email).exclude(pk=request.user.pk).exists():
-                    messages.error(request, "That email is already in use by another account.")
-                    return redirect("sub-admin-profile")
-                request.user.email = email
-
-            if full_name:
-                request.user.full_name = full_name
-            request.user.save()
-
-            profile.whatsapp_number = whatsapp
-            profile.save(update_fields=["whatsapp_number"])
-
-            messages.success(request, "Profile updated successfully.")
-            return redirect("sub-admin-profile")
-
-        # ── Avatar upload ─────────────────────────────────────────
-        elif action == "update_avatar":
-            avatar = request.FILES.get("avatar")
-            if not avatar:
-                messages.error(request, "Please choose an image to upload.")
-                return redirect("sub-admin-profile")
-
-            if not avatar.content_type.startswith("image/"):
-                messages.error(request, "File must be an image.")
-                return redirect("sub-admin-profile")
-
-            profile.avatar = avatar
-            profile.save(update_fields=["avatar"])
-            messages.success(request, "Profile photo updated.")
-            return redirect("sub-admin-profile")
-
-        # ── Change password ───────────────────────────────────────
-        elif action == "change_password":
-            old_password     = request.POST.get("old_password", "")
-            new_password     = request.POST.get("new_password", "")
-            confirm_password = request.POST.get("confirm_password", "")
-
-            if not request.user.check_password(old_password):
-                messages.error(request, "Your current password is incorrect.")
-            elif len(new_password) < 8:
-                messages.error(request, "New password must be at least 8 characters.")
-            elif new_password != confirm_password:
-                messages.error(request, "New passwords do not match.")
-            else:
-                request.user.set_password(new_password)
-                request.user.save()
-                # keep the user logged in after the password hash changes
-                update_session_auth_hash(request, request.user)
-                messages.success(request, "Password changed successfully.")
-
-            return redirect("sub-admin-profile")
-
-        # ── Delete account ────────────────────────────────────────
-        elif action == "delete_account":
-            user = request.user
-            uid  = user.pk
-
-            logout(request)
-
-            # Anonymize instead of hard-deleting, so historical
-            # shipments / payments keep a valid FK reference.
-            user.full_name   = "Deleted User"
-            user.email       = f"deleted_user_{uid}@transedge.invalid"
-            user.is_active   = False
-            user.set_unusable_password()
-            user.save()
-
-            messages.success(request, "Your account has been deleted.")
-            return redirect("home")
-
-    context = {
-        "profile":       profile,
-        "pricing":       pricing,
-        "referral_link": profile.get_referral_link(request),
-    }
-    return render(request, "admin/subadmin/profile.html", context)
-
-@sub_admin_approved_required
-def sub_admin_shipment_addons(request, pk):
-    """Manage optional add-ons for a shipment (e.g. support contact link)."""
-    shipment = get_object_or_404(Shipment, pk=pk, created_by=request.user)
-    profile  = request.user.sub_admin_profile
-    pricing  = PointsPricing.get_current()
-
-    if request.method == "POST":
-        action = request.POST.get("action")
-
-        if action == "save_support_link":
-            url   = request.POST.get("support_link_url", "").strip()
-            label = request.POST.get("support_link_label", "").strip() or "Chat with Support"
-
-            if not url:
-                messages.error(request, "Please provide a link/URL.")
-                return redirect("sub-admin-shipment-addons", pk=pk)
-
-            if not (url.startswith("http://") or url.startswith("https://")):
-                messages.error(request, "Link must start with http:// or https://")
-                return redirect("sub-admin-shipment-addons", pk=pk)
-
-            cost = pricing.points_per_support_link
-            if profile.points_balance < cost:
-                messages.error(
-                    request,
-                    f"You need {cost} point(s) to set/update the support link. "
-                    f"You have {profile.points_balance}."
-                )
-                return redirect("sub-admin-buy-points")
-
-            profile.deduct_points(cost)
-            shipment.support_link_url    = url
-            shipment.support_link_label  = label
-            shipment.support_link_active = True
-            shipment.save(update_fields=["support_link_url", "support_link_label", "support_link_active"])
-
-            messages.success(
-                request,
-                f"Support link saved and activated. {cost} point(s) deducted. "
-                f"Balance: {profile.points_balance} pts."
-            )
-            return redirect("sub-admin-shipment-addons", pk=pk)
-
-        elif action == "toggle_support_link":
-            # Free toggle — no charge, just show/hide on client page
-            shipment.support_link_active = not shipment.support_link_active
-            shipment.save(update_fields=["support_link_active"])
-            state = "enabled" if shipment.support_link_active else "disabled"
-            messages.success(request, f"Support link {state}.")
-            return redirect("sub-admin-shipment-addons", pk=pk)
-
-    context = {
-        "shipment": shipment,
-        "profile":  profile,
-        "pricing":  pricing,
-    }
-    return render(request, "admin/subadmin/shipment_addons.html", context)
-
-# ════════════════════════════════════════════════════════════════
-#  REPLACE both existing functions with these versions
-# ════════════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════
+#  SHIPMENT AMENDMENT
+# ════════════════════════════════════════════════════════
 
 @sub_admin_approved_required
 def sub_admin_shipment_amend_form(request, pk):
@@ -1232,9 +916,169 @@ def sub_admin_shipment_amend(request, pk):
     return redirect("sub-admin-shipment-detail", pk=pk)
 
 
+# ════════════════════════════════════════════════════════
+#  PROFILE
+# ════════════════════════════════════════════════════════
 
-from datetime import timedelta
-from .models import Invoice, InvoiceItem
+@sub_admin_approved_required
+def sub_admin_profile(request):
+    profile = request.user.sub_admin_profile
+    pricing = PointsPricing.get_current()
+
+    if request.method == "POST":
+        action = request.POST.get("action")
+
+        # ── Update profile info (name, email, whatsapp) ──────────
+        if action == "update_profile":
+            full_name = request.POST.get("full_name", "").strip()
+            email     = request.POST.get("email", "").strip().lower()
+            whatsapp  = request.POST.get("whatsapp_number", "").strip()
+
+            if email and email != request.user.email:
+                if User.objects.filter(email=email).exclude(pk=request.user.pk).exists():
+                    messages.error(request, "That email is already in use by another account.")
+                    return redirect("sub-admin-profile")
+                request.user.email = email
+
+            if full_name:
+                request.user.full_name = full_name
+            request.user.save()
+
+            profile.whatsapp_number = whatsapp
+            profile.save(update_fields=["whatsapp_number"])
+
+            messages.success(request, "Profile updated successfully.")
+            return redirect("sub-admin-profile")
+
+        # ── Avatar upload ─────────────────────────────────────────
+        elif action == "update_avatar":
+            avatar = request.FILES.get("avatar")
+            if not avatar:
+                messages.error(request, "Please choose an image to upload.")
+                return redirect("sub-admin-profile")
+
+            if not avatar.content_type.startswith("image/"):
+                messages.error(request, "File must be an image.")
+                return redirect("sub-admin-profile")
+
+            profile.avatar = avatar
+            profile.save(update_fields=["avatar"])
+            messages.success(request, "Profile photo updated.")
+            return redirect("sub-admin-profile")
+
+        # ── Change password ───────────────────────────────────────
+        elif action == "change_password":
+            old_password     = request.POST.get("old_password", "")
+            new_password     = request.POST.get("new_password", "")
+            confirm_password = request.POST.get("confirm_password", "")
+
+            if not request.user.check_password(old_password):
+                messages.error(request, "Your current password is incorrect.")
+            elif len(new_password) < 8:
+                messages.error(request, "New password must be at least 8 characters.")
+            elif new_password != confirm_password:
+                messages.error(request, "New passwords do not match.")
+            else:
+                request.user.set_password(new_password)
+                request.user.save()
+                update_session_auth_hash(request, request.user)
+                messages.success(request, "Password changed successfully.")
+
+            return redirect("sub-admin-profile")
+
+        # ── Delete account ────────────────────────────────────────
+        elif action == "delete_account":
+            user = request.user
+            uid  = user.pk
+
+            logout(request)
+
+            # Anonymize instead of hard-deleting, so historical
+            # shipments / payments keep a valid FK reference.
+            user.full_name   = "Deleted User"
+            user.email       = f"deleted_user_{uid}@transedge.invalid"
+            user.is_active   = False
+            user.set_unusable_password()
+            user.save()
+
+            messages.success(request, "Your account has been deleted.")
+            return redirect("home")
+
+    context = {
+        "profile":       profile,
+        "pricing":       pricing,
+        "referral_link": profile.get_referral_link(request),
+    }
+    return render(request, "admin/subadmin/profile.html", context)
+
+
+# ════════════════════════════════════════════════════════
+#  SHIPMENT ADD-ONS
+# ════════════════════════════════════════════════════════
+
+@sub_admin_approved_required
+def sub_admin_shipment_addons(request, pk):
+    """Manage optional add-ons for a shipment (e.g. support contact link)."""
+    shipment = get_object_or_404(Shipment, pk=pk, created_by=request.user)
+    profile  = request.user.sub_admin_profile
+    pricing  = PointsPricing.get_current()
+
+    if request.method == "POST":
+        action = request.POST.get("action")
+
+        if action == "save_support_link":
+            url   = request.POST.get("support_link_url", "").strip()
+            label = request.POST.get("support_link_label", "").strip() or "Chat with Support"
+
+            if not url:
+                messages.error(request, "Please provide a link/URL.")
+                return redirect("sub-admin-shipment-addons", pk=pk)
+
+            if not (url.startswith("http://") or url.startswith("https://")):
+                messages.error(request, "Link must start with http:// or https://")
+                return redirect("sub-admin-shipment-addons", pk=pk)
+
+            cost = pricing.points_per_support_link
+            if profile.points_balance < cost:
+                messages.error(
+                    request,
+                    f"You need {cost} point(s) to set/update the support link. "
+                    f"You have {profile.points_balance}."
+                )
+                return redirect("sub-admin-buy-points")
+
+            profile.deduct_points(cost)
+            shipment.support_link_url    = url
+            shipment.support_link_label  = label
+            shipment.support_link_active = True
+            shipment.save(update_fields=["support_link_url", "support_link_label", "support_link_active"])
+
+            messages.success(
+                request,
+                f"Support link saved and activated. {cost} point(s) deducted. "
+                f"Balance: {profile.points_balance} pts."
+            )
+            return redirect("sub-admin-shipment-addons", pk=pk)
+
+        elif action == "toggle_support_link":
+            # Free toggle — no charge, just show/hide on client page
+            shipment.support_link_active = not shipment.support_link_active
+            shipment.save(update_fields=["support_link_active"])
+            state = "enabled" if shipment.support_link_active else "disabled"
+            messages.success(request, f"Support link {state}.")
+            return redirect("sub-admin-shipment-addons", pk=pk)
+
+    context = {
+        "shipment": shipment,
+        "profile":  profile,
+        "pricing":  pricing,
+    }
+    return render(request, "admin/subadmin/shipment_addons.html", context)
+
+
+# ════════════════════════════════════════════════════════
+#  INVOICES
+# ════════════════════════════════════════════════════════
 
 @sub_admin_approved_required
 def sub_admin_invoice_create(request, pk):
@@ -1293,7 +1137,6 @@ def sub_admin_invoice_create(request, pk):
     return redirect("sub-admin-invoice-detail", pk=invoice.pk)
 
 
-
 @sub_admin_approved_required
 def sub_admin_invoice_detail(request, pk):
     invoice = get_object_or_404(
@@ -1303,7 +1146,6 @@ def sub_admin_invoice_detail(request, pk):
     )
     return render(request, "admin/subadmin/invoice_detail.html", {"invoice": invoice})
 
-from decimal import Decimal, InvalidOperation
 
 @sub_admin_approved_required
 @require_POST
@@ -1378,13 +1220,6 @@ def sub_admin_invoice_mark_paid(request, pk):
     return redirect("sub-admin-invoice-detail", pk=pk)
 
 
-
-
-from io import BytesIO
-from django.http import HttpResponse
-from django.template.loader import render_to_string
-from xhtml2pdf import pisa
-
 @sub_admin_approved_required
 def sub_admin_invoice_pdf(request, pk):
     invoice = get_object_or_404(
@@ -1405,10 +1240,6 @@ def sub_admin_invoice_pdf(request, pk):
     return response
 
 
-import os
-from django.conf import settings
-
-
 def link_callback(uri, rel):
     """
     Resolves static/media URLs to absolute filesystem paths so
@@ -1425,23 +1256,11 @@ def link_callback(uri, rel):
         raise Exception(f"Static/media file not found for PDF: {path}")
     return path
 
-# ══════════════════════════════════════════════════════════════════
-#  ADD TO Business/sub_admin_views.py — 5SIM FOREIGN NUMBERS
+
+# ════════════════════════════════════════════════════════
+#  5SIM FOREIGN NUMBERS
 #  Sub-admin only. Uses Account (NGN wallet), separate from points.
-# ══════════════════════════════════════════════════════════════════
-
-import math
-import logging
-from decouple import config
-from django.db import transaction as db_transaction
-from django.urls import reverse
-from django.http import JsonResponse
-from .models import Account, ForeignNumber
-
-logger = logging.getLogger(__name__)
-
-
-# ── Wallet helpers ──────────────────────────────────────────────
+# ════════════════════════════════════════════════════════
 
 def get_or_create_account(user):
     account, _ = Account.objects.get_or_create(user=user)
@@ -1464,8 +1283,6 @@ def get_owner_account():
         logger.warning(f"SITE_OWNER_EMAIL '{owner_email}' has no matching Account — skipping owner credit.")
         return None
 
-
-# ── 5Sim static data ────────────────────────────────────────────
 
 FOREIGN_COUNTRIES = [
     "usa", "uk", "canada", "russia", "india", "indonesia",
@@ -1588,8 +1405,6 @@ FIVESIM_SERVICE_MAP = {
 }
 
 
-# ── 5Sim helpers ────────────────────────────────────────────────
-
 def _ngn_price(usd_price):
     def clean(val):
         return str(val).split("#")[0].strip().strip('"').strip("'")
@@ -1641,8 +1456,6 @@ def _fetch_5sim_prices(country=None, service=None):
                 })
     return prices
 
-
-# ── Views ────────────────────────────────────────────────────────
 
 @sub_admin_approved_required
 def sub_admin_buy_foreign_number(request):
@@ -1868,18 +1681,9 @@ def sub_admin_check_sms_5sim(request, order_id):
     return JsonResponse({"status": api_status, "sms_code": None})
 
 
-
-# ══════════════════════════════════════════════════════════════════
-#  ADD TO Business/sub_admin_views.py — WALLET DEPOSIT (Paystack)
-#  Mirrors sub_admin_buy_points / sub_admin_points_pay / verify /
-#  webhook exactly, but credits Account.balance instead of points.
-# ══════════════════════════════════════════════════════════════════
-
-from decimal import Decimal, InvalidOperation
-from django.urls import reverse
-
-from .models import Account, WalletDeposit
-
+# ════════════════════════════════════════════════════════
+#  WALLET DEPOSIT (Paystack)
+# ════════════════════════════════════════════════════════
 
 @sub_admin_approved_required
 def sub_admin_wallet_deposit(request):
@@ -1996,13 +1800,6 @@ def _credit_wallet(deposit):
     return True
 
 
-# ══════════════════════════════════════════════════════════════════
-#  REPLACE your existing sub_admin_paystack_webhook with this —
-#  it now routes to points or wallet crediting based on the
-#  reference prefix ("PTS-" vs "WAL-"), so one webhook URL in your
-#  Paystack dashboard covers both payment types.
-# ══════════════════════════════════════════════════════════════════
-
 @csrf_exempt
 def sub_admin_paystack_webhook(request):
     """Paystack webhook — handles charge.success for points AND wallet deposits."""
@@ -2043,29 +1840,8 @@ def sub_admin_paystack_webhook(request):
     return HttpResponse(status=200)
 
 
-# ══════════════════════════════════════════════════════════════════
-#  ADD TO Business/sub_admin_views.py
-#
-#  Notification system:
-#    - Super admin sends a notification to ONE sub-admin, or
-#      broadcasts to ALL sub-admins at once.
-#    - Sub-admins see a full inbox page AND get a live pop-up toast
-#      (via sub_admin_notifications_poll, polled from JS every 30s —
-#      see notifications_toast.html).
-#
-#  Make sure these are imported at the top of sub_admin_views.py:
-#    from django.http import JsonResponse
-#    from django.core.paginator import Paginator
-#    from django.db.models import Q
-#  And add Notification, NotificationRead to your existing model import:
-#    from .models import (
-#        ..., Notification, NotificationRead,
-#    )
-# ══════════════════════════════════════════════════════════════════
-
-
 # ════════════════════════════════════════════════════════
-#  SUPER ADMIN — SEND / MANAGE NOTIFICATIONS
+#  NOTIFICATIONS
 # ════════════════════════════════════════════════════════
 
 @super_admin_required
@@ -2161,10 +1937,6 @@ def admin_notification_delete(request, pk):
     return redirect("admin-notification-list")
 
 
-# ════════════════════════════════════════════════════════
-#  SUB-ADMIN — INBOX / READ NOTIFICATIONS
-# ════════════════════════════════════════════════════════
-
 def _visible_notifications_qs(user):
     """Private notifications addressed to this user + all public broadcasts."""
     return Notification.objects.filter(
@@ -2258,23 +2030,35 @@ def sub_admin_notifications_poll(request):
     return JsonResponse({"unread_count": len(unread), "notifications": data})
 
 
-# ══════════════════════════════════════════════════════════════════
-#  ADD TO Business/sub_admin_views.py
-#
-#  Landing-page customization:
-#    - Sub-admin edits their own SubAdminSiteSettings row.
-#    - Every save costs `points_per_site_customization` points
-#      (same pattern as the shipment support link).
-#    - If a sub-admin never customizes (or resets), their public
-#      page falls back to the admin's global default automatically
-#      via SubAdminSiteSettings.for_user() — no extra code needed.
-#    - Super admin gets a separate view to edit that global default.
-#
-#  Add SubAdminSiteSettings to your existing model import:
-#    from .models import (
-#        ..., SubAdminSiteSettings,
-#    )
-# ══════════════════════════════════════════════════════════════════
+@sub_admin_approved_required
+def sub_admin_notifications_feed(request):
+    """JSON list of recent notifications for the bell dropdown popup."""
+    notifications = _visible_notifications_qs(request.user).select_related("sender")[:15]
+
+    read_public_ids = set(
+        NotificationRead.objects.filter(user=request.user).values_list("notification_id", flat=True)
+    )
+
+    data = []
+    for n in notifications:
+        is_read = n.is_read if n.recipient_id == request.user.pk else (n.id in read_public_ids)
+        data.append({
+            "id":         str(n.id),
+            "type":       n.type,
+            "title":      n.title,
+            "body":       n.body,
+            "link":       n.link,
+            "link_label": n.link_label,
+            "is_read":    is_read,
+            "created_at": n.created_at.strftime("%d %b, %H:%M"),
+        })
+
+    return JsonResponse({"notifications": data})
+
+
+# ════════════════════════════════════════════════════════
+#  LANDING-PAGE CUSTOMIZATION
+# ════════════════════════════════════════════════════════
 
 SITE_SETTINGS_TEXT_FIELDS = [
     "site_name", "site_tagline", "favicon_url", "primary_color",
@@ -2287,10 +2071,16 @@ SITE_SETTINGS_TEXT_FIELDS = [
     "logo_url",  # fallback if they don't upload a file
 ]
 
+SITE_SETTINGS_DEFAULT_FIELDS = [
+    "site_name", "site_tagline", "logo_url", "favicon_url", "primary_color",
+    "hero_title", "hero_subtitle", "hero_image_url", "about_text",
+    "stat_deliveries", "stat_satisfaction", "stat_support",
+    "phone_primary", "phone_secondary", "email_support", "email_info",
+    "address", "google_maps_url", "whatsapp_number",
+    "twitter_url", "instagram_url", "facebook_url", "linkedin_url", "tiktok_url",
+    "copyright_text", "meta_description", "meta_keywords",
+]
 
-# ════════════════════════════════════════════════════════
-#  SUB-ADMIN — CUSTOMIZE OWN LANDING PAGE
-# ════════════════════════════════════════════════════════
 
 @sub_admin_approved_required
 def sub_admin_site_settings(request):
@@ -2360,11 +2150,6 @@ def sub_admin_site_settings(request):
     return render(request, "admin/subadmin/site_settings.html", context)
 
 
-# ════════════════════════════════════════════════════════
-#  SUPER ADMIN — EDIT THE GLOBAL DEFAULT LANDING PAGE
-#  (used by any sub-admin who hasn't customized their own)
-# ════════════════════════════════════════════════════════
-
 @super_admin_required
 def admin_default_site_settings(request):
     default = SubAdminSiteSettings.get_default()
@@ -2384,76 +2169,13 @@ def admin_default_site_settings(request):
     return render(request, "admin/default_site_settings.html", {"settings": default})
 
 
-
-
-
-# ══════════════════════════════════════════════════════════════════
-#  ADD TO Business/sub_admin_views.py — sits next to the other
-#  notification views (sub_admin_notifications_poll etc.)
-#
-#  This is separate from sub_admin_notifications_poll:
-#    - poll   → only UNREAD ones, used to fire the auto toast every 30s
-#    - feed   → recent notifications (read + unread), used to fill
-#               the dropdown panel when the bell is clicked
-# ══════════════════════════════════════════════════════════════════
-
-@sub_admin_approved_required
-def sub_admin_notifications_feed(request):
-    """JSON list of recent notifications for the bell dropdown popup."""
-    notifications = _visible_notifications_qs(request.user).select_related("sender")[:15]
-
-    read_public_ids = set(
-        NotificationRead.objects.filter(user=request.user).values_list("notification_id", flat=True)
-    )
-
-    data = []
-    for n in notifications:
-        is_read = n.is_read if n.recipient_id == request.user.pk else (n.id in read_public_ids)
-        data.append({
-            "id":         str(n.id),
-            "type":       n.type,
-            "title":      n.title,
-            "body":       n.body,
-            "link":       n.link,
-            "link_label": n.link_label,
-            "is_read":    is_read,
-            "created_at": n.created_at.strftime("%d %b, %H:%M"),
-        })
-
-    return JsonResponse({"notifications": data})
-
-
-# ══════════════════════════════════════════════════════════════════
-#  ADD TO Business/sub_admin_views.py (or views.py — this is public,
-#  not behind any of the sub_admin_* decorators)
-#
-#  Two entry points:
-#    - /site/<referral_code>/  → that sub-admin's branded landing page
-#      (their own SubAdminSiteSettings, falling back field-by-field
-#      to the admin's global default wherever they haven't customized)
-#    - /site/                  → the plain global-default landing page
-#
-#  Add to your model import if not already there:
-#    from .models import SubAdminSiteSettings, SubAdminProfile
-# ══════════════════════════════════════════════════════════════════
-
-SITE_SETTINGS_DEFAULT_FIELDS = [
-    "site_name", "site_tagline", "logo_url", "favicon_url", "primary_color",
-    "hero_title", "hero_subtitle", "hero_image_url", "about_text",
-    "stat_deliveries", "stat_satisfaction", "stat_support",
-    "phone_primary", "phone_secondary", "email_support", "email_info",
-    "address", "google_maps_url", "whatsapp_number",
-    "twitter_url", "instagram_url", "facebook_url", "linkedin_url", "tiktok_url",
-    "copyright_text", "meta_description", "meta_keywords",
-]
-
-
 def _default_settings_context():
     """Global-default-only settings, for the plain /site/ page."""
     default = SubAdminSiteSettings.get_default()
     ctx = {field: (getattr(default, field, "") or "") for field in SITE_SETTINGS_DEFAULT_FIELDS}
     ctx["logo"] = default.get_logo()
     return ctx
+
 
 def public_subadmin_landing(request, referral_code):
     """
@@ -2463,13 +2185,12 @@ def public_subadmin_landing(request, referral_code):
     global default automatically.
     """
     profile = get_object_or_404(SubAdminProfile, referral_code=referral_code.upper())
+    request.session["active_referral_code"] = profile.referral_code 
     settings_ctx = SubAdminSiteSettings.for_user(profile.user)
     return render(request, "public/landing.html", {
         "settings":     settings_ctx,
         "profile":      profile,
-        # Admin-owned, identical on every sub-admin's page — no per-user filtering
         "testimonials": Testimonial.objects.filter(is_active=True).order_by("sort_order"),
-        # Fixed brand imagery — no sub-admin code path touches this table
         "gallery_images": BrandGalleryImage.objects.filter(is_active=True).order_by("sort_order"),
     })
 
@@ -2483,12 +2204,17 @@ def public_default_landing(request):
         "gallery_images": BrandGalleryImage.objects.filter(is_active=True).order_by("sort_order"),
     })
 
+
 def _shared_landing_context():
     return {
         "testimonials": Testimonial.objects.filter(is_active=True).order_by("sort_order"),
         "gallery_images": BrandGalleryImage.objects.filter(is_active=True).order_by("sort_order"),
     }
 
+
+# ════════════════════════════════════════════════════════
+#  PUBLIC TRACKING PAGES
+# ════════════════════════════════════════════════════════
 
 def tracking_driver(request, tracking_id):
     shipment = get_object_or_404(Shipment, tracking_id=tracking_id)
@@ -2505,7 +2231,6 @@ def tracking_driver(request, tracking_id):
     return render(request, "public/tracking_driver.html", {"shipment": shipment, "driver": driver})
 
 
-# views.py
 def tracking_shipment_info(request, tracking_id):
     shipment = get_object_or_404(
         Shipment.objects.select_related("sender", "receiver").prefetch_related("checkpoints", "images"),
@@ -2517,6 +2242,8 @@ def tracking_shipment_info(request, tracking_id):
          "event": cp.get_event_type_display(), "time": cp.timestamp.strftime("%d %b %Y, %H:%M")}
         for cp in checkpoints if cp.latitude and cp.longitude
     ])
-    return render(request, "public/tracking_shipment_info.html", {"shipment": shipment, "map_points": map_points})
-
-
+    return render(request, "public/tracking_shipment_info.html", {
+        "shipment": shipment,
+        "map_points": map_points,
+        "progress_status": get_progress_status(shipment, shipment.checkpoints),
+    })

@@ -114,14 +114,12 @@
   <section class="py-16 px-6">
     <div class="bg-neutral-50 rounded-2xl border border-neutral-200 p-8 max-w-xl mx-auto" id="track">
       <h3 class="text-lg font-bold mb-6">Track Your Shipment</h3>
-      <form method="post" action="{% url 'tracking-search' %}">
-        {% csrf_token %}
-       <input type="text" name="tracking_id" placeholder="TRK-2026-XXXXXXXX" required/>
+      <form class="space-y-4">
+        <input type="text" placeholder="Tracking ID" class="w-full px-4 py-3 rounded-lg border border-neutral-300 focus:brand-border outline-none">
         <button type="submit" class="w-full brand-bg text-white py-3 rounded-lg font-semibold">Track Now</button>
       </form>
     </div>
   </section>
-  
 
   <!-- ================= TESTIMONIALS (admin-managed only — no sub-admin CRUD) ================= -->
   {% if testimonials %}

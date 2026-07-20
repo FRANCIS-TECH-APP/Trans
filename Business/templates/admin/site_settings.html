@@ -1,131 +1,412 @@
+{% extends "admin/subadmin/base.html" %}
+{% load static %}
 
-{% extends "admin/base_admin.html" %}
-{% block title %}Site Settings{% endblock %}
-{% block page_title %}Site Settings{% endblock %}
-{% block breadcrumb %}<a href="{% url 'admin-dashboard' %}">Home</a> / Site Settings{% endblock %}
+{% block title %}Landing Page — TransEdge{% endblock %}
+
+{% block extra_css %}
+.page-head { margin-bottom: 16px; }
+.page-head h1 { font-size: 20px; font-weight: 800; letter-spacing: -.02em; }
+.page-head p { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+
+.status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.pts-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 14px 6px 8px;
+  font-size: 12px;
+}
+.pts-pill .pts-icon {
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--sky-dim); color: var(--sky);
+  display: flex; align-items: center; justify-content: center;
+}
+.pts-pill b { color: var(--text); }
+
+.preview-wrap {
+  background: linear-gradient(160deg, #10241a, #15171c 55%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 16px 16px;
+  margin-bottom: 14px;
+  position: relative;
+  overflow: hidden;
+}
+.preview-wrap::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(circle at 30% 0%, rgba(59,130,246,.18), transparent 60%);
+  pointer-events: none;
+}
+.preview-label {
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--muted); margin-bottom: 10px; position: relative;
+}
+.preview-card {
+  position: relative;
+  display: flex; align-items: center; gap: 12px;
+}
+.preview-logo {
+  width: 46px; height: 46px; border-radius: 12px;
+  background: var(--surface2); border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden; flex-shrink: 0;
+}
+.preview-logo img { width: 100%; height: 100%; object-fit: cover; }
+.preview-logo svg { color: var(--muted); }
+.preview-text h2 { font-size: 16px; font-weight: 700; color: #fff; }
+.preview-text p { font-size: 11.5px; color: rgba(255,255,255,.6); margin-top: 2px; }
+.preview-hero {
+  position: relative; margin-top: 14px; font-size: 12px;
+  color: rgba(255,255,255,.75); line-height: 1.5;
+}
+
+.field-section-title {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .05em;
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  padding: 14px 16px;
+}
+@media (min-width: 480px) {
+  .form-grid.cols-2 { grid-template-columns: 1fr 1fr; }
+}
+.field label {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 5px;
+}
+.field input[type="text"],
+.field input[type="url"],
+.field input[type="email"],
+.field textarea {
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 9px;
+  padding: 9px 11px;
+  font-size: 12.5px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color .15s;
+}
+.field input:focus, .field textarea:focus { border-color: var(--sky); }
+.field textarea { resize: vertical; min-height: 64px; }
+.field .hint { font-size: 10.5px; color: var(--muted); margin-top: 4px; }
+
+.color-row { display: flex; align-items: center; gap: 10px; }
+.color-row input[type="color"] {
+  width: 40px; height: 36px; border: 1px solid var(--border);
+  border-radius: 8px; background: var(--surface2); cursor: pointer; padding: 2px;
+}
+
+.img-upload {
+  display: flex; align-items: center; gap: 12px;
+}
+.img-upload .img-preview {
+  width: 52px; height: 52px; border-radius: 12px;
+  background: var(--surface2); border: 1px dashed var(--border);
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden; flex-shrink: 0; color: var(--muted);
+}
+.img-upload.wide .img-preview { width: 90px; height: 52px; border-radius: 8px; }
+.img-upload .img-preview img { width: 100%; height: 100%; object-fit: cover; }
+.img-upload input[type="file"] {
+  font-size: 11.5px; color: var(--muted);
+}
+
+.action-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; padding: 14px 16px; flex-wrap: wrap;
+}
+.action-bar .cost-note { font-size: 11.5px; color: var(--muted); }
+.action-bar .cost-note b { color: var(--amber); }
+.btn-danger-outline {
+  background: transparent; color: var(--red); border: 1px solid var(--red-dim);
+}
+{% endblock %}
 
 {% block content %}
-<form method="post">
+
+<div class="page-head">
+  <h1>Landing Page</h1>
+  <p>Customize the branding your customers see on your public tracking page.</p>
+</div>
+
+<div class="pts-pill" style="margin-top:8px;">
+  <span class="pts-icon"><i class="fas fa-link"></i></span>
+  <span>Your page: <a href="{% url 'public-subadmin-landing' referral_code=request.user.sub_admin_profile.referral_code %}" target="_blank" style="color:var(--sky);">/site/{{ request.user.sub_admin_profile.referral_code }}/</a></span>
+</div>
+
+<div class="status-row">
+  {% if is_customized %}
+    <span class="badge b-delivered">Customized</span>
+  {% else %}
+    <span class="badge b-cancelled">Using default branding</span>
+  {% endif %}
+
+  <div class="pts-pill">
+    <span class="pts-icon">
+      <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+        <circle cx="12" cy="12" r="9"/>
+        <path d="M12 7v5l3 3"/>
+      </svg>
+    </span>
+    <span><b>{{ profile.points_balance }}</b> pts available</span>
+  </div>
+</div>
+
+<!-- live preview -->
+<div class="preview-wrap">
+  <div class="preview-label">Live preview</div>
+  <div class="preview-card">
+    <div class="preview-logo">
+      {% if merged.logo %}
+        <img src="{{ merged.logo }}" alt="logo">
+      {% else %}
+        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path d="M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h11a2 2 0 012 2v3"/>
+          <rect x="9" y="11" width="14" height="10" rx="2"/>
+        </svg>
+      {% endif %}
+    </div>
+    <div class="preview-text">
+      <h2>{{ merged.site_name|default:"Your Company Name" }}</h2>
+      <p>{{ merged.site_tagline|default:"Your tagline shows up here" }}</p>
+    </div>
+  </div>
+  {% if merged.hero_subtitle %}
+  <div class="preview-hero">{{ merged.hero_subtitle }}</div>
+  {% endif %}
+</div>
+
+<form method="post" enctype="multipart/form-data">
   {% csrf_token %}
 
-  <div class="card" style="margin-bottom:14px;">
-    <div class="card-header"><h3><i class="fas fa-building" style="color:var(--accent);margin-right:6px;"></i>Company Info</h3></div>
-    <div class="card-body">
-      <div class="form-grid">
-        <div class="form-group">
-          <label>Company Name</label>
-          <input type="text" name="company_name" value="{{ site.company_name }}"/>
+  <!-- BRANDING -->
+  <div class="section">
+    <div class="section-header"><h3>Branding</h3></div>
+    <div class="form-grid cols-2">
+      <div class="field">
+        <label>Company / site name</label>
+        <input type="text" name="site_name" value="{{ own_settings.site_name|default:'' }}" placeholder="{{ merged.site_name }}">
+      </div>
+      <div class="field">
+        <label>Tagline</label>
+        <input type="text" name="site_tagline" value="{{ own_settings.site_tagline|default:'' }}" placeholder="{{ merged.site_tagline }}">
+      </div>
+    </div>
+    <div class="form-grid cols-2">
+      <div class="field">
+        <label>Logo</label>
+        <div class="img-upload">
+          <div class="img-preview">
+            {% if merged.logo %}<img src="{{ merged.logo }}" alt="logo">{% else %}
+            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/></svg>
+            {% endif %}
+          </div>
+          <input type="file" name="logo" accept="image/*">
         </div>
-        <div class="form-group">
-          <label>Tagline</label>
-          <input type="text" name="tagline" value="{{ site.tagline }}"/>
-        </div>
-        <div class="form-group span-2">
-          <label>Hero Subtitle / About Description</label>
-          <textarea name="hero_subtitle">{{ site.hero_subtitle }}</textarea>
-        </div>
-        <div class="form-group span-2">
-          <label>Hero Background Image URL (optional)</label>
-          <input type="url" name="hero_image_url" value="{{ site.hero_image_url }}" placeholder="https://..."/>
+        <div class="hint">Uploading a file overrides the logo URL below.</div>
+      </div>
+      <div class="field">
+        <label>Logo URL (optional)</label>
+        <input type="url" name="logo_url" value="{{ own_settings.logo_url|default:'' }}" placeholder="https://...">
+      </div>
+    </div>
+    <div class="form-grid cols-2">
+      <div class="field">
+        <label>Favicon URL</label>
+        <input type="url" name="favicon_url" value="{{ own_settings.favicon_url|default:'' }}" placeholder="https://...">
+      </div>
+      <div class="field">
+        <label>Primary color</label>
+        <div class="color-row">
+          <input type="color" name="primary_color" value="{{ own_settings.primary_color|default:'#3b82f6' }}">
+          <input type="text" name="primary_color_hex" value="{{ own_settings.primary_color|default:'' }}" placeholder="#3b82f6" style="flex:1;" oninput="this.form.primary_color.value=this.value">
         </div>
       </div>
     </div>
   </div>
 
-  <div class="card" style="margin-bottom:14px;">
-    <div class="card-header"><h3><i class="fas fa-phone" style="color:var(--green);margin-right:6px;"></i>Contact Details</h3></div>
-    <div class="card-body">
-      <div class="form-grid">
-        <div class="form-group">
-          <label>Primary Phone</label>
-          <input type="text" name="phone_primary" value="{{ site.phone_primary }}"/>
+  <!-- HERO / ABOUT -->
+  <div class="section">
+    <div class="section-header"><h3>Hero &amp; About</h3></div>
+    <div class="form-grid">
+      <div class="field">
+        <label>Hero title</label>
+        <input type="text" name="hero_title" value="{{ own_settings.hero_title|default:'' }}" placeholder="{{ merged.hero_title }}">
+      </div>
+      <div class="field">
+        <label>Hero subtitle</label>
+        <textarea name="hero_subtitle" placeholder="{{ merged.hero_subtitle }}">{{ own_settings.hero_subtitle|default:'' }}</textarea>
+      </div>
+
+      <!-- NEW: hero image upload, mirrors the logo pattern above -->
+      <div class="field">
+        <label>Hero image</label>
+        <div class="img-upload wide">
+          <div class="img-preview">
+            {% if merged.hero_image %}<img src="{{ merged.hero_image }}" alt="hero">{% else %}
+            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg>
+            {% endif %}
+          </div>
+          <input type="file" name="hero_image" accept="image/*">
         </div>
-        <div class="form-group">
-          <label>Secondary Phone</label>
-          <input type="text" name="phone_secondary" value="{{ site.phone_secondary }}"/>
-        </div>
-        <div class="form-group">
-          <label>Support Email</label>
-          <input type="email" name="email_support" value="{{ site.email_support }}"/>
-        </div>
-        <div class="form-group">
-          <label>Info Email</label>
-          <input type="email" name="email_info" value="{{ site.email_info }}"/>
-        </div>
-        <div class="form-group">
-          <label>WhatsApp Number (with country code, no +)</label>
-          <input type="text" name="whatsapp_number" value="{{ site.whatsapp_number }}" placeholder="2348012345678"/>
-        </div>
-        <div class="form-group">
-          <label>Google Maps URL (optional)</label>
-          <input type="url" name="google_maps_url" value="{{ site.google_maps_url }}"/>
-        </div>
-        <div class="form-group span-2">
-          <label>Address</label>
-          <textarea name="address">{{ site.address }}</textarea>
-        </div>
+        <div class="hint">Uploading a file overrides the hero image URL below.</div>
+      </div>
+      <div class="field">
+        <label>Hero image URL (optional)</label>
+        <input type="url" name="hero_image_url" value="{{ own_settings.hero_image_url|default:'' }}" placeholder="https://...">
+      </div>
+
+      <div class="field">
+        <label>About text</label>
+        <textarea name="about_text" placeholder="{{ merged.about_text }}">{{ own_settings.about_text|default:'' }}</textarea>
       </div>
     </div>
   </div>
 
-  <div class="card" style="margin-bottom:14px;">
-    <div class="card-header"><h3><i class="fas fa-share-alt" style="color:var(--orange);margin-right:6px;"></i>Social Media</h3></div>
-    <div class="card-body">
-      <div class="form-grid">
-        <div class="form-group">
-          <label>Twitter / X URL</label>
-          <input type="url" name="twitter_url" value="{{ site.twitter_url }}"/>
-        </div>
-        <div class="form-group">
-          <label>Instagram URL</label>
-          <input type="url" name="instagram_url" value="{{ site.instagram_url }}"/>
-        </div>
-        <div class="form-group">
-          <label>LinkedIn URL</label>
-          <input type="url" name="linkedin_url" value="{{ site.linkedin_url }}"/>
-        </div>
-        <div class="form-group">
-          <label>Facebook URL</label>
-          <input type="url" name="facebook_url" value="{{ site.facebook_url }}"/>
-        </div>
+  <!-- STATS -->
+  <div class="section">
+    <div class="section-header"><h3>Homepage stats</h3></div>
+    <div class="form-grid cols-2">
+      <div class="field">
+        <label>Deliveries stat</label>
+        <input type="text" name="stat_deliveries" value="{{ own_settings.stat_deliveries|default:'' }}" placeholder="{{ merged.stat_deliveries|default:'15k+' }}">
+      </div>
+      <div class="field">
+        <label>Satisfaction stat</label>
+        <input type="text" name="stat_satisfaction" value="{{ own_settings.stat_satisfaction|default:'' }}" placeholder="{{ merged.stat_satisfaction|default:'98%' }}">
+      </div>
+    </div>
+    <div class="form-grid">
+      <div class="field">
+        <label>Support stat</label>
+        <input type="text" name="stat_support" value="{{ own_settings.stat_support|default:'' }}" placeholder="{{ merged.stat_support|default:'24/7' }}">
       </div>
     </div>
   </div>
 
-  <div class="card" style="margin-bottom:14px;">
-    <div class="card-header"><h3><i class="fas fa-chart-bar" style="color:var(--yellow);margin-right:6px;"></i>Homepage Stats</h3></div>
-    <div class="card-body">
-      <div class="form-grid cols-3">
-        <div class="form-group">
-          <label>Deliveries Stat</label>
-          <input type="text" name="stat_deliveries" value="{{ site.stat_deliveries }}" placeholder="15k+"/>
-        </div>
-        <div class="form-group">
-          <label>Satisfaction Stat</label>
-          <input type="text" name="stat_satisfaction" value="{{ site.stat_satisfaction }}" placeholder="98%"/>
-        </div>
-        <div class="form-group">
-          <label>Support Stat</label>
-          <input type="text" name="stat_support" value="{{ site.stat_support }}" placeholder="24/7"/>
-        </div>
+  <!-- CONTACT -->
+  <div class="section">
+    <div class="section-header"><h3>Contact</h3></div>
+    <div class="form-grid cols-2">
+      <div class="field">
+        <label>Primary phone</label>
+        <input type="text" name="phone_primary" value="{{ own_settings.phone_primary|default:'' }}" placeholder="{{ merged.phone_primary }}">
+      </div>
+      <div class="field">
+        <label>Secondary phone</label>
+        <input type="text" name="phone_secondary" value="{{ own_settings.phone_secondary|default:'' }}" placeholder="{{ merged.phone_secondary }}">
+      </div>
+      <div class="field">
+        <label>Support email</label>
+        <input type="email" name="email_support" value="{{ own_settings.email_support|default:'' }}" placeholder="{{ merged.email_support }}">
+      </div>
+      <div class="field">
+        <label>Info email</label>
+        <input type="email" name="email_info" value="{{ own_settings.email_info|default:'' }}" placeholder="{{ merged.email_info }}">
+      </div>
+    </div>
+    <div class="form-grid cols-2">
+      <div class="field">
+        <label>Address</label>
+        <textarea name="address" placeholder="{{ merged.address }}">{{ own_settings.address|default:'' }}</textarea>
+      </div>
+      <div class="field">
+        <label>Google Maps URL</label>
+        <input type="url" name="google_maps_url" value="{{ own_settings.google_maps_url|default:'' }}" placeholder="https://maps.google.com/...">
       </div>
     </div>
   </div>
 
-  <div class="card" style="margin-bottom:14px;">
-    <div class="card-header"><h3><i class="fas fa-copyright" style="color:var(--muted);margin-right:6px;"></i>Footer</h3></div>
-    <div class="card-body">
-      <div class="form-group">
-        <label>Copyright Text</label>
-        <input type="text" name="copyright_text" value="{{ site.copyright_text }}"/>
+  <!-- SOCIAL -->
+  <div class="section">
+    <div class="section-header"><h3>Social media</h3></div>
+    <div class="form-grid cols-2">
+      <div class="field">
+        <label>WhatsApp number</label>
+        <input type="text" name="whatsapp_number" value="{{ own_settings.whatsapp_number|default:'' }}" placeholder="234801234xxxx">
+      </div>
+      <div class="field">
+        <label>Twitter / X URL</label>
+        <input type="url" name="twitter_url" value="{{ own_settings.twitter_url|default:'' }}" placeholder="https://x.com/...">
+      </div>
+      <div class="field">
+        <label>Instagram URL</label>
+        <input type="url" name="instagram_url" value="{{ own_settings.instagram_url|default:'' }}" placeholder="https://instagram.com/...">
+      </div>
+      <div class="field">
+        <label>Facebook URL</label>
+        <input type="url" name="facebook_url" value="{{ own_settings.facebook_url|default:'' }}" placeholder="https://facebook.com/...">
+      </div>
+      <div class="field">
+        <label>LinkedIn URL</label>
+        <input type="url" name="linkedin_url" value="{{ own_settings.linkedin_url|default:'' }}" placeholder="https://linkedin.com/...">
+      </div>
+      <div class="field">
+        <label>TikTok URL</label>
+        <input type="url" name="tiktok_url" value="{{ own_settings.tiktok_url|default:'' }}" placeholder="https://tiktok.com/@...">
       </div>
     </div>
   </div>
 
-  <div style="display:flex;gap:10px;justify-content:flex-end;">
-    <button type="submit" class="btn btn-primary">
-      <i class="fas fa-save"></i> Save Settings
-    </button>
+  <!-- FOOTER / SEO -->
+  <div class="section">
+    <div class="section-header"><h3>Footer &amp; SEO</h3></div>
+    <div class="form-grid">
+      <div class="field">
+        <label>Copyright text</label>
+        <input type="text" name="copyright_text" value="{{ own_settings.copyright_text|default:'' }}" placeholder="{{ merged.copyright_text }}">
+      </div>
+      <div class="field">
+        <label>Meta description</label>
+        <textarea name="meta_description" placeholder="{{ merged.meta_description }}">{{ own_settings.meta_description|default:'' }}</textarea>
+      </div>
+      <div class="field">
+        <label>Meta keywords</label>
+        <input type="text" name="meta_keywords" value="{{ own_settings.meta_keywords|default:'' }}" placeholder="logistics, shipping, tracking">
+      </div>
+    </div>
   </div>
+
+  <!-- ACTIONS -->
+  <div class="section">
+    <div class="action-bar">
+      <span class="cost-note">Saving costs <b>{{ cost }} pt{{ cost|pluralize }}</b> — you have {{ profile.points_balance }}.</span>
+      <div style="display:flex; gap:8px;">
+        {% if is_customized %}
+        <button type="submit" name="action" value="reset" class="btn btn-danger-outline btn-sm"
+                onclick="return confirm('Reset your landing page to the default branding? Your customizations will be lost.');">
+          Reset to default
+        </button>
+        {% endif %}
+        <button type="submit" name="action" value="save" class="btn btn-primary btn-sm">
+          Save changes
+        </button>
+      </div>
+    </div>
+  </div>
+
 </form>
+
 {% endblock %}

@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>{% block title %}SwiftTrack{% endblock %}</title>
+  <title>{% block title %}{{ settings.site_name|default:"SwiftTrack" }}{% endblock %}</title>
+  {% if settings.favicon_url %}<link rel="icon" href="{{ settings.favicon_url }}">{% endif %}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -29,7 +30,10 @@
     }
     nav .brand a {
       color: var(--accent); text-decoration: none; font-weight: 800; font-size: 17px;
-      letter-spacing: -.01em; display: flex; align-items: center; gap: 6px;
+      letter-spacing: -.01em; display: flex; align-items: center; gap: 8px;
+    }
+    nav .brand img {
+      width: 24px; height: 24px; border-radius: 6px; object-fit: cover; flex-shrink: 0;
     }
     nav .links { display: flex; align-items: center; gap: 18px; }
     nav .links a {
@@ -48,18 +52,22 @@
     .messages li.success { background: var(--green-dim); color: var(--green); border-color: rgba(34,197,94,.3); }
     .messages li.error   { background: rgba(239,68,68,.12); color: #ef4444; border-color: rgba(239,68,68,.3); }
     .messages li.info    { background: var(--accent-dim); color: var(--accent); border-color: rgba(249,115,22,.3); }
-
-    footer {
-      text-align: center; padding: 24px 20px; font-size: 11.5px;
-      color: var(--muted); border-top: 1px solid var(--border); margin-top: 20px;
-    }
   </style>
   {% block extra_css %}{% endblock %}
 </head>
 <body>
 
 <nav>
-  <span class="brand"><a href="{% url 'home' %}">📦 SwiftTrack</a></span>
+  <span class="brand">
+    <a href="{% url 'home' %}">
+      {% if settings.logo %}
+        <img src="{{ settings.logo }}" alt="{{ settings.site_name|default:'SwiftTrack' }}">
+      {% else %}
+        📦
+      {% endif %}
+      {{ settings.site_name|default:"SwiftTrack" }}
+    </a>
+  </span>
   <span class="links">
     <a href="{% url 'tracking-search' %}">Track Shipment</a>
   </span>
@@ -76,10 +84,6 @@
 
   {% block content %}{% endblock %}
 </div>
-
-<footer>
-  &copy; 2024 SwiftTrack. All rights reserved.
-</footer>
 
 {% block extra_js %}{% endblock %}
 </body>

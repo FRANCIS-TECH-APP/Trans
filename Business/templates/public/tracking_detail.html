@@ -41,6 +41,17 @@
   .hero-stat .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-bottom: 4px; }
   .hero-stat .val { font-size: 15px; font-weight: 700; }
 
+  /* Hold banner */
+  .hold-banner {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--amber-dim);
+    color: var(--amber);
+    border: 1px solid var(--amber);
+    border-radius: var(--radius-sm);
+    font-size: 13px; font-weight: 600;
+    padding: 12px 16px; margin-bottom: 16px;
+  }
+
   /* Progress stepper */
   .progress-card {
     background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
@@ -126,9 +137,15 @@
   </div>
 </div>
 
+{% if shipment.status == 'held' %}
+<div class="hold-banner">
+  <span>⏸</span> This shipment is currently on hold. Contact support for details.
+</div>
+{% endif %}
+
 <div class="progress-card">
   <h2>Shipment Progress</h2>
-  {% with s=shipment.status %}
+  {% with s=progress_status %}
   <ol class="stepper">
     <li class="{% if s != 'created' %}done{% endif %}" {% if s == 'created' %}aria-current="step"{% endif %}><span>Order Placed</span></li>
     <li class="{% if s in 'in_transit,at_customs,out_for_delivery,delivered' %}done{% endif %}" {% if s == 'picked_up' %}aria-current="step"{% endif %}><span>Processing</span></li>

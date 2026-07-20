@@ -34,3 +34,25 @@ def unread_notifications(request):
     ).exclude(id__in=read_public_ids).count()
 
     return {"unread_notifications": unread_private + unread_public}
+
+
+
+# yourapp/context_processors.py
+from .models import SubAdminProfile, SubAdminSiteSettings, Testimonial, BrandGalleryImage
+from .utils import default_settings_context  # wherever your admin-default builder lives
+
+def branding(request):
+    ref = request.session.get("active_referral_code")
+    profile = SubAdminProfile.objects.filter(referral_code=ref).first() if ref else None
+
+    settings_ctx = (
+        SubAdminSiteSettings.for_user(profile.user) if profile
+        else default_settings_context()
+    )
+
+    return {
+        "settings": settings_ctx,
+        "profile": profile,
+        "testimonials": Testimonial.objects.filter(is_active=True).order_by("sort_order"),
+        "gallery_images": BrandGalleryImage.objects.filter(is_active=True).order_by("sort_order"),
+    }

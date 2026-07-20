@@ -41,23 +41,18 @@ def admin_required(view_func):
 
 def home(request):
     return render(request, "public/home.html")
-
-
 def tracking_search(request):
     if request.method == "POST":
         tracking_id = request.POST.get("tracking_id", "").strip().upper()
-        if not tracking_id:
-            messages.error(request, "Please enter a tracking ID.")
-            return render(request, "public/search.html")
+        shipment = Shipment.objects.filter(tracking_id=tracking_id).first()
 
-        exists = Shipment.objects.filter(tracking_id=tracking_id).exists()
-        if not exists:
-            messages.error(request, f"No shipment found for '{tracking_id}'. Please check and try again.")
-            return render(request, "public/search.html", {"query": tracking_id})
+        if shipment:
+            return redirect("tracking-detail", tracking_id=shipment.tracking_id)
+        else:
+            messages.error(request, "No shipment found with that tracking ID.")
+            return redirect("home")  # or wherever your track form lives
 
-        return redirect("tracking-detail", tracking_id=tracking_id)
-
-    return render(request, "public/search.html")
+    return redirect("home")
 
 
 def tracking_detail(request, tracking_id):
