@@ -168,6 +168,8 @@ urlpatterns = [
     path('adverts/<int:pk>/toggle/', views.admin_advert_toggle, name='admin-advert-toggle'),
     path('adverts/<int:pk>/delete/', views.admin_advert_delete, name='admin-advert-delete'),
     path('adverts/<int:pk>/edit/', views.admin_advert_edit, name='admin-advert-edit'),
+    path('sub-admin/gallery/upload/', sv.sub_admin_gallery_upload, name='sub-admin-gallery-upload'),
+    path('sub-admin/gallery/<int:pk>/delete/', sv.sub_admin_gallery_delete, name='sub-admin-gallery-delete'),
 
 ]
 

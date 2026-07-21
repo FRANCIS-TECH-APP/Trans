@@ -110,6 +110,23 @@
   </section>
   {% endif %}
 
+  <!-- ================= SUB-ADMIN'S OWN GALLERY (their uploads — only shows on their branded page) ================= -->
+  {% if profile and profile.gallery_images.exists %}
+  <section class="py-16">
+    <div class="px-6 mb-8 text-center">
+      <p class="text-xs uppercase tracking-widest text-neutral-500">Gallery</p>
+      <h2 class="text-xl font-bold mt-2">{{ settings.site_name|default:"Our" }} Photos</h2>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-3 gap-2 px-2">
+      {% for g in profile.gallery_images.all %}
+      <div class="aspect-square overflow-hidden rounded-lg">
+        <img src="{{ g.image.url }}" alt="{{ g.caption }}" class="w-full h-full object-cover">
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
   <!-- ================= QUOTE FORM ================= -->
   <section class="py-16 px-6">
     <div class="bg-neutral-50 rounded-2xl border border-neutral-200 p-8 max-w-xl mx-auto" id="track">

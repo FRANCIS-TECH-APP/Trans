@@ -1226,3 +1226,25 @@ class BrandGalleryImage(models.Model):
 
     def __str__(self):
         return self.caption or f"Gallery image #{self.pk}"
+
+
+
+class SubAdminGalleryImage(models.Model):
+    """
+    A sub-admin's own gallery images on their public landing page —
+    separate from the admin-managed BrandGalleryImage. Sub-admins can
+    add and remove their own; they never touch the admin's fixed set.
+    """
+    sub_admin  = models.ForeignKey(
+        SubAdminProfile, on_delete=models.CASCADE, related_name="gallery_images"
+    )
+    image      = models.ImageField(upload_to="subadmin_gallery/")
+    caption    = models.CharField(max_length=120, blank=True)
+    sort_order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["sort_order", "created_at"]
+
+    def __str__(self):
+        return self.caption or f"Gallery image #{self.pk}"

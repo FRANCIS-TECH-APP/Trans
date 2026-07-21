@@ -35,7 +35,7 @@ from .models import (
     Account, ForeignNumber, WalletDeposit,
     Notification, NotificationRead, SubAdminSiteSettings,
     DashboardAdvert, DashboardAnnouncement, Testimonial, BrandGalleryImage,
-    Invoice, InvoiceItem,
+    Invoice, InvoiceItem,SubAdminGalleryImage
 )
 
 logger = logging.getLogger(__name__)
@@ -2120,6 +2120,25 @@ def sub_admin_site_settings(request):
                 obj.logo = logo_file
 
             obj.save()
+
+
+            # ── Save any new gallery images uploaded alongside branding ──
+            gallery_files = request.FILES.getlist("gallery_images")
+            if gallery_files:
+                existing_count = profile.gallery_images.count()
+                for i, f in enumerate(gallery_files):
+                    SubAdminGalleryImage.objects.create(
+                        sub_admin=profile, image=f, sort_order=existing_count + i
+                    )
+
+            profile.deduct_points(cost)
+
+            messages.success(
+                request,
+                f"Landing page updated. {cost} point(s) deducted. "
+                f"Balance: {profile.points_balance} pts."
+            )
+        
             profile.deduct_points(cost)
 
             messages.success(
@@ -2146,6 +2165,7 @@ def sub_admin_site_settings(request):
         "own_settings":  own_settings,
         "merged":        merged_preview,
         "is_customized": is_customized,
+        "gallery":       profile.gallery_images.all(),
     }
     return render(request, "admin/subadmin/site_settings.html", context)
 
@@ -2262,3 +2282,39 @@ def subadmin_domain_required(view_func):
         return view_func(request, *args, **kwargs)
     wrapper.__name__ = view_func.__name__
     return wrapper
+
+
+
+@sub_admin_approved_required
+@require_POST
+def sub_admin_gallery_upload(request):
+    """Add one or more images to the sub-admin's own gallery."""
+    profile = request.user.sub_admin_profile
+    files = request.FILES.getlist("gallery_images")
+
+    if not files:
+        messages.error(request, "Please choose at least one image.")
+        return redirect("sub-admin-site-settings")
+
+    existing_count = profile.gallery_images.count()
+    for i, f in enumerate(files):
+        SubAdminGalleryImage.objects.create(
+            sub_admin=profile,
+            image=f,
+            sort_order=existing_count + i,
+        )
+
+    messages.success(request, f"{len(files)} image(s) added to your gallery.")
+    return redirect("sub-admin-site-settings")
+
+
+@sub_admin_approved_required
+@require_POST
+def sub_admin_gallery_delete(request, pk):
+    """Remove one image from the sub-admin's own gallery."""
+    image = get_object_or_404(
+        SubAdminGalleryImage, pk=pk, sub_admin=request.user.sub_admin_profile
+    )
+    image.delete()
+    messages.success(request, "Image removed.")
+    return redirect("sub-admin-site-settings")
