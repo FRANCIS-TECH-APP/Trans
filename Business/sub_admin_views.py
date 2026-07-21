@@ -35,7 +35,7 @@ from .models import (
     Account, ForeignNumber, WalletDeposit,
     Notification, NotificationRead, SubAdminSiteSettings,
     DashboardAdvert, DashboardAnnouncement, Testimonial, BrandGalleryImage,
-    Invoice, InvoiceItem,SubAdminGalleryImage
+    Invoice, InvoiceItem,SubAdminGalleryImage,Purchase
 )
 
 logger = logging.getLogger(__name__)
@@ -45,38 +45,8 @@ logger = logging.getLogger(__name__)
 #  DECORATORS
 # ════════════════════════════════════════════════════════
 
-def sub_admin_login_required(view_func):
-    def wrapper(request, *args, **kwargs):
-        if not request.user.is_authenticated:
-            return redirect("sub-admin-login")
-        if request.user.role != User.Role.SUB_ADMIN:
-            return redirect("sub-admin-login")
-        return view_func(request, *args, **kwargs)
-    wrapper.__name__ = view_func.__name__
-    return wrapper
 
 
-def sub_admin_approved_required(view_func):
-    """Logged in + approved. Can browse but NOT create shipments."""
-    def wrapper(request, *args, **kwargs):
-        if not request.user.is_authenticated:
-            return redirect("sub-admin-login")
-        if request.user.role != User.Role.SUB_ADMIN:
-            return redirect("sub-admin-login")
-        try:
-            profile = request.user.sub_admin_profile
-        except SubAdminProfile.DoesNotExist:
-            return redirect("sub-admin-login")
-
-        if profile.approval_status == SubAdminProfile.ApprovalStatus.PENDING:
-            return render(request, "admin/subadmin/pending_approval.html", {"profile": profile})
-        if profile.approval_status == SubAdminProfile.ApprovalStatus.REJECTED:
-            return render(request, "admin/subadmin/rejected.html", {"profile": profile})
-        if profile.approval_status == SubAdminProfile.ApprovalStatus.SUSPENDED:
-            return render(request, "admin/subadmin/suspended.html", {"profile": profile})
-        return view_func(request, *args, **kwargs)
-    wrapper.__name__ = view_func.__name__
-    return wrapper
 
 
 def sub_admin_has_points(view_func):
@@ -93,16 +63,16 @@ def sub_admin_has_points(view_func):
         if profile.approval_status != SubAdminProfile.ApprovalStatus.APPROVED:
             return redirect("sub-admin-dashboard")
         if not profile.can_create_shipment():
-            messages.warning(
+            return insufficient_funds_redirect(
                 request,
-                f"You need at least "
-                f"{PointsPricing.get_current().points_per_shipment} point(s) to create a shipment. "
-                f"You have {profile.points_balance}. Please top up."
+                needed=PointsPricing.get_current().points_per_shipment,
+                reason="create a shipment",
+                next_url=reverse("sub-admin-dashboard"),
             )
-            return redirect("sub-admin-buy-points")
         return view_func(request, *args, **kwargs)
     wrapper.__name__ = view_func.__name__
     return wrapper
+
 
 
 def super_admin_required(view_func):
@@ -160,15 +130,19 @@ def sub_admin_register(request):
         referrer = None
         if ref_code:
             referrer = SubAdminProfile.objects.filter(referral_code=ref_code).first()
+        
+
 
         SubAdminProfile.objects.create(
-            user         = user,
-            phone        = phone,
-            company_name = company,
-            address      = address,
-            referred_by  = referrer,
+            user            = user,
+            phone           = phone,
+            company_name    = company,
+            address         = address,
+            referred_by     = referrer,
+            approval_status = SubAdminProfile.ApprovalStatus.APPROVED,
+            approved_at     = timezone.now(),
         )
-        messages.success(request, "Registration successful! Awaiting admin approval.")
+        messages.success(request, "Registration successful! You can now log in.")
         return redirect("sub-admin-login")
 
     return render(request, "admin/subadmin/register.html", {"ref_code": ref_code})
@@ -200,7 +174,7 @@ def sub_admin_logout(request):
 #  DASHBOARD
 # ════════════════════════════════════════════════════════
 
-@sub_admin_approved_required
+@login_required
 def sub_admin_dashboard(request):
     profile  = request.user.sub_admin_profile
     pricing  = PointsPricing.get_current()
@@ -238,7 +212,7 @@ def sub_admin_dashboard(request):
 #  POINTS — BUY & WEBHOOK
 # ════════════════════════════════════════════════════════
 
-@sub_admin_approved_required
+
 def sub_admin_buy_points(request):
     profile  = request.user.sub_admin_profile
     pricing  = PointsPricing.get_current()
@@ -252,7 +226,7 @@ def sub_admin_buy_points(request):
     return render(request, "admin/subadmin/buy_points.html", context)
 
 
-@sub_admin_approved_required
+@login_required
 @require_POST
 def sub_admin_points_pay(request):
     """Initiate Paystack payment for points top-up."""
@@ -366,7 +340,7 @@ def _credit_points(purchase):
 #  SHIPMENTS
 # ════════════════════════════════════════════════════════
 
-@sub_admin_approved_required
+@login_required
 def sub_admin_shipment_list(request):
     qs = Shipment.objects.filter(
         created_by=request.user
@@ -410,8 +384,12 @@ def sub_admin_shipment_create(request):
 
         # Re-check points on POST (race condition safety)
         if not profile.can_create_shipment():
-            messages.error(request, "Insufficient points.")
-            return redirect("sub-admin-buy-points")
+            return insufficient_funds_redirect(
+                request,
+                needed=pricing.points_per_shipment,
+                reason="create a shipment",
+                next_url=reverse("sub-admin-shipment-create"),
+            )
 
         sender = ContactInfo.objects.create(
             full_name   = p.get("sender_name", ""),
@@ -501,8 +479,7 @@ def sub_admin_shipment_create(request):
     }
     return render(request, "admin/subadmin/shipment_form.html", context)
 
-
-@sub_admin_approved_required
+@login_required
 def sub_admin_shipment_detail(request, pk):
     shipment = get_object_or_404(
         Shipment.objects
@@ -582,7 +559,7 @@ def reject_sub_admin(request, pk):
     return redirect("manage-sub-admins")
 
 
-@super_admin_required
+@login_required
 @require_POST
 def suspend_sub_admin(request, pk):
     profile = get_object_or_404(SubAdminProfile, pk=pk)
@@ -592,7 +569,7 @@ def suspend_sub_admin(request, pk):
     return redirect("manage-sub-admins")
 
 
-@super_admin_required
+@login_required
 @require_POST
 def reinstate_sub_admin(request, pk):
     profile = get_object_or_404(SubAdminProfile, pk=pk)
@@ -602,7 +579,7 @@ def reinstate_sub_admin(request, pk):
     return redirect("manage-sub-admins")
 
 
-@super_admin_required
+@login_required
 @require_POST
 def set_points_pricing(request):
     """Super admin updates point costs and price per point."""
@@ -631,7 +608,7 @@ def set_points_pricing(request):
     return redirect("manage-sub-admins")
 
 
-@super_admin_required
+@login_required
 @require_POST
 def admin_adjust_points(request, pk):
     """Super admin manually add or remove points from a sub-admin."""
@@ -734,7 +711,7 @@ def get_progress_status(shipment, checkpoints):
     return Shipment.Status.CREATED
 
 
-@sub_admin_approved_required
+@login_required
 @require_POST
 def sub_admin_checkpoint_add(request, pk):
     shipment = get_object_or_404(Shipment, pk=pk, created_by=request.user)
@@ -775,7 +752,7 @@ def sub_admin_checkpoint_add(request, pk):
 #  SHIPMENT AMENDMENT
 # ════════════════════════════════════════════════════════
 
-@sub_admin_approved_required
+@login_required
 def sub_admin_shipment_amend_form(request, pk):
     """Render the amendment form (GET)."""
     shipment = get_object_or_404(
@@ -797,8 +774,7 @@ def sub_admin_shipment_amend_form(request, pk):
     }
     return render(request, "admin/subadmin/shipment_amend.html", context)
 
-
-@sub_admin_approved_required
+@login_required
 @require_POST
 def sub_admin_shipment_amend(request, pk):
     """Process the amendment form (POST) — same field set as shipment_create."""
@@ -811,12 +787,10 @@ def sub_admin_shipment_amend(request, pk):
     cost     = pricing.points_per_amendment
 
     if profile.points_balance < cost:
-        messages.error(
-            request,
-            f"You need {cost} point(s) to amend this shipment. "
-            f"You have {profile.points_balance}."
+        return insufficient_funds_redirect(
+            request, needed=cost, reason="amend this shipment",
+            next_url=reverse("sub-admin-shipment-amend-form", kwargs={"pk": pk}),
         )
-        return redirect("sub-admin-shipment-amend-form", pk=pk)
 
     p = request.POST
 
@@ -920,7 +894,7 @@ def sub_admin_shipment_amend(request, pk):
 #  PROFILE
 # ════════════════════════════════════════════════════════
 
-@sub_admin_approved_required
+@login_required
 def sub_admin_profile(request):
     profile = request.user.sub_admin_profile
     pricing = PointsPricing.get_current()
@@ -1019,7 +993,7 @@ from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 
 
-@sub_admin_approved_required
+@login_required
 def sub_admin_shipment_addons(request, pk):
     """Manage optional add-ons for a shipment (e.g. support contact link/email)."""
     shipment = get_object_or_404(Shipment, pk=pk, created_by=request.user)
@@ -1055,12 +1029,10 @@ def sub_admin_shipment_addons(request, pk):
 
             cost = pricing.points_per_support_link
             if profile.points_balance < cost:
-                messages.error(
-                    request,
-                    f"You need {cost} point(s) to set/update the support contact. "
-                    f"You have {profile.points_balance}."
+                return insufficient_funds_redirect(
+                    request, needed=cost, reason="add a support contact",
+                    next_url=reverse("sub-admin-shipment-addons", kwargs={"pk": pk}),
                 )
-                return redirect("sub-admin-buy-points")
 
             profile.deduct_points(cost)
             shipment.support_link_type   = link_type
@@ -1097,12 +1069,10 @@ def sub_admin_shipment_addons(request, pk):
     }
     return render(request, "admin/subadmin/shipment_addons.html", context)
 
-
 # ════════════════════════════════════════════════════════
 #  INVOICES
 # ════════════════════════════════════════════════════════
-
-@sub_admin_approved_required
+@login_required
 def sub_admin_invoice_create(request, pk):
     shipment = get_object_or_404(Shipment, pk=pk, created_by=request.user)
 
@@ -1115,12 +1085,10 @@ def sub_admin_invoice_create(request, pk):
     cost    = pricing.points_per_invoice
 
     if profile.points_balance < cost:
-        messages.error(
-            request,
-            f"You need {cost} point(s) to create an invoice. "
-            f"You have {profile.points_balance}. Please top up."
+        return insufficient_funds_redirect(
+            request, needed=cost, reason="create an invoice",
+            next_url=reverse("sub-admin-shipment-detail", kwargs={"pk": pk}),
         )
-        return redirect("sub-admin-buy-points")
 
     invoice = Invoice.objects.create(
         shipment        = shipment,
@@ -1159,7 +1127,7 @@ def sub_admin_invoice_create(request, pk):
     return redirect("sub-admin-invoice-detail", pk=invoice.pk)
 
 
-@sub_admin_approved_required
+@login_required
 def sub_admin_invoice_detail(request, pk):
     invoice = get_object_or_404(
         Invoice.objects.select_related("shipment", "shipment__sender", "shipment__receiver")
@@ -1169,7 +1137,7 @@ def sub_admin_invoice_detail(request, pk):
     return render(request, "admin/subadmin/invoice_detail.html", {"invoice": invoice})
 
 
-@sub_admin_approved_required
+@login_required
 @require_POST
 def sub_admin_invoice_update(request, pk):
     invoice = get_object_or_404(Invoice, pk=pk, shipment__created_by=request.user)
@@ -1205,7 +1173,7 @@ def sub_admin_invoice_update(request, pk):
     return redirect("sub-admin-invoice-detail", pk=pk)
 
 
-@sub_admin_approved_required
+@login_required
 @require_POST
 def sub_admin_invoice_add_item(request, pk):
     invoice = get_object_or_404(Invoice, pk=pk, shipment__created_by=request.user)
@@ -1220,7 +1188,7 @@ def sub_admin_invoice_add_item(request, pk):
     return redirect("sub-admin-invoice-detail", pk=pk)
 
 
-@sub_admin_approved_required
+@login_required
 @require_POST
 def sub_admin_invoice_remove_item(request, pk, item_pk):
     item = get_object_or_404(
@@ -1233,7 +1201,7 @@ def sub_admin_invoice_remove_item(request, pk, item_pk):
     return redirect("sub-admin-invoice-detail", pk=pk)
 
 
-@sub_admin_approved_required
+@login_required
 @require_POST
 def sub_admin_invoice_mark_paid(request, pk):
     invoice = get_object_or_404(Invoice, pk=pk, shipment__created_by=request.user)
@@ -1242,7 +1210,7 @@ def sub_admin_invoice_mark_paid(request, pk):
     return redirect("sub-admin-invoice-detail", pk=pk)
 
 
-@sub_admin_approved_required
+@login_required
 def sub_admin_invoice_pdf(request, pk):
     invoice = get_object_or_404(
         Invoice.objects.select_related("shipment", "shipment__sender", "shipment__receiver")
@@ -1479,7 +1447,7 @@ def _fetch_5sim_prices(country=None, service=None):
     return prices
 
 
-@sub_admin_approved_required
+@login_required
 def sub_admin_buy_foreign_number(request):
     account = get_or_create_account(request.user)
     selected_country = request.GET.get("country", "") or request.POST.get("country", "")
@@ -1601,7 +1569,7 @@ def sub_admin_buy_foreign_number(request):
     return render(request, "admin/subadmin/buy_foreign_number.html", context)
 
 
-@sub_admin_approved_required
+@login_required
 def sub_admin_foreign_number_prices(request):
     country = request.GET.get("country", "").strip().lower()
     service = request.GET.get("service", "").strip().lower()
@@ -1614,7 +1582,7 @@ def sub_admin_foreign_number_prices(request):
     return JsonResponse({"prices": prices})
 
 
-@sub_admin_approved_required
+@login_required
 def sub_admin_cancel_foreign_number(request, order_id):
     try:
         foreign_number = ForeignNumber.objects.get(order_id=order_id, user=request.user)
@@ -1667,7 +1635,7 @@ def sub_admin_cancel_foreign_number(request, order_id):
     return redirect("sub-admin-buy-foreign-number")
 
 
-@sub_admin_approved_required
+@login_required
 def sub_admin_check_sms_5sim(request, order_id):
     """Poll 5SIM for an incoming SMS code and save it to the ForeignNumber record."""
     try:
@@ -1707,7 +1675,7 @@ def sub_admin_check_sms_5sim(request, order_id):
 #  WALLET DEPOSIT (Paystack)
 # ════════════════════════════════════════════════════════
 
-@sub_admin_approved_required
+@login_required
 def sub_admin_wallet_deposit(request):
     account = get_or_create_account(request.user)
     history = account.deposits.order_by("-created_at")[:10]
@@ -1715,7 +1683,7 @@ def sub_admin_wallet_deposit(request):
     return render(request, "admin/subadmin/wallet_deposit.html", context)
 
 
-@sub_admin_approved_required
+@login_required
 @require_POST
 def sub_admin_wallet_deposit_pay(request):
     """Initiate Paystack payment to fund the NGN wallet."""
@@ -1966,7 +1934,7 @@ def _visible_notifications_qs(user):
     ).order_by("-created_at")
 
 
-@sub_admin_approved_required
+@login_required
 def sub_admin_notifications(request):
     """Full notification inbox page for the logged-in sub-admin."""
     notifications = _visible_notifications_qs(request.user).select_related("sender")
@@ -1985,7 +1953,7 @@ def sub_admin_notifications(request):
     return render(request, "admin/subadmin/notifications.html", {"page_obj": page_obj})
 
 
-@sub_admin_approved_required
+@login_required
 @require_POST
 def sub_admin_notification_mark_read(request, pk):
     notification = get_object_or_404(_visible_notifications_qs(request.user), pk=pk)
@@ -1997,7 +1965,7 @@ def sub_admin_notification_mark_read(request, pk):
     return JsonResponse({"status": "ok"})
 
 
-@sub_admin_approved_required
+@login_required
 @require_POST
 def sub_admin_notification_mark_all_read(request):
     Notification.objects.filter(recipient=request.user, is_read=False).update(is_read=True)
@@ -2014,7 +1982,7 @@ def sub_admin_notification_mark_all_read(request):
     return redirect("sub-admin-notifications")
 
 
-@sub_admin_approved_required
+@login_required
 def sub_admin_notifications_poll(request):
     """
     JSON endpoint polled every ~30s from the sub-admin dashboard.
@@ -2052,7 +2020,7 @@ def sub_admin_notifications_poll(request):
     return JsonResponse({"unread_count": len(unread), "notifications": data})
 
 
-@sub_admin_approved_required
+@login_required
 def sub_admin_notifications_feed(request):
     """JSON list of recent notifications for the bell dropdown popup."""
     notifications = _visible_notifications_qs(request.user).select_related("sender")[:15]
@@ -2103,8 +2071,7 @@ SITE_SETTINGS_DEFAULT_FIELDS = [
     "copyright_text", "meta_description", "meta_keywords",
 ]
 
-
-@sub_admin_approved_required
+@login_required
 def sub_admin_site_settings(request):
     """
     Edit page for the sub-admin's own landing-page branding.
@@ -2125,12 +2092,10 @@ def sub_admin_site_settings(request):
 
         if action == "save":
             if profile.points_balance < cost:
-                messages.error(
-                    request,
-                    f"You need {cost} point(s) to customize your landing page. "
-                    f"You have {profile.points_balance}. Please top up."
+                return insufficient_funds_redirect(
+                    request, needed=cost, reason="customize your landing page",
+                    next_url=reverse("sub-admin-site-settings"),
                 )
-                return redirect("sub-admin-buy-points")
 
             obj, _ = SubAdminSiteSettings.objects.get_or_create(sub_admin=profile)
 
@@ -2143,7 +2108,6 @@ def sub_admin_site_settings(request):
 
             obj.save()
 
-
             # ── Save any new gallery images uploaded alongside branding ──
             gallery_files = request.FILES.getlist("gallery_images")
             if gallery_files:
@@ -2153,14 +2117,6 @@ def sub_admin_site_settings(request):
                         sub_admin=profile, image=f, sort_order=existing_count + i
                     )
 
-            profile.deduct_points(cost)
-
-            messages.success(
-                request,
-                f"Landing page updated. {cost} point(s) deducted. "
-                f"Balance: {profile.points_balance} pts."
-            )
-        
             profile.deduct_points(cost)
 
             messages.success(
@@ -2307,7 +2263,7 @@ def subadmin_domain_required(view_func):
 
 
 
-@sub_admin_approved_required
+@login_required
 @require_POST
 def sub_admin_gallery_upload(request):
     """Add one or more images to the sub-admin's own gallery."""
@@ -2330,7 +2286,7 @@ def sub_admin_gallery_upload(request):
     return redirect("sub-admin-site-settings")
 
 
-@sub_admin_approved_required
+@login_required
 @require_POST
 def sub_admin_gallery_delete(request, pk):
     """Remove one image from the sub-admin's own gallery."""
@@ -2340,3 +2296,58 @@ def sub_admin_gallery_delete(request, pk):
     image.delete()
     messages.success(request, "Image removed.")
     return redirect("sub-admin-site-settings")
+
+
+
+# ════════════════════════════════════════════════════════
+#  BUY LOGS — PURCHASE RECEIPT (full page)
+# ════════════════════════════════════════════════════════
+@login_required
+def buy_logs_receipt(request, pk):
+    """Full-page receipt for one log purchase, with credentials."""
+    purchase = get_object_or_404(
+        Purchase.objects.select_related("product", "product__category", "log", "account"),
+        pk=pk,
+        buyer=request.user,
+    )
+    return render(request, "admin/subadmin/buy_logs_receipt.html", {"purchase": purchase})
+
+
+
+from urllib.parse import urlencode
+
+
+def insufficient_funds_redirect(request, needed, reason, next_url=None):
+    """
+    Call this instead of `messages.error(...) + redirect('sub-admin-buy-points')`
+    anywhere a points/balance check fails. Shows a popup-style page instead
+    of a flash message.
+    """
+    profile = request.user.sub_admin_profile
+    params = {"needed": needed, "reason": reason}
+    if next_url:
+        params["next"] = next_url
+    return redirect(f"{reverse('sub-admin-insufficient-funds')}?{urlencode(params)}")
+
+
+@login_required
+def sub_admin_insufficient_funds(request):
+    """Popup-style 'you don't have enough points' page."""
+    profile = request.user.sub_admin_profile
+    try:
+        needed = int(request.GET.get("needed", 0))
+    except (TypeError, ValueError):
+        needed = 0
+
+    have      = profile.points_balance
+    shortfall = max(needed - have, 0)
+
+    context = {
+        "profile":   profile,
+        "needed":    needed,
+        "have":      have,
+        "shortfall": shortfall,
+        "reason":    request.GET.get("reason", "complete this action"),
+        "next_url":  request.GET.get("next", ""),
+    }
+    return render(request, "admin/subadmin/insufficient_funds.html", context)

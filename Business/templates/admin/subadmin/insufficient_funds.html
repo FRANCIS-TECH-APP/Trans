@@ -1,0 +1,106 @@
+{% extends "admin/subadmin/base.html" %}
+{% block title %}Insufficient Points — TransEdge{% endblock %}
+
+{% block extra_css %}
+<style>
+  .if-overlay {
+    position: fixed; inset: 0;
+    background: rgba(5,6,9,.72);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px; z-index: 300;
+  }
+  .if-card {
+    width: 100%; max-width: 380px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 22px; padding: 30px 26px 26px;
+    text-align: center;
+    box-shadow: 0 24px 60px rgba(0,0,0,.5);
+    animation: if-pop .28s cubic-bezier(.34,1.56,.64,1);
+  }
+  @keyframes if-pop {
+    0% { transform: scale(.9); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  .if-icon {
+    width: 64px; height: 64px; border-radius: 50%;
+    background: var(--amber-dim); color: var(--amber);
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 16px;
+  }
+  .if-icon svg { width: 30px; height: 30px; }
+  .if-title { font-size: 17px; font-weight: 800; margin-bottom: 6px; }
+  .if-reason { font-size: 13.5px; color: var(--muted); margin-bottom: 20px; line-height: 1.5; }
+
+  .if-stats {
+    display: flex; align-items: center; justify-content: center; gap: 14px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 14px; padding: 14px 10px; margin-bottom: 22px;
+  }
+  .if-stat { flex: 1; }
+  .if-stat .num { font-size: 19px; font-weight: 800; }
+  .if-stat .lbl { font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); margin-top: 2px; }
+  .if-stat.have .num { color: var(--text); }
+  .if-stat.needed .num { color: var(--amber); }
+  .if-stat.short .num { color: var(--red); }
+  .if-divider { width: 1px; align-self: stretch; background: var(--border); }
+
+  .if-actions { display: flex; flex-direction: column; gap: 10px; }
+  .if-btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 12px 16px; border-radius: 12px;
+    font-size: 14px; font-weight: 700; text-decoration: none;
+    border: none; cursor: pointer; width: 100%;
+  }
+  .if-btn-primary { background: var(--amber); color: #1a1200; }
+  .if-btn-primary:hover { filter: brightness(1.08); }
+  .if-btn-ghost { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+  .if-btn-ghost:hover { color: var(--text); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="if-overlay">
+  <div class="if-card">
+    <div class="if-icon">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path d="M2 8a2 2 0 012-2h16a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V8z"/>
+        <path d="M2 10h20"/>
+        <line x1="6" y1="15" x2="10" y2="15"/>
+      </svg>
+    </div>
+    <div class="if-title">Not Enough Points</div>
+    <p class="if-reason">You need more points to {{ reason }}.</p>
+
+    <div class="if-stats">
+      <div class="if-stat have">
+        <div class="num">{{ have }}</div>
+        <div class="lbl">You Have</div>
+      </div>
+      <div class="if-divider"></div>
+      <div class="if-stat needed">
+        <div class="num">{{ needed }}</div>
+        <div class="lbl">Required</div>
+      </div>
+      <div class="if-divider"></div>
+      <div class="if-stat short">
+        <div class="num">{{ shortfall }}</div>
+        <div class="lbl">Short By</div>
+      </div>
+    </div>
+
+    <div class="if-actions">
+      <a href="{% url 'sub-admin-buy-points' %}" class="if-btn if-btn-primary">
+        <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M12 2v20M2 12h20"/></svg>
+        Top Up Points
+      </a>
+      {% if next_url %}
+        <a href="{{ next_url }}" class="if-btn if-btn-ghost">Go Back</a>
+      {% else %}
+        <a href="{% url 'sub-admin-dashboard' %}" class="if-btn if-btn-ghost">Back to Dashboard</a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -2,7 +2,7 @@
 from .models import SiteSettings
 
 def default_settings_context():
-    site = SiteSettings.objects.first()
+    site = SiteSettings.get()  # get_or_create(pk=1) — never returns None
     return {
         "site_name": site.company_name,
         "site_tagline": site.tagline,

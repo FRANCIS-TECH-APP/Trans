@@ -26,8 +26,8 @@ SECRET_KEY = config('SECRET_KEY')
 PAYSTACK_SECRET_KEY = config('PAYSTACK_SECRET_KEY')
 PAYSTACK_PUBLIC_KEY = config('PAYSTACK_PUBLIC_KEY')
 FIVE_SIM_API_KEY = config("FIVE_SIM_API_KEY")
-FLW_SECRET_KEY     = config("FLW_SECRET_KEY")
-FLW_WEBHOOK_SECRET = config("FLW_WEBHOOK_SECRET", default="")
+DATABASE_URL = config('DATABASE_URL')
+
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -90,15 +90,17 @@ WSGI_APPLICATION = 'consignee.wsgi.application'
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
 
+
+from decouple import config
+import dj_database_url
+
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    "default": dj_database_url.parse(
+        config("DATABASE_URL"),
+        conn_max_age=600,
+        ssl_require=True,
+    )
 }
-
-
-
 
 
 # Password validation
@@ -144,11 +146,8 @@ MEDIA_URL   = "/media/"
 MEDIA_ROOT  = BASE_DIR / "media"
 # settings.py
 AUTH_USER_MODEL = 'Business.User'  # ✅ Tell Django to use YOUR User model
-
-SESSION_COOKIE_DOMAIN = '.transedge.site'  # dot prefix covers all subdomains
-CSRF_COOKIE_DOMAIN    = '.transedge.site'
-BASE_DOMAIN = 'transedge.site'
-
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
 
 
 CSRF_TRUSTED_ORIGINS = [
@@ -156,3 +155,5 @@ CSRF_TRUSTED_ORIGINS = [
     'https://www.transedge.site',
     'https://admin.transedge.site',
 ]
+
+LOGIN_URL = 'sub-admin-login'  # or whatever your login URL name is

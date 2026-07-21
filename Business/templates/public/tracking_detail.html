@@ -165,13 +165,6 @@
   <span class="arrow">→</span>
 </a>
 
-{% if shipment.support_link_active and shipment.support_link_url %}
-<div class="support-card">
-  <p>Need help? Contact our support team directly.</p>
-  <a href="{{ shipment.support_link_url }}" target="_blank" rel="noopener noreferrer" class="btn-support">
-    {{ shipment.support_link_label|default:"Chat with Support" }}
-  </a>
-</div>
-{% endif %}
+
 
 {% endblock %}
