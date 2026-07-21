@@ -281,7 +281,7 @@ def sub_admin_points_pay(request):
     )
 
     callback_url = request.build_absolute_uri(
-        f"/sub-admin/points/verify/{reference}/"
+    reverse("sub-admin-points-verify", args=[reference])
     )
 
     try:
@@ -1015,10 +1015,13 @@ def sub_admin_profile(request):
 # ════════════════════════════════════════════════════════
 #  SHIPMENT ADD-ONS
 # ════════════════════════════════════════════════════════
+from django.core.validators import validate_email
+from django.core.exceptions import ValidationError
+
 
 @sub_admin_approved_required
 def sub_admin_shipment_addons(request, pk):
-    """Manage optional add-ons for a shipment (e.g. support contact link)."""
+    """Manage optional add-ons for a shipment (e.g. support contact link/email)."""
     shipment = get_object_or_404(Shipment, pk=pk, created_by=request.user)
     profile  = request.user.sub_admin_profile
     pricing  = PointsPricing.get_current()
@@ -1027,35 +1030,54 @@ def sub_admin_shipment_addons(request, pk):
         action = request.POST.get("action")
 
         if action == "save_support_link":
+            link_type = request.POST.get("support_link_type", "link").strip()
+            if link_type not in ("link", "email"):
+                link_type = "link"
+
             url   = request.POST.get("support_link_url", "").strip()
             label = request.POST.get("support_link_label", "").strip() or "Chat with Support"
 
             if not url:
-                messages.error(request, "Please provide a link/URL.")
+                field_name = "email address" if link_type == "email" else "link/URL"
+                messages.error(request, f"Please provide a {field_name}.")
                 return redirect("sub-admin-shipment-addons", pk=pk)
 
-            if not (url.startswith("http://") or url.startswith("https://")):
-                messages.error(request, "Link must start with http:// or https://")
-                return redirect("sub-admin-shipment-addons", pk=pk)
+            if link_type == "email":
+                try:
+                    validate_email(url)
+                except ValidationError:
+                    messages.error(request, "Please provide a valid email address.")
+                    return redirect("sub-admin-shipment-addons", pk=pk)
+            else:
+                if not (url.startswith("http://") or url.startswith("https://")):
+                    messages.error(request, "Link must start with http:// or https://")
+                    return redirect("sub-admin-shipment-addons", pk=pk)
 
             cost = pricing.points_per_support_link
             if profile.points_balance < cost:
                 messages.error(
                     request,
-                    f"You need {cost} point(s) to set/update the support link. "
+                    f"You need {cost} point(s) to set/update the support contact. "
                     f"You have {profile.points_balance}."
                 )
                 return redirect("sub-admin-buy-points")
 
             profile.deduct_points(cost)
+            shipment.support_link_type   = link_type
             shipment.support_link_url    = url
             shipment.support_link_label  = label
             shipment.support_link_active = True
-            shipment.save(update_fields=["support_link_url", "support_link_label", "support_link_active"])
+            shipment.save(update_fields=[
+                "support_link_type",
+                "support_link_url",
+                "support_link_label",
+                "support_link_active",
+            ])
 
+            contact_desc = "Support email" if link_type == "email" else "Support link"
             messages.success(
                 request,
-                f"Support link saved and activated. {cost} point(s) deducted. "
+                f"{contact_desc} saved and activated. {cost} point(s) deducted. "
                 f"Balance: {profile.points_balance} pts."
             )
             return redirect("sub-admin-shipment-addons", pk=pk)
@@ -1065,7 +1087,7 @@ def sub_admin_shipment_addons(request, pk):
             shipment.support_link_active = not shipment.support_link_active
             shipment.save(update_fields=["support_link_active"])
             state = "enabled" if shipment.support_link_active else "disabled"
-            messages.success(request, f"Support link {state}.")
+            messages.success(request, f"Support contact {state}.")
             return redirect("sub-admin-shipment-addons", pk=pk)
 
     context = {

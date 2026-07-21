@@ -1,4 +1,3 @@
-
 {% extends "admin/subadmin/base.html" %}
 
 {% block title %}Shipment Add-ons — TransEdge{% endblock %}
@@ -34,10 +33,21 @@
   .form-group .hint { font-size:11.5px;color:var(--muted);font-weight:400;text-transform:none;letter-spacing:normal; }
   .form-group input { padding:9px 12px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;font-size:13.5px;color:var(--text);outline:none;transition:border-color .2s;font-family:inherit;width:100%; }
   .form-group input:focus { border-color:var(--purple); }
+  .form-group input:disabled { opacity:.4; }
 
-  .preview-box { border:1.5px dashed var(--border);border-radius:10px;padding:14px;background:var(--surface2);margin-top:4px; }
-  .preview-box .preview-label { font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:8px; }
-  .preview-btn { display:inline-flex;align-items:center;gap:8px;background:var(--green);color:#fff;font-weight:700;font-size:13px;padding:9px 16px;border-radius:20px;text-decoration:none; }
+  /* Contact type toggle */
+  .type-toggle { display:flex;gap:8px; }
+  .type-option { flex:1;display:flex;align-items:center;justify-content:center;gap:7px;padding:10px 12px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--muted);text-transform:none;letter-spacing:normal;transition:border-color .15s,color .15s,background .15s; }
+  .type-option input { width:auto;position:absolute;opacity:0;pointer-events:none; }
+  .type-option:has(input:checked) { border-color:var(--purple);color:var(--purple);background:var(--purple-dim); }
+
+  .preview-box { border:1.5px dashed var(--border);border-radius:10px;padding:18px;background:var(--surface2);margin-top:4px;display:flex;flex-direction:column;align-items:flex-start;gap:10px; }
+  .preview-box .preview-label { font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted); }
+  .preview-fab { display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:50%;background:var(--green);color:#fff;box-shadow:0 6px 18px rgba(34,197,94,.35); }
+  .preview-fab svg { width:22px;height:22px; }
+  .preview-fab-row { display:flex;align-items:center;gap:12px; }
+  .preview-fab-text { font-size:12.5px;color:var(--muted); }
+  .preview-fab-text strong { color:var(--text);display:block;font-size:13.5px;margin-bottom:1px; }
   .preview-empty { font-size:13px;color:var(--muted);font-style:italic; }
 
   .divider { height:1px;background:var(--border);margin:16px 0; }
@@ -77,46 +87,83 @@
     {% if shipment.support_link_url %}
     <div class="points-notice charge-warning">
       <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="color:var(--amber);flex-shrink:0;"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-      <span>A support link is already set. Saving changes will deduct <strong>{{ pricing.points_per_support_link }} point{{ pricing.points_per_support_link|pluralize }}</strong> again. You have <strong>{{ profile.points_balance }} points</strong>.</span>
+      <span>A support contact is already set. Saving changes will deduct <strong>{{ pricing.points_per_support_link }} point{{ pricing.points_per_support_link|pluralize }}</strong> again. You have <strong>{{ profile.points_balance }} points</strong>.</span>
     </div>
     {% else %}
     <div class="points-notice">
       <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="color:var(--purple);flex-shrink:0;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-      <span>Adding a support link will deduct <strong>{{ pricing.points_per_support_link }} point{{ pricing.points_per_support_link|pluralize }}</strong>. You have <strong>{{ profile.points_balance }} points</strong>. If you don't add one, no support chat will appear on the client's tracking page.</span>
+      <span>Adding a support contact will deduct <strong>{{ pricing.points_per_support_link }} point{{ pricing.points_per_support_link|pluralize }}</strong>. You have <strong>{{ profile.points_balance }} points</strong>. If you don't add one, no support button will appear on the client's tracking page.</span>
     </div>
     {% endif %}
 
     <form method="post">
       {% csrf_token %}
       <input type="hidden" name="action" value="save_support_link">
+
       <div class="form-group">
-        <label>Support Link / URL <span class="req">*</span></label>
-        <input type="text" name="support_link_url" placeholder="https://wa.me/2348012345678" value="{{ shipment.support_link_url }}" required>
-        <span class="hint">Must start with http:// or https://</span>
+        <label>Contact Method <span class="req">*</span></label>
+        <div class="type-toggle">
+          <label class="type-option">
+            <input type="radio" name="support_link_type" value="link" {% if shipment.support_link_type != 'email' %}checked{% endif %} onchange="toggleContactType()">
+            <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
+            Chat Link / URL
+          </label>
+          <label class="type-option">
+            <input type="radio" name="support_link_type" value="email" {% if shipment.support_link_type == 'email' %}checked{% endif %} onchange="toggleContactType()">
+            <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
+            Email Address
+          </label>
+        </div>
       </div>
+
+      <div class="form-group" id="field-link">
+        <label>Support Link / URL <span class="req">*</span></label>
+        <input type="text" name="support_link_url" id="input-link"
+               placeholder="https://wa.me/2348012345678"
+               value="{% if shipment.support_link_type != 'email' %}{{ shipment.support_link_url }}{% endif %}">
+        <span class="hint">Must start with http:// or https:// (WhatsApp, Telegram, live chat, etc.)</span>
+      </div>
+
+      <div class="form-group" id="field-email" style="display:none;">
+        <label>Support Email <span class="req">*</span></label>
+        <input type="email" name="support_link_url" id="input-email"
+               placeholder="support@example.com"
+               value="{% if shipment.support_link_type == 'email' %}{{ shipment.support_link_url }}{% endif %}">
+        <span class="hint">The client's button will open their email app addressed to this address</span>
+      </div>
+
       <div class="form-group">
-        <label>Button Label <span class="hint">(shown to client)</span></label>
+        <label>Button Label <span class="hint">(shown to client on hover)</span></label>
         <input type="text" name="support_link_label" maxlength="100" placeholder="Chat with Support" value="{{ shipment.support_link_label|default:'Chat with Support' }}">
       </div>
 
       {% if shipment.support_link_url %}
       <div class="preview-box" style="margin-bottom:14px;">
-        <div class="preview-label">Client sees</div>
-        <span class="preview-btn">
-          <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
-          {{ shipment.support_link_label|default:"Chat with Support" }}
-        </span>
+        <div class="preview-label">Client sees (bottom-right of every page)</div>
+        <div class="preview-fab-row">
+          <span class="preview-fab">
+            {% if shipment.support_link_type == 'email' %}
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
+            {% else %}
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
+            {% endif %}
+          </span>
+          <span class="preview-fab-text">
+            <strong>{{ shipment.support_link_label|default:"Chat with Support" }}</strong>
+            {% if shipment.support_link_type == 'email' %}Opens email app{% else %}Opens link in new tab{% endif %}
+          </span>
+        </div>
       </div>
       {% else %}
       <div class="preview-box" style="margin-bottom:14px;">
         <div class="preview-label">Client sees</div>
-        <p class="preview-empty">Nothing — no support button will appear until you save a link.</p>
+        <p class="preview-empty">Nothing — no support button will appear until you save a contact method.</p>
       </div>
       {% endif %}
 
       <button type="submit" class="btn btn-primary">
         <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-        {% if shipment.support_link_url %}Save Changes &amp; Deduct{% else %}Add Support Link &amp; Deduct{% endif %}
+        {% if shipment.support_link_url %}Save Changes &amp; Deduct{% else %}Add Support Contact &amp; Deduct{% endif %}
         {{ pricing.points_per_support_link }} pt{{ pricing.points_per_support_link|pluralize }}
       </button>
     </form>
@@ -129,7 +176,7 @@
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
         <p style="font-size:13px;color:var(--muted);">
           {% if shipment.support_link_active %}
-            Hide the support button from the client without losing your saved link. No points refunded — you can re-enable for free.
+            Hide the support button from the client without losing your saved contact. No points refunded — you can re-enable for free.
           {% else %}
             The support button is hidden. Re-enable it at no extra cost.
           {% endif %}
@@ -146,4 +193,19 @@
   </div>
 </div>
 
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  function toggleContactType() {
+    const isEmail = document.querySelector('input[name="support_link_type"]:checked').value === 'email';
+    document.getElementById('field-link').style.display = isEmail ? 'none' : 'flex';
+    document.getElementById('field-email').style.display = isEmail ? 'flex' : 'none';
+    document.getElementById('input-link').disabled = isEmail;
+    document.getElementById('input-link').required = !isEmail;
+    document.getElementById('input-email').disabled = !isEmail;
+    document.getElementById('input-email').required = isEmail;
+  }
+  document.addEventListener('DOMContentLoaded', toggleContactType);
+</script>
 {% endblock %}

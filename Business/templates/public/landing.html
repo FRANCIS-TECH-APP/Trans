@@ -9,22 +9,93 @@
 <meta name="keywords" content="{{ settings.meta_keywords }}">
 {% if settings.favicon_url %}<link rel="icon" href="{{ settings.favicon_url }}">{% endif %}
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
 <style>
   :root { --brand: {{ settings.primary_color|default:"#3b82f6" }}; }
+  * { font-family: 'Inter', 'Hanken Grotesk', sans-serif; }
   .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
   .brand-bg { background-color: var(--brand); }
   .brand-text { color: var(--brand); }
   .brand-border { border-color: var(--brand); }
-  .hero-gradient { background: linear-gradient(to bottom, rgba(0,0,0,.35), rgba(0,0,0,.7)); }
+  .hero-gradient { background: linear-gradient(to bottom, rgba(0,0,0,.25) 0%, rgba(0,0,0,.55) 60%, rgba(0,0,0,.8) 100%); }
   .glass-card { background: rgba(255,255,255,.75); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+
+  /* ── scroll reveal ─────────────────────────────────────── */
+  .reveal { opacity: 0; transform: translateY(28px); transition: opacity .7s cubic-bezier(.16,1,.3,1), transform .7s cubic-bezier(.16,1,.3,1); }
+  .reveal.in-view { opacity: 1; transform: translateY(0); }
+  .reveal-stagger.in-view > * { animation: staggerIn .6s cubic-bezier(.16,1,.3,1) both; }
+  .reveal-stagger.in-view > *:nth-child(1) { animation-delay: .05s; }
+  .reveal-stagger.in-view > *:nth-child(2) { animation-delay: .15s; }
+  .reveal-stagger.in-view > *:nth-child(3) { animation-delay: .25s; }
+  .reveal-stagger.in-view > *:nth-child(4) { animation-delay: .35s; }
+  .reveal-stagger.in-view > *:nth-child(5) { animation-delay: .45s; }
+  .reveal-stagger.in-view > *:nth-child(6) { animation-delay: .55s; }
+  @keyframes staggerIn { from { opacity: 0; transform: translateY(20px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+  /* ── hero entrance ─────────────────────────────────────── */
+  @keyframes heroIn { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
+  .hero-el { opacity: 0; animation: heroIn .8s cubic-bezier(.16,1,.3,1) forwards; }
+  .hero-el.d1 { animation-delay: .1s; }
+  .hero-el.d2 { animation-delay: .25s; }
+  .hero-el.d3 { animation-delay: .4s; }
+  .hero-el.d4 { animation-delay: .55s; }
+
+  .hero-bg-img { transform: scale(1.08); animation: heroZoomOut 1.6s cubic-bezier(.16,1,.3,1) forwards; }
+  @keyframes heroZoomOut { to { transform: scale(1); } }
+
+  /* ── header shrink/blur on scroll ──────────────────────── */
+  #siteHeader { transition: box-shadow .3s ease, background-color .3s ease; }
+  #siteHeader.scrolled { box-shadow: 0 4px 24px rgba(0,0,0,.06); }
+
+  /* ── card lift ──────────────────────────────────────────── */
+  .lift-card { transition: transform .35s cubic-bezier(.16,1,.3,1), box-shadow .35s ease; }
+  .lift-card:hover { transform: translateY(-6px); box-shadow: 0 20px 40px rgba(0,0,0,.08); }
+
+  /* ── gallery zoom ───────────────────────────────────────── */
+  .gallery-tile { overflow: hidden; position: relative; }
+  .gallery-tile img { transition: transform .6s cubic-bezier(.16,1,.3,1), filter .4s ease; }
+  .gallery-tile:hover img { transform: scale(1.12); }
+  .gallery-tile::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(to top, rgba(0,0,0,.35), transparent 50%);
+    opacity: 0; transition: opacity .4s ease;
+  }
+  .gallery-tile:hover::after { opacity: 1; }
+
+  /* ── cta button micro-interaction ──────────────────────── */
+  .cta-btn { transition: transform .2s ease, box-shadow .2s ease, opacity .2s ease; }
+  .cta-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(0,0,0,.15); }
+  .cta-btn:active { transform: translateY(0); }
+
+  /* ── animated underline on nav link ────────────────────── */
+  .nav-link { position: relative; }
+  .nav-link::after {
+    content: ''; position: absolute; left: 0; bottom: -3px; width: 0; height: 2px;
+    background: var(--brand); transition: width .3s ease;
+  }
+  .nav-link:hover::after { width: 100%; }
+
+  /* ── star pop on testimonial hover ─────────────────────── */
+  .testi-card:hover .star { animation: starPop .4s ease forwards; }
+  @keyframes starPop { 50% { transform: scale(1.3); } 100% { transform: scale(1); } }
+
+  /* ── floating badge pulse ──────────────────────────────── */
+  .pulse-dot { position: relative; }
+  .pulse-dot::before {
+    content: ''; position: absolute; inset: 0; border-radius: 999px;
+    background: currentColor; opacity: .5; animation: pulseRing 2s ease-out infinite;
+  }
+  @keyframes pulseRing { 0% { transform: scale(1); opacity: .5; } 100% { transform: scale(2.4); opacity: 0; } }
+
+  /* ── smooth marquee-style trust strip (optional visual accent) ──── */
+  .soft-divider { background: linear-gradient(90deg, transparent, rgba(0,0,0,.08), transparent); height: 1px; }
 </style>
 </head>
 <body class="bg-white text-neutral-900">
 
 <!-- ================= TOP BAR ================= -->
-<header class="fixed top-0 left-0 w-full z-50 bg-white/90 backdrop-blur-md border-b border-neutral-200 flex justify-between items-center h-16 px-5">
+<header id="siteHeader" class="fixed top-0 left-0 w-full z-50 bg-white/90 backdrop-blur-md border-b border-neutral-200 flex justify-between items-center h-16 px-5">
   <div class="flex items-center gap-3">
     {% if settings.logo %}
       <img src="{{ settings.logo }}" alt="{{ settings.site_name }}" class="h-8 w-auto">
@@ -33,7 +104,7 @@
     {% endif %}
     <span class="font-bold text-lg tracking-tight">{{ settings.site_name|default:"Logistics" }}</span>
   </div>
-  <a href="#track" class="text-sm font-semibold brand-text">Track</a>
+  <a href="#track" class="text-sm font-semibold brand-text nav-link">Track</a>
 </header>
 
 <main class="pt-16">
@@ -42,52 +113,53 @@
   <section class="relative min-h-[560px] flex items-center justify-center overflow-hidden">
     <div class="absolute inset-0">
       {% if settings.hero_image_url %}
-        <img src="{{ settings.hero_image_url }}" class="w-full h-full object-cover" alt="">
+        <img src="{{ settings.hero_image_url }}" class="w-full h-full object-cover hero-bg-img" alt="">
       {% else %}
         <!-- Fixed fallback: admin brand gallery cover shot, shown when a sub-admin has no custom hero image -->
         {% with gallery_images|first as fallback %}
-          {% if fallback %}<img src="{{ fallback.image.url }}" class="w-full h-full object-cover" alt="">{% else %}
+          {% if fallback %}<img src="{{ fallback.image.url }}" class="w-full h-full object-cover hero-bg-img" alt="">{% else %}
           <div class="w-full h-full bg-neutral-900"></div>{% endif %}
         {% endwith %}
       {% endif %}
     </div>
     <div class="absolute inset-0 hero-gradient"></div>
     <div class="relative z-10 w-full px-6 text-center text-white">
-      <span class="inline-block px-4 py-1 rounded-full border border-white/30 bg-white/10 backdrop-blur-sm text-xs uppercase tracking-widest mb-6">
+      <span class="hero-el d1 inline-flex items-center gap-2 px-4 py-1 rounded-full border border-white/30 bg-white/10 backdrop-blur-sm text-xs uppercase tracking-widest mb-6">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 pulse-dot"></span>
         {{ settings.site_tagline|default:"Your Logistics Partner" }}
       </span>
-      <h1 class="font-bold text-3xl md:text-5xl leading-tight mb-6">
+      <h1 class="hero-el d2 font-extrabold text-3xl md:text-5xl leading-tight mb-6 tracking-tight">
         {{ settings.hero_title|default:"Fast, Reliable Shipping — Every Time." }}
       </h1>
       {% if settings.hero_subtitle %}
-      <p class="max-w-xl mx-auto text-white/85 mb-8">{{ settings.hero_subtitle }}</p>
+      <p class="hero-el d3 max-w-xl mx-auto text-white/85 mb-8">{{ settings.hero_subtitle }}</p>
       {% endif %}
-      <div class="flex flex-col sm:flex-row gap-4 justify-center mt-4">
-        <a href="#track" class="brand-bg text-white py-4 px-8 rounded-lg font-semibold shadow-lg">Track a Shipment</a>
-        <a href="#contact" class="bg-white/10 backdrop-blur-md border border-white/20 text-white py-4 px-8 rounded-lg font-semibold">Contact Us</a>
+      <div class="hero-el d4 flex flex-col sm:flex-row gap-4 justify-center mt-4">
+        <a href="#track" class="cta-btn brand-bg text-white py-4 px-8 rounded-lg font-semibold shadow-lg">Track a Shipment</a>
+        <a href="#contact" class="cta-btn bg-white/10 backdrop-blur-md border border-white/20 text-white py-4 px-8 rounded-lg font-semibold">Contact Us</a>
       </div>
     </div>
   </section>
 
   <!-- ================= STATS ================= -->
-  <section class="py-14 px-6 grid grid-cols-3 gap-4 text-center border-b border-neutral-100">
+  <section class="reveal reveal-stagger py-14 px-6 grid grid-cols-3 gap-4 text-center border-b border-neutral-100">
     <div>
-      <p class="text-2xl md:text-3xl font-bold brand-text">{{ settings.stat_deliveries|default:"15k+" }}</p>
+      <p class="stat-num text-2xl md:text-3xl font-extrabold brand-text" data-target="{{ settings.stat_deliveries|default:'15k+' }}">0</p>
       <p class="text-xs uppercase tracking-widest text-neutral-500 mt-1">Deliveries</p>
     </div>
     <div>
-      <p class="text-2xl md:text-3xl font-bold brand-text">{{ settings.stat_satisfaction|default:"98%" }}</p>
+      <p class="stat-num text-2xl md:text-3xl font-extrabold brand-text" data-target="{{ settings.stat_satisfaction|default:'98%' }}">0</p>
       <p class="text-xs uppercase tracking-widest text-neutral-500 mt-1">Satisfaction</p>
     </div>
     <div>
-      <p class="text-2xl md:text-3xl font-bold brand-text">{{ settings.stat_support|default:"24/7" }}</p>
+      <p class="stat-num text-2xl md:text-3xl font-extrabold brand-text" data-target="{{ settings.stat_support|default:'24/7' }}">0</p>
       <p class="text-xs uppercase tracking-widest text-neutral-500 mt-1">Support</p>
     </div>
   </section>
 
   <!-- ================= ABOUT ================= -->
   {% if settings.about_text %}
-  <section class="py-16 px-6 max-w-2xl mx-auto text-center">
+  <section class="reveal py-16 px-6 max-w-2xl mx-auto text-center">
     <h2 class="text-xl font-bold mb-4">About Us</h2>
     <p class="text-neutral-600 leading-relaxed">{{ settings.about_text }}</p>
   </section>
@@ -96,13 +168,13 @@
   <!-- ================= BRAND GALLERY (fixed — admin-managed, not editable per sub-admin) ================= -->
   {% if gallery_images %}
   <section class="py-16 bg-neutral-50">
-    <div class="px-6 mb-8 text-center">
+    <div class="reveal px-6 mb-8 text-center">
       <p class="text-xs uppercase tracking-widest text-neutral-500">In Action</p>
       <h2 class="text-xl font-bold mt-2">How We Deliver</h2>
     </div>
-    <div class="grid grid-cols-2 md:grid-cols-3 gap-2 px-2">
+    <div class="reveal reveal-stagger grid grid-cols-2 md:grid-cols-3 gap-2 px-2">
       {% for g in gallery_images %}
-      <div class="aspect-square overflow-hidden rounded-lg">
+      <div class="gallery-tile aspect-square rounded-lg">
         <img src="{{ g.image.url }}" alt="{{ g.caption }}" class="w-full h-full object-cover">
       </div>
       {% endfor %}
@@ -113,13 +185,13 @@
   <!-- ================= SUB-ADMIN'S OWN GALLERY (their uploads — only shows on their branded page) ================= -->
   {% if profile and profile.gallery_images.exists %}
   <section class="py-16">
-    <div class="px-6 mb-8 text-center">
+    <div class="reveal px-6 mb-8 text-center">
       <p class="text-xs uppercase tracking-widest text-neutral-500">Gallery</p>
       <h2 class="text-xl font-bold mt-2">{{ settings.site_name|default:"Our" }} Photos</h2>
     </div>
-    <div class="grid grid-cols-2 md:grid-cols-3 gap-2 px-2">
+    <div class="reveal reveal-stagger grid grid-cols-2 md:grid-cols-3 gap-2 px-2">
       {% for g in profile.gallery_images.all %}
-      <div class="aspect-square overflow-hidden rounded-lg">
+      <div class="gallery-tile aspect-square rounded-lg">
         <img src="{{ g.image.url }}" alt="{{ g.caption }}" class="w-full h-full object-cover">
       </div>
       {% endfor %}
@@ -127,31 +199,35 @@
   </section>
   {% endif %}
 
+  <div class="soft-divider max-w-4xl mx-auto"></div>
+
   <!-- ================= QUOTE FORM ================= -->
-  <section class="py-16 px-6">
-    <div class="bg-neutral-50 rounded-2xl border border-neutral-200 p-8 max-w-xl mx-auto" id="track">
+  <section class="reveal py-16 px-6">
+    <div class="lift-card bg-neutral-50 rounded-2xl border border-neutral-200 p-8 max-w-xl mx-auto" id="track">
       <h3 class="text-lg font-bold mb-6">Track Your Shipment</h3>
-      <form method="post" action="{% url 'tracking-search' %}">
+      <form method="post" action="{% url 'tracking-search' %}" class="space-y-3">
         {% csrf_token %}
-       <input type="text" name="tracking_id" placeholder="TRK-2026-XXXXXXXX" required/>
-        <button type="submit" class="w-full brand-bg text-white py-3 rounded-lg font-semibold">Track Now</button>
+        <input type="text" name="tracking_id" placeholder="TRK-2026-XXXXXXXX" required
+               class="w-full px-4 py-3 rounded-lg border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-offset-1"
+               style="--tw-ring-color: var(--brand);"/>
+        <button type="submit" class="cta-btn w-full brand-bg text-white py-3 rounded-lg font-semibold">Track Now</button>
       </form>
     </div>
   </section>
-  
+
 
   <!-- ================= TESTIMONIALS (admin-managed only — no sub-admin CRUD) ================= -->
   {% if testimonials %}
   <section class="py-16 px-6 bg-neutral-50">
-    <div class="text-center mb-10">
+    <div class="reveal text-center mb-10">
       <p class="text-xs uppercase tracking-widest text-neutral-500">Client Feedback</p>
       <h2 class="text-xl font-bold mt-2">What Our Partners Say</h2>
     </div>
-    <div class="flex flex-col gap-6 max-w-xl mx-auto">
+    <div class="reveal reveal-stagger flex flex-col gap-6 max-w-xl mx-auto">
       {% for t in testimonials %}
-      <div class="bg-white p-6 rounded-2xl border border-neutral-200 shadow-sm">
+      <div class="testi-card lift-card bg-white p-6 rounded-2xl border border-neutral-200 shadow-sm">
         <div class="flex gap-1 mb-3 text-amber-400 text-sm">
-          {% for i in "12345" %}{% if forloop.counter <= t.rating %}★{% else %}☆{% endif %}{% endfor %}
+          {% for i in "12345" %}{% if forloop.counter <= t.rating %}<span class="star">★</span>{% else %}☆{% endif %}{% endfor %}
         </div>
         <p class="text-neutral-600 italic mb-6 leading-relaxed">"{{ t.content }}"</p>
         <div class="flex items-center gap-3">
@@ -172,14 +248,14 @@
   {% endif %}
 
   <!-- ================= CONTACT ================= -->
-  <section class="py-16 px-6 max-w-xl mx-auto" id="contact">
+  <section class="reveal py-16 px-6 max-w-xl mx-auto" id="contact">
     <h2 class="text-xl font-bold mb-6 text-center">Get In Touch</h2>
     <div class="space-y-3 text-sm text-neutral-600">
-      {% if settings.phone_primary %}<p><span class="material-symbols-outlined align-middle text-base mr-2">call</span>{{ settings.phone_primary }}</p>{% endif %}
-      {% if settings.email_support %}<p><span class="material-symbols-outlined align-middle text-base mr-2">mail</span>{{ settings.email_support }}</p>{% endif %}
-      {% if settings.address %}<p><span class="material-symbols-outlined align-middle text-base mr-2">location_on</span>{{ settings.address }}</p>{% endif %}
+      {% if settings.phone_primary %}<p class="flex items-center"><span class="material-symbols-outlined align-middle text-base mr-2">call</span>{{ settings.phone_primary }}</p>{% endif %}
+      {% if settings.email_support %}<p class="flex items-center"><span class="material-symbols-outlined align-middle text-base mr-2">mail</span>{{ settings.email_support }}</p>{% endif %}
+      {% if settings.address %}<p class="flex items-center"><span class="material-symbols-outlined align-middle text-base mr-2">location_on</span>{{ settings.address }}</p>{% endif %}
       {% if settings.whatsapp_number %}
-      <a href="https://wa.me/{{ settings.whatsapp_number }}" class="inline-flex items-center gap-2 brand-text font-semibold">
+      <a href="https://wa.me/{{ settings.whatsapp_number }}" class="inline-flex items-center gap-2 brand-text font-semibold cta-btn">
         <span class="material-symbols-outlined text-base">chat</span> Chat on WhatsApp
       </a>
       {% endif %}
@@ -191,13 +267,83 @@
 <!-- ================= FOOTER ================= -->
 <footer class="bg-neutral-900 text-neutral-400 pt-12 pb-8 px-6 text-center">
   <div class="flex justify-center gap-4 mb-6">
-    {% if settings.twitter_url %}<a href="{{ settings.twitter_url }}" class="hover:text-white"><span class="material-symbols-outlined">tag</span></a>{% endif %}
-    {% if settings.instagram_url %}<a href="{{ settings.instagram_url }}" class="hover:text-white"><span class="material-symbols-outlined">photo_camera</span></a>{% endif %}
-    {% if settings.facebook_url %}<a href="{{ settings.facebook_url }}" class="hover:text-white"><span class="material-symbols-outlined">public</span></a>{% endif %}
-    {% if settings.linkedin_url %}<a href="{{ settings.linkedin_url }}" class="hover:text-white"><span class="material-symbols-outlined">work</span></a>{% endif %}
+    {% if settings.twitter_url %}<a href="{{ settings.twitter_url }}" class="hover:text-white transition-colors duration-300"><span class="material-symbols-outlined">tag</span></a>{% endif %}
+    {% if settings.instagram_url %}<a href="{{ settings.instagram_url }}" class="hover:text-white transition-colors duration-300"><span class="material-symbols-outlined">photo_camera</span></a>{% endif %}
+    {% if settings.facebook_url %}<a href="{{ settings.facebook_url }}" class="hover:text-white transition-colors duration-300"><span class="material-symbols-outlined">public</span></a>{% endif %}
+    {% if settings.linkedin_url %}<a href="{{ settings.linkedin_url }}" class="hover:text-white transition-colors duration-300"><span class="material-symbols-outlined">work</span></a>{% endif %}
   </div>
   <p class="text-xs uppercase tracking-widest">{{ settings.copyright_text|default:"© All rights reserved." }}</p>
 </footer>
+
+<script>
+  // Scroll-reveal: fade/slide sections into view once, on first intersection
+  (function () {
+    const targets = document.querySelectorAll('.reveal');
+    if (!('IntersectionObserver' in window) || targets.length === 0) {
+      targets.forEach(el => el.classList.add('in-view'));
+      return;
+    }
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('in-view');
+          io.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+    targets.forEach(el => io.observe(el));
+  })();
+
+  // Header shadow once page has scrolled
+  (function () {
+    const header = document.getElementById('siteHeader');
+    if (!header) return;
+    window.addEventListener('scroll', () => {
+      header.classList.toggle('scrolled', window.scrollY > 8);
+    }, { passive: true });
+  })();
+
+  // Animated stat counters — parses leading digits from values like "15k+", "98%", "24/7"
+  (function () {
+    const nums = document.querySelectorAll('.stat-num');
+    if (nums.length === 0) return;
+
+    function animateCount(el) {
+      const target = el.getAttribute('data-target') || '';
+      const match = target.match(/[\d.]+/);
+      if (!match) { el.textContent = target; return; }
+
+      const numeric = parseFloat(match[0]);
+      const prefix = target.slice(0, match.index);
+      const suffix = target.slice(match.index + match[0].length);
+      const duration = 1100;
+      const start = performance.now();
+
+      function tick(now) {
+        const progress = Math.min((now - start) / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        const current = (numeric * eased).toFixed(match[0].includes('.') ? 1 : 0);
+        el.textContent = `${prefix}${current}${suffix}`;
+        if (progress < 1) requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    }
+
+    if ('IntersectionObserver' in window) {
+      const io = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            animateCount(entry.target);
+            io.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.5 });
+      nums.forEach(el => io.observe(el));
+    } else {
+      nums.forEach(el => { el.textContent = el.getAttribute('data-target'); });
+    }
+  })();
+</script>
 
 </body>
 </html>

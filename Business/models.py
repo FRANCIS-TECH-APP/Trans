@@ -86,7 +86,6 @@ class ContactInfo(models.Model):
     def __str__(self):
         return f"{self.full_name} <{self.email}>"
 
-
 class Shipment(models.Model):
     class Status(models.TextChoices):
         CREATED          = "created",         "Created"
@@ -105,6 +104,10 @@ class Shipment(models.Model):
         OVERNIGHT = "overnight", "Overnight"
         FREIGHT   = "freight",   "Freight"
         DOCUMENT  = "document",  "Document Only"
+
+    class SupportLinkType(models.TextChoices):
+        LINK  = "link",  "Chat Link / URL"
+        EMAIL = "email", "Email Address"
 
     id                   = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tracking_id          = models.CharField(
@@ -141,7 +144,11 @@ class Shipment(models.Model):
     amendment_count = models.PositiveIntegerField(default=0) 
     created_at           = models.DateTimeField(auto_now_add=True)
     updated_at           = models.DateTimeField(auto_now=True)
-    support_link_url    = models.URLField(blank=True)
+    support_link_type   = models.CharField(
+        max_length=10, choices=SupportLinkType.choices, default=SupportLinkType.LINK
+    )
+    # Stores either a URL or an email address depending on support_link_type
+    support_link_url    = models.CharField(max_length=255, blank=True)
     support_link_label  = models.CharField(max_length=100, blank=True, default="Chat with Support")
     support_link_active = models.BooleanField(default=False)
 
@@ -158,7 +165,6 @@ class Shipment(models.Model):
 
     def __str__(self):
         return f"{self.tracking_id} — {self.sender} → {self.receiver}"
-
 
 class ShipmentImage(models.Model):
     id          = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

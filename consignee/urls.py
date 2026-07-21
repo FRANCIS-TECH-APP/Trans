@@ -23,14 +23,14 @@ from django.conf import settings
 from django.conf.urls.static import static
 
 
-from Business.sub_admin_views import sub_admin_landing
+from Business.sub_admin_views import sub_admin_landing,public_default_landing
 from Business import views
 
 
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', sub_admin_landing, name='home'),
+    path('', public_default_landing, name='home'),
     path('shipping/', include('Business.urls')),
     path('track/', views.tracking_search, name='tracking-search'),
     path('track/<str:tracking_id>/', views.tracking_detail, name='tracking-detail'),
