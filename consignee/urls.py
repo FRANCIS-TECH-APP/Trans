@@ -16,26 +16,22 @@ Including another URLconf
 """
 
 
+# consignee/urls.py
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
-from django.http import HttpResponseNotFound
 
 
-def get_urlpatterns_for_subdomain(request):
-    """Return different URL patterns based on subdomain."""
-    subdomain = getattr(request, 'subdomain', 'main')
-    if subdomain == 'admin':
-        return 'Business.urls_subadmin'
-    return 'Business.urls_main'
+from Business.sub_admin_views import sub_admin_landing
+from Business import views
+
 
 
 urlpatterns = [
-    # Django admin always available
-    path('django-admin/', admin.site.urls),
-
-    # Route everything else based on subdomain
-    path('', include('Business.urls_router')),
-
+    path('admin/', admin.site.urls),
+    path('', sub_admin_landing, name='home'),
+    path('shipping/', include('Business.urls')),
+    path('track/', views.tracking_search, name='tracking-search'),
+    path('track/<str:tracking_id>/', views.tracking_detail, name='tracking-detail'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

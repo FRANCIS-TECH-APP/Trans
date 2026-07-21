@@ -35,7 +35,6 @@ DEBUG = True
 ALLOWED_HOSTS = [
     'transedge.site',
     'www.transedge.site',
-    'admin.transedge.site',
     'localhost',
     '127.0.0.1',
 ]
