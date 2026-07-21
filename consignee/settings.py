@@ -33,13 +33,12 @@ FLW_WEBHOOK_SECRET = config("FLW_WEBHOOK_SECRET", default="")
 DEBUG = True
 
 ALLOWED_HOSTS = [
-    "transedge.onrender.com",
-    "localhost",
-    "transedge.site",
-    "127.0.0.1",
-    "trans-212s.onrender.com"
+    'transedge.site',
+    'www.transedge.site',
+    'admin.transedge.site',
+    'localhost',
+    '127.0.0.1',
 ]
-
 
 # Application definition
 
@@ -55,17 +54,15 @@ INSTALLED_APPS = [
    
 ]
 
-
 MIDDLEWARE = [
-    "whitenoise.middleware.WhiteNoiseMiddleware",
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-  
 ]
 
 ROOT_URLCONF = 'consignee.urls'
@@ -149,6 +146,14 @@ MEDIA_ROOT  = BASE_DIR / "media"
 # settings.py
 AUTH_USER_MODEL = 'Business.User'  # ✅ Tell Django to use YOUR User model
 
+SESSION_COOKIE_DOMAIN = '.transedge.site'  # dot prefix covers all subdomains
+CSRF_COOKIE_DOMAIN    = '.transedge.site'
+BASE_DOMAIN = 'transedge.site'
 
-SESSION_COOKIE_SECURE = not DEBUG
-CSRF_COOKIE_SECURE = not DEBUG
+
+
+CSRF_TRUSTED_ORIGINS = [
+    'https://transedge.site',
+    'https://www.transedge.site',
+    'https://admin.transedge.site',
+]

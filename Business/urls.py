@@ -5,6 +5,8 @@ from . import sub_admin_views as sv
 urlpatterns = [
 
     # ── PUBLIC ────────────────────────────────────────
+
+   
     path("", sv.public_default_landing, name="transedge-home"),
     path("track/",                        views.tracking_search,  name="tracking-search"),
     path("track/<str:tracking_id>/",      views.tracking_detail,  name="tracking-detail"),

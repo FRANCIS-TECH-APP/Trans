@@ -2247,3 +2247,18 @@ def tracking_shipment_info(request, tracking_id):
         "map_points": map_points,
         "progress_status": get_progress_status(shipment, shipment.checkpoints),
     })
+
+
+
+
+# Business/sub_admin_views.py
+
+def subadmin_domain_required(view_func):
+    """Redirect to correct subdomain if accessing from wrong domain."""
+    def wrapper(request, *args, **kwargs):
+        subdomain = getattr(request, 'subdomain', 'main')
+        if subdomain != 'admin' and not settings.DEBUG:
+            return redirect(f'https://admin.transedge.site{request.path}')
+        return view_func(request, *args, **kwargs)
+    wrapper.__name__ = view_func.__name__
+    return wrapper
