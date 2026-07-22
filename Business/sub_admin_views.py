@@ -405,16 +405,15 @@ def sub_admin_shipment_list(request):
     }
     return render(request, "admin/subadmin/shipment_list.html", context)
 
-
-@sub_admin_has_points
+@login_required
 def sub_admin_shipment_create(request):
-    profile = request.user.sub_admin_profile
+    profile = get_or_create_sub_admin_profile(request.user)
     pricing = PointsPricing.get_current()
 
     if request.method == "POST":
         p = request.POST
 
-        # Re-check points on POST (race condition safety)
+        # This is now the ONLY points gate — form itself is always viewable
         if not profile.can_create_shipment():
             return insufficient_funds_redirect(
                 request,
@@ -508,6 +507,7 @@ def sub_admin_shipment_create(request):
         "payment_statuses":  Payment.Status.choices,
         "pricing":           pricing,
         "profile":           profile,
+        "can_create":        profile.can_create_shipment(),  # for an inline "low points" banner, not a block
     }
     return render(request, "admin/subadmin/shipment_form.html", context)
 
