@@ -83,7 +83,7 @@
     {% if not product.in_stock %}
     <div class="warn-note">This product is currently sold out. Check back soon or try another product.</div>
     {% elif wallet_balance < product.price %}
-    <div class="warn-note">Your wallet balance is too low for this purchase. <a href="{% url 'wallet-fund' %}">Fund your wallet</a> to continue.</div>
+    <div class="warn-note">Your wallet balance is too low for this purchase. <a href="{% url 'sub-admin-wallet-deposit' %}">Fund your wallet</a> to continue.</div>
     {% endif %}
   </div>
 </div>

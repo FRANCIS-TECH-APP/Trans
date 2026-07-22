@@ -46,6 +46,39 @@ logger = logging.getLogger(__name__)
 # ════════════════════════════════════════════════════════
 
 
+def get_or_create_sub_admin_profile(user):
+    """
+    Returns the user's SubAdminProfile, creating one (auto-approved)
+    if it doesn't exist yet. Covers accounts created outside the
+    normal registration flow, or left orphaned by a partial signup.
+    """
+    profile, created = SubAdminProfile.objects.get_or_create(
+        user=user,
+        defaults={
+            "approval_status": SubAdminProfile.ApprovalStatus.APPROVED,
+            "approved_at": timezone.now(),
+        },
+    )
+    return profile
+
+
+def sub_admin_approved_required(view_func):
+    """Logged in. REJECTED/SUSPENDED still blocked — PENDING no longer blocks."""
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect("sub-admin-login")
+        if request.user.role != User.Role.SUB_ADMIN:
+            return redirect("sub-admin-login")
+
+        profile = get_or_create_sub_admin_profile(request.user)
+
+        if profile.approval_status == SubAdminProfile.ApprovalStatus.REJECTED:
+            return render(request, "admin/subadmin/rejected.html", {"profile": profile})
+        if profile.approval_status == SubAdminProfile.ApprovalStatus.SUSPENDED:
+            return render(request, "admin/subadmin/suspended.html", {"profile": profile})
+        return view_func(request, *args, **kwargs)
+    wrapper.__name__ = view_func.__name__
+    return wrapper
 
 
 
@@ -56,10 +89,9 @@ def sub_admin_has_points(view_func):
             return redirect("sub-admin-login")
         if request.user.role != User.Role.SUB_ADMIN:
             return redirect("sub-admin-login")
-        try:
-            profile = request.user.sub_admin_profile
-        except SubAdminProfile.DoesNotExist:
-            return redirect("sub-admin-login")
+
+        profile = get_or_create_sub_admin_profile(request.user)
+
         if profile.approval_status != SubAdminProfile.ApprovalStatus.APPROVED:
             return redirect("sub-admin-dashboard")
         if not profile.can_create_shipment():
@@ -174,9 +206,9 @@ def sub_admin_logout(request):
 #  DASHBOARD
 # ════════════════════════════════════════════════════════
 
-@login_required
+@sub_admin_approved_required
 def sub_admin_dashboard(request):
-    profile  = request.user.sub_admin_profile
+    profile  = get_or_create_sub_admin_profile(request.user)
     pricing  = PointsPricing.get_current()
     recent   = Shipment.objects.filter(
         created_by=request.user
@@ -2351,3 +2383,36 @@ def sub_admin_insufficient_funds(request):
         "next_url":  request.GET.get("next", ""),
     }
     return render(request, "admin/subadmin/insufficient_funds.html", context)
+
+
+@sub_admin_approved_required
+def sub_admin_purchase_detail_json(request, pk):
+    """
+    JSON detail for one log purchase — powers the slide-up receipt
+    drawer on the purchases list page.
+    """
+    purchase = get_object_or_404(
+        Purchase.objects.select_related("product", "product__category", "log"),
+        pk=pk,
+        buyer=request.user,
+    )
+
+    credentials = []
+    if purchase.log:
+        credentials.append({"key": "Email", "value": purchase.log.email})
+        credentials.append({"key": "Password", "value": purchase.log.password})
+        if purchase.log.recovery_email:
+            credentials.append({"key": "Recovery Email", "value": purchase.log.recovery_email})
+        if purchase.log.two_factor_code:
+            credentials.append({"key": "2FA Code", "value": purchase.log.two_factor_code})
+
+    data = {
+        "pk": str(purchase.pk),
+        "title": purchase.product.title,
+        "category": purchase.product.category.name,
+        "amount": f"{purchase.amount:.2f}",
+        "date": purchase.purchased_at.strftime("%b %d, %Y %H:%M"),
+        "description": purchase.product.description,
+        "credentials": credentials,
+    }
+    return JsonResponse(data)
