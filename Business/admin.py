@@ -5,7 +5,7 @@ from .models import (
     Shipment, ContactInfo, ShipmentImage,
     TransitCheckpoint, Payment, 
     User, SubAdminProfile, PointsPricing, PointsPurchase,NotificationRead, Notification, SubAdminSiteSettings,
-    Account, ForeignNumber, SiteSettings, Testimonial, Invoice, InvoiceItem,DashboardAnnouncement,BrandGalleryImage
+    Account, ForeignNumber, SiteSettings, Testimonial, Invoice, InvoiceItem,DashboardAnnouncement,BrandGalleryImage,BuyLogDetailField,BuyLogDetails,BuyLogDetailField
 )
 
 
@@ -150,7 +150,6 @@ class PaymentInline(admin.StackedInline):
     ]
 
 
-
 @admin.register(Shipment)
 class ShipmentAdmin(admin.ModelAdmin):
     list_display    = [
@@ -206,7 +205,6 @@ class SubAdminProfileAdmin(admin.ModelAdmin):
     readonly_fields = ["created_at", "updated_at", "approved_by", "approved_at"]
 
 
-
 @admin.register(PointsPurchase)
 class PointsPurchaseAdmin(admin.ModelAdmin):
     list_display    = ["sub_admin", "points_bought", "amount_paid", "currency", "status", "paid_at"]
@@ -215,14 +213,12 @@ class PointsPurchaseAdmin(admin.ModelAdmin):
     readonly_fields = ["paystack_reference", "paystack_access_code", "created_at"]
 
 
-from django.contrib import admin
-from .models import SiteSettings, Testimonial
-
 @admin.register(SiteSettings)
 class SiteSettingsAdmin(admin.ModelAdmin):
     # Prevent creating more than one row
     def has_add_permission(self, request):
         return not SiteSettings.objects.exists()
+
 
 @admin.register(Testimonial)
 class TestimonialAdmin(admin.ModelAdmin):
@@ -230,11 +226,11 @@ class TestimonialAdmin(admin.ModelAdmin):
     list_editable = ["is_active", "sort_order"]
     list_filter   = ["is_active"]
 
-from .models import Invoice, InvoiceItem
 
 class InvoiceItemInline(admin.TabularInline):
     model = InvoiceItem
     extra = 1
+
 
 @admin.register(Invoice)
 class InvoiceAdmin(admin.ModelAdmin):
@@ -245,12 +241,8 @@ class InvoiceAdmin(admin.ModelAdmin):
 
 
 # ══════════════════════════════════════════════════════════════════
-#  ADD TO Business/admin.py — Account & ForeignNumber
+#  Account & ForeignNumber
 # ══════════════════════════════════════════════════════════════════
-
-from django.contrib import admin
-from .models import Account, ForeignNumber
-
 
 @admin.register(Account)
 class AccountAdmin(admin.ModelAdmin):
@@ -284,35 +276,12 @@ class ForeignNumberAdmin(admin.ModelAdmin):
     user_display.admin_order_field = "user__email"
 
 
-
 # ══════════════════════════════════════════════════════════════════
-#  ADD TO Business/admin.py
-#
-#  Covers:
-#    1. PointsPricing  — super admin sets points_per_site_customization
-#       (and every other points_per_* cost) from the Django admin,
-#       as an alternative to the in-app manage_sub_admins pricing form.
-#    2. Notification / NotificationRead — send + inspect notifications
-#       straight from the admin, without needing the custom
-#       admin_notification_create view.
-#    3. SubAdminSiteSettings — inspect/edit any sub-admin's landing
-#       page override, or the global default row, from one screen.
-#
-#  Add these imports to the top of your existing admin.py (merge with
-#  whatever you already import from .models):
-#    from .models import (
-#        PointsPricing, Notification, NotificationRead,
-#        SubAdminSiteSettings, SubAdminProfile, User,
-#    )
+#  PointsPricing / Notification / NotificationRead / SubAdminSiteSettings
 # ══════════════════════════════════════════════════════════════════
 
-from django.contrib import admin
 from django.utils.html import format_html
 
-
-# ════════════════════════════════════════════════════════
-#  POINTS PRICING — singleton, one row only
-# ════════════════════════════════════════════════════════
 
 @admin.register(PointsPricing)
 class PointsPricingAdmin(admin.ModelAdmin):
@@ -349,7 +318,6 @@ class PointsPricingAdmin(admin.ModelAdmin):
     )
 
     def has_add_permission(self, request):
-        # Singleton — PointsPricing.get_current() always uses pk=1.
         return not PointsPricing.objects.exists()
 
     def has_delete_permission(self, request, obj=None):
@@ -359,10 +327,6 @@ class PointsPricingAdmin(admin.ModelAdmin):
         obj.updated_by = request.user
         super().save_model(request, obj, form, change)
 
-
-# ════════════════════════════════════════════════════════
-#  NOTIFICATIONS
-# ════════════════════════════════════════════════════════
 
 class NotificationReadInline(admin.TabularInline):
     model = NotificationRead
@@ -473,11 +437,6 @@ class NotificationReadAdmin(admin.ModelAdmin):
         return False
 
 
-# ════════════════════════════════════════════════════════
-#  SUB-ADMIN SITE SETTINGS (landing page branding)
-# ════════════════════════════════════════════════════════
-from .models import SubAdminSiteSettings
-
 @admin.register(SubAdminSiteSettings)
 class SubAdminSiteSettingsAdmin(admin.ModelAdmin):
     list_display   = ["sub_admin", "site_name", "phone_primary", "email_support", "updated_at"]
@@ -502,19 +461,15 @@ class SubAdminSiteSettingsAdmin(admin.ModelAdmin):
     ]
 
 
-
 # ══════════════════════════════════════════════════════════════════
-#  ADD TO Business/admin.py
-#  Only ADMIN-role users can add/edit log stock (BuyLogDetails).
-#  Sub-admins never reach this at all — they don't have is_staff,
-#  so Django admin login already excludes them; this adds a second,
+#  BuyLogs / BuyLogDetails — only ADMIN-role users can add/edit log stock.
+#  Sub-admins never reach this at all — they don't have is_staff, so
+#  Django admin login already excludes them; this adds a second,
 #  explicit check so a STAFF user can't stock logs either — only
 #  users with role == User.Role.ADMIN can.
 # ══════════════════════════════════════════════════════════════════
 
-from django.contrib import admin
-from django.utils.html import format_html
-from .models import BuyLogs, BuyLogDetails, Purchase
+from .models import BuyLogs, BuyLogDetails, Purchase, Category
 
 
 def _is_admin_role(request):
@@ -522,12 +477,24 @@ def _is_admin_role(request):
     return user.is_superuser or getattr(user, "role", None) == "admin"
 
 
+class BuyLogDetailFieldInline(admin.TabularInline):
+    model = BuyLogDetailField
+    extra = 2
+    fields = ("label", "value", "is_sensitive", "sort_order")
+
+
 class BuyLogDetailsInline(admin.TabularInline):
+    """
+    Lightweight inline on the BuyLogs page — just lets you see/add
+    stock count here. Add the actual credential fields by opening
+    the BuyLogDetails item itself (via 'View on site' / its own
+    admin page), where BuyLogDetailFieldInline is available.
+    """
     model = BuyLogDetails
-    extra = 0
-    fields = ("email", "password", "recovery_email", "two_factor_code", "sold", "sold_at")
+    extra = 1
+    fields = ("sold", "sold_at")
     readonly_fields = ("sold_at",)
-    show_change_link = False
+    show_change_link = True
 
     def has_add_permission(self, request, obj=None):
         return _is_admin_role(request)
@@ -544,7 +511,7 @@ class BuyLogsAdmin(admin.ModelAdmin):
     list_display = ("title", "category", "price", "stock_badge", "active", "created_at")
     list_filter = ("category", "active")
     search_fields = ("title", "description")
-    autocomplete_fields = ("category",) 
+    autocomplete_fields = ("category",)
     inlines = [BuyLogDetailsInline]
 
     def stock_badge(self, obj):
@@ -561,8 +528,6 @@ class BuyLogsAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return _is_admin_role(request)
-
-from .models import BuyLogs, BuyLogDetails, Purchase, Category
 
 
 @admin.register(Category)
@@ -588,31 +553,9 @@ class CategoryAdmin(admin.ModelAdmin):
 
 @admin.register(BuyLogDetails)
 class BuyLogDetailsAdmin(admin.ModelAdmin):
-    """
-    Standalone view of stock across all products — handy for bulk
-    stocking. Same admin-only restriction as the inline above.
-    """
-    list_display = ("email", "product", "sold", "sold_at", "added_by", "created_at")
-    list_filter = ("sold", "product__category", "product")
-    search_fields = ("email", "product__title")
-    readonly_fields = ("sold_at",)
-
-    def save_model(self, request, obj, form, change):
-        if not change:
-            obj.added_by = request.user
-        super().save_model(request, obj, form, change)
-
-    def has_module_permission(self, request):
-        return _is_admin_role(request)
-
-    def has_add_permission(self, request):
-        return _is_admin_role(request)
-
-    def has_change_permission(self, request, obj=None):
-        return _is_admin_role(request)
-
-    def has_delete_permission(self, request, obj=None):
-        return _is_admin_role(request)
+    list_display = ("product", "sold", "created_at", "sold_at")
+    list_filter  = ("sold", "product")
+    inlines      = [BuyLogDetailFieldInline]
 
 
 @admin.register(Purchase)
@@ -635,11 +578,8 @@ class PurchaseAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return _is_admin_role(request)
-    
 
 
-from django.contrib import admin
-from django.utils.html import format_html
 from .models import DashboardAdvert
 
 @admin.register(DashboardAdvert)
@@ -660,13 +600,11 @@ class DashboardAdvertAdmin(admin.ModelAdmin):
     preview.short_description = "Preview"
 
 
-
 @admin.register(DashboardAnnouncement)
 class DashboardAnnouncementAdmin(admin.ModelAdmin):
     list_display = ("title", "is_active", "created_at")
 
 
-# admin.py
 @admin.register(BrandGalleryImage)
 class BrandGalleryImageAdmin(admin.ModelAdmin):
     list_display = ("caption", "sort_order", "is_active")

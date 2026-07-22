@@ -2338,7 +2338,8 @@ def sub_admin_gallery_delete(request, pk):
 def buy_logs_receipt(request, pk):
     """Full-page receipt for one log purchase, with credentials."""
     purchase = get_object_or_404(
-        Purchase.objects.select_related("product", "product__category", "log", "account"),
+        Purchase.objects.select_related("product", "product__category", "log", "account")
+                        .prefetch_related("log__credential_fields"),
         pk=pk,
         buyer=request.user,
     )
@@ -2384,7 +2385,6 @@ def sub_admin_insufficient_funds(request):
     }
     return render(request, "admin/subadmin/insufficient_funds.html", context)
 
-
 @sub_admin_approved_required
 def sub_admin_purchase_detail_json(request, pk):
     """
@@ -2392,19 +2392,16 @@ def sub_admin_purchase_detail_json(request, pk):
     drawer on the purchases list page.
     """
     purchase = get_object_or_404(
-        Purchase.objects.select_related("product", "product__category", "log"),
+        Purchase.objects.select_related("product", "product__category", "log")
+                        .prefetch_related("log__credential_fields"),
         pk=pk,
         buyer=request.user,
     )
 
     credentials = []
     if purchase.log:
-        credentials.append({"key": "Email", "value": purchase.log.email})
-        credentials.append({"key": "Password", "value": purchase.log.password})
-        if purchase.log.recovery_email:
-            credentials.append({"key": "Recovery Email", "value": purchase.log.recovery_email})
-        if purchase.log.two_factor_code:
-            credentials.append({"key": "2FA Code", "value": purchase.log.two_factor_code})
+        for field in purchase.log.credential_fields.all():
+            credentials.append({"key": field.label, "value": field.value})
 
     data = {
         "pk": str(purchase.pk),

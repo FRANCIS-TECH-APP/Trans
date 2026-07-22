@@ -1106,20 +1106,10 @@ class BuyLogs(models.Model):
 
     
 class BuyLogDetails(models.Model):
-    """
-    The actual credential stock. Only ever created/edited from the
-    Django admin by an ADMIN-role user (enforced in admin.py) —
-    sub-admins never see this model directly, only the Purchase
-    it produces once bought.
-    """
-    id              = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    product         = models.ForeignKey(
+    id      = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    product = models.ForeignKey(
         BuyLogs, on_delete=models.CASCADE, related_name="details"
     )
-    email           = models.CharField(max_length=200)
-    password        = models.CharField(max_length=200)
-    recovery_email  = models.CharField(max_length=200, blank=True)
-    two_factor_code = models.CharField(max_length=100, blank=True)
 
     sold       = models.BooleanField(default=False)
     added_by   = models.ForeignKey(
@@ -1135,7 +1125,32 @@ class BuyLogDetails(models.Model):
         verbose_name_plural = "Log Stock Items"
 
     def __str__(self):
-        return f"{self.email} — {'SOLD' if self.sold else 'AVAILABLE'}"
+        first_field = self.credential_fields.first()
+        preview = first_field.value if first_field else str(self.pk)[:8]
+        return f"{preview} — {'SOLD' if self.sold else 'AVAILABLE'}"
+
+class BuyLogDetailField(models.Model):
+    """
+    One labeled credential value belonging to a stock item.
+    """
+    id     = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    detail = models.ForeignKey(
+        BuyLogDetails, on_delete=models.CASCADE, related_name="credential_fields"
+    )
+    label        = models.CharField(max_length=100, help_text="e.g. Email, Password, API Key, PIN")
+    value        = models.CharField(max_length=500)
+    is_sensitive = models.BooleanField(
+        default=True,
+        help_text="If true, shown as a copy-to-clipboard credential on the receipt.",
+    )
+    sort_order   = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["sort_order"]
+        verbose_name = "Credential Field"
+
+    def __str__(self):
+        return f"{self.label}: {self.value[:20]}"
 
 
 class Purchase(models.Model):
