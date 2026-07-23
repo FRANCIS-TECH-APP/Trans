@@ -1,0 +1,27 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block content %}
+<h1>Bulk Add Stock — {{ product.title }}</h1>
+
+<p>
+  This product's field format is: <strong>{{ labels|join:" | " }}</strong>
+  ({{ labels|length }} field{{ labels|length|pluralize }} per line).
+</p>
+<p style="color:#666;">
+  Example line: <code>{% for l in labels %}{{ l|lower }}_value{% if not forloop.last %} | {% endif %}{% endfor %}</code>
+</p>
+<p style="color:#666;">
+  Want a different format for this product? Edit its
+  <strong>Credential Format</strong> field on the product page first
+  (e.g. change it to <code>Username,PIN,Recovery Code</code>), save, then
+  come back here.
+</p>
+
+<form method="post">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <input type="submit" value="Add Stock" class="default" style="margin-top:10px;">
+  <a href="{% url 'admin:Business_buylogs_change' product.pk %}" style="margin-left:12px;">Cancel</a>
+</form>
+{% endblock %}

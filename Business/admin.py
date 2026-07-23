@@ -506,9 +506,22 @@ class BuyLogDetailsInline(admin.TabularInline):
         return _is_admin_role(request)
 
 
+from django.urls import path
+from django.shortcuts import render, redirect, get_object_or_404
+from django import forms
+
+
+class BulkAddStockForm(forms.Form):
+    lines = forms.CharField(
+        widget=forms.Textarea(attrs={"rows": 14, "style": "width:100%;font-family:monospace;"}),
+        label="Paste stock — one item per line",
+        help_text="Separate fields with a pipe ( | ). One line = one stock unit.",
+    )
+
+
 @admin.register(BuyLogs)
 class BuyLogsAdmin(admin.ModelAdmin):
-    list_display = ("title", "category", "price", "stock_badge", "active", "created_at")
+    list_display = ("title", "category", "price", "stock_badge", "active", "created_at", "bulk_add_link")
     list_filter = ("category", "active")
     search_fields = ("title", "description")
     autocomplete_fields = ("category",)
@@ -520,6 +533,11 @@ class BuyLogsAdmin(admin.ModelAdmin):
         return format_html('<b style="color:{}">{} in stock</b>', color, count)
     stock_badge.short_description = "Stock"
 
+    def bulk_add_link(self, obj):
+        url = f"{obj.pk}/bulk-add-stock/"
+        return format_html('<a class="button" href="{}">+ Bulk Add Stock</a>', url)
+    bulk_add_link.short_description = "Add Stock"
+
     def has_add_permission(self, request):
         return _is_admin_role(request)
 
@@ -528,6 +546,83 @@ class BuyLogsAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return _is_admin_role(request)
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom = [
+            path(
+                "<uuid:pk>/bulk-add-stock/",
+                self.admin_site.admin_view(self.bulk_add_stock_view),
+                name="business_buylogs_bulk_add_stock",
+            ),
+        ]
+        return custom + urls
+
+    def bulk_add_stock_view(self, request, pk):
+        if not _is_admin_role(request):
+            self.message_user(request, "You don't have permission to do this.", level="error")
+            return redirect("admin:Business_buylogs_changelist")
+
+        product = get_object_or_404(BuyLogs, pk=pk)
+        labels = product.format_labels()
+
+        if request.method == "POST":
+            form = BulkAddStockForm(request.POST)
+            if form.is_valid():
+                raw_lines = form.cleaned_data["lines"].splitlines()
+                created_count = 0
+                skipped_lines = []
+
+                for raw_line in raw_lines:
+                    line = raw_line.strip()
+                    if not line:
+                        continue
+                    parts = [p.strip() for p in line.split("|")]
+
+                    if len(parts) != len(labels):
+                        skipped_lines.append(raw_line)
+                        continue
+
+                    detail = BuyLogDetails.objects.create(
+                        product=product,
+                        added_by=request.user,
+                    )
+                    for i, (label, value) in enumerate(zip(labels, parts)):
+                        if not value:
+                            continue
+                        BuyLogDetailField.objects.create(
+                            detail=detail,
+                            label=label,
+                            value=value,
+                            sort_order=i,
+                        )
+                    created_count += 1
+
+                if created_count:
+                    self.message_user(
+                        request,
+                        f"Added {created_count} stock item(s) to '{product.title}'."
+                    )
+                if skipped_lines:
+                    self.message_user(
+                        request,
+                        f"Skipped {len(skipped_lines)} line(s) — wrong number of fields "
+                        f"(expected {len(labels)}: {', '.join(labels)}).",
+                        level="warning",
+                    )
+                return redirect("admin:Business_buylogs_change", object_id=product.pk)
+        else:
+            form = BulkAddStockForm()
+
+        context = {
+            **self.admin_site.each_context(request),
+            "title": f"Bulk Add Stock — {product.title}",
+            "product": product,
+            "labels": labels,
+            "form": form,
+            "opts": self.model._meta,
+        }
+        return render(request, "admin/business/buylogs/bulk_add_stock.html", context)
 
 
 @admin.register(Category)

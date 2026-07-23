@@ -1074,8 +1074,6 @@ class Category(models.Model):
             self.slug = slugify(self.name)
         super().save(*args, **kwargs)
 
-
-
 class BuyLogs(models.Model):
     id          = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     category    = models.ForeignKey(Category, on_delete=models.PROTECT, related_name="products")
@@ -1084,6 +1082,14 @@ class BuyLogs(models.Model):
     description = models.TextField()
     price       = models.DecimalField(max_digits=10, decimal_places=2)
     active      = models.BooleanField(default=True)
+    credential_format = models.CharField(
+        max_length=255, blank=True, default="Email,Password",
+        help_text=(
+            "Comma-separated field labels, in the order they'll appear "
+            "when bulk-pasting stock. E.g. 'Email,Password' or "
+            "'Username,PIN,Recovery Code'."
+        ),
+    )
     created_at  = models.DateTimeField(auto_now_add=True)
     updated_at  = models.DateTimeField(auto_now=True)
 
@@ -1102,7 +1108,10 @@ class BuyLogs(models.Model):
     @property
     def in_stock(self):
         return self.stock_count > 0
-    
+
+    def format_labels(self):
+        """Returns the credential_format string as a clean list of labels."""
+        return [l.strip() for l in self.credential_format.split(",") if l.strip()] or ["Email", "Password"]
 
     
 class BuyLogDetails(models.Model):
