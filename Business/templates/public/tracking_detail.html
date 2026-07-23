@@ -145,15 +145,14 @@
 
 <div class="progress-card">
   <h2>Shipment Progress</h2>
-  {% with s=progress_status %}
   <ol class="stepper">
-    <li class="{% if s != 'created' %}done{% endif %}" {% if s == 'created' %}aria-current="step"{% endif %}><span>Order Placed</span></li>
-    <li class="{% if s in 'in_transit,at_customs,out_for_delivery,delivered' %}done{% endif %}" {% if s == 'picked_up' %}aria-current="step"{% endif %}><span>Processing</span></li>
-    <li class="{% if s in 'at_customs,out_for_delivery,delivered' %}done{% endif %}" {% if s == 'in_transit' %}aria-current="step"{% endif %}><span>In Transit</span></li>
-    <li class="{% if s in 'out_for_delivery,delivered' %}done{% endif %}" {% if s == 'at_customs' %}aria-current="step"{% endif %}><span>At Customs</span></li>
-    <li class="{% if s == 'delivered' %}done{% endif %}" {% if s == 'delivered' %}aria-current="step"{% endif %}><span>Delivered</span></li>
+    <li class="{% if progress_index > 0 %}done{% endif %}" {% if progress_index == 0 %}aria-current="step"{% endif %}><span>Order Placed</span></li>
+    <li class="{% if progress_index > 1 %}done{% endif %}" {% if progress_index == 1 %}aria-current="step"{% endif %}><span>Processing</span></li>
+    <li class="{% if progress_index > 2 %}done{% endif %}" {% if progress_index == 2 %}aria-current="step"{% endif %}><span>In Transit</span></li>
+    <li class="{% if progress_index > 3 %}done{% endif %}" {% if progress_index == 3 %}aria-current="step"{% endif %}><span>At Customs</span></li>
+    <li class="{% if progress_index >= 5 %}done{% endif %}" {% if progress_index == 4 %}aria-current="step"{% endif %}><span>Out for Delivery</span></li>
+    <li class="{% if progress_index >= 5 %}done{% endif %}" {% if progress_index == 5 %}aria-current="step"{% endif %}><span>Delivered</span></li>
   </ol>
-  {% endwith %}
 </div>
 
 <a href="{% url 'tracking-shipment-info' tracking_id=shipment.tracking_id %}" class="link-row">

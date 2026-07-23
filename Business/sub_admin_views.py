@@ -730,12 +730,13 @@ def get_progress_status(shipment, checkpoints):
     Returns the stepper-relevant status: the shipment's own status if
     it's one of the five progress stages, otherwise (held/returned/
     cancelled) falls back to the last progress stage reached, inferred
-    from checkpoint history.
+    from checkpoint *creation* order — not the editable event
+    timestamp, so backdated or blank timestamps can't distort it.
     """
     if shipment.status in PROGRESS_STATUSES:
         return shipment.status
 
-    for cp in checkpoints.order_by("-timestamp"):
+    for cp in checkpoints.order_by("-created_at"):
         mapped = CHECKPOINT_TO_STATUS.get(cp.event_type)
         if mapped in PROGRESS_STATUSES:
             return mapped
@@ -2304,13 +2305,15 @@ def tracking_shipment_info(request, tracking_id):
          "event": cp.get_event_type_display(), "time": cp.timestamp.strftime("%d %b %Y, %H:%M")}
         for cp in checkpoints if cp.latitude and cp.longitude
     ])
+    progress_status = get_progress_status(shipment, shipment.checkpoints)
+    progress_index = PROGRESS_ORDER.index(progress_status)
+
     return render(request, "public/tracking_shipment_info.html", {
         "shipment": shipment,
         "map_points": map_points,
-        "progress_status": get_progress_status(shipment, shipment.checkpoints),
+        "progress_status": progress_status,
+        "progress_index": progress_index,
     })
-
-
 
 
 # Business/sub_admin_views.py
