@@ -567,6 +567,25 @@ def generate_invoice_number():
     return f"INV-{year}-{suffix}"
 
 
+CURRENCY_CHOICES = [
+    ("USD", "US Dollar ($)"),
+    ("NGN", "Nigerian Naira (₦)"),
+    ("EUR", "Euro (€)"),
+    ("GBP", "British Pound (£)"),
+    ("CAD", "Canadian Dollar (C$)"),
+    ("GHS", "Ghanaian Cedi (₵)"),
+]
+
+CURRENCY_SYMBOLS = {
+    "USD": "$",
+    "NGN": "₦",
+    "EUR": "€",
+    "GBP": "£",
+    "CAD": "C$",
+    "GHS": "₵",
+}
+
+
 class Invoice(models.Model):
     class Status(models.TextChoices):
         DRAFT     = "draft",     "Draft"
@@ -587,14 +606,13 @@ class Invoice(models.Model):
         related_name="created_invoices",
     )
 
-    # Billing party — pre-filled from receiver, but editable independently
     bill_to_name    = models.CharField(max_length=255, blank=True)
     bill_to_email   = models.EmailField(blank=True)
     bill_to_address = models.TextField(blank=True)
 
     issue_date = models.DateField(default=timezone.now)
     due_date   = models.DateField(null=True, blank=True)
-    currency   = models.CharField(max_length=5, default="NGN")
+    currency   = models.CharField(max_length=5, choices=CURRENCY_CHOICES, default="USD")
 
     tax_rate         = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0"))
     discount_amount  = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0"))
@@ -603,7 +621,6 @@ class Invoice(models.Model):
     tax_amount    = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0"), editable=False)
     total_amount  = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0"), editable=False)
     amount_paid   = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0"))
-
 
     status  = models.CharField(max_length=10, choices=Status.choices, default=Status.DRAFT)
     notes   = models.TextField(blank=True)
@@ -622,14 +639,14 @@ class Invoice(models.Model):
     @property
     def balance_due(self):
         return self.total_amount - self.amount_paid
-    
 
+    @property
+    def currency_symbol(self):
+        return CURRENCY_SYMBOLS.get(self.currency, self.currency)
 
     def recalculate_totals(self):
         subtotal = sum((item.amount for item in self.items.all()), start=Decimal("0"))
 
-         # tax_rate/discount_amount may be int/str/float in memory if the
-        # instance hasn't round-tripped through the DB yet — force Decimal.
         tax_rate = self.tax_rate if isinstance(self.tax_rate, Decimal) else Decimal(str(self.tax_rate))
         discount_amount = (
             self.discount_amount if isinstance(self.discount_amount, Decimal)
@@ -643,13 +660,11 @@ class Invoice(models.Model):
         self.total_amount  = subtotal + tax - discount_amount
         self.save(update_fields=["subtotal", "tax_amount", "total_amount", "updated_at"])
 
-    
     def mark_paid(self):
         self.status      = self.Status.PAID
         self.amount_paid = self.total_amount
         self.paid_at     = timezone.now()
         self.save(update_fields=["status", "amount_paid", "paid_at", "updated_at"])
-
 
 class InvoiceItem(models.Model):
     id          = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

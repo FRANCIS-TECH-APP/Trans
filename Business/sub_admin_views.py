@@ -35,7 +35,7 @@ from .models import (
     Account, ForeignNumber, WalletDeposit,
     Notification, NotificationRead, SubAdminSiteSettings,
     DashboardAdvert, DashboardAnnouncement, Testimonial, BrandGalleryImage,
-    Invoice, InvoiceItem,SubAdminGalleryImage,Purchase
+    Invoice, InvoiceItem,SubAdminGalleryImage,Purchase,CURRENCY_CHOICES
 )
 
 logger = logging.getLogger(__name__)
@@ -1162,12 +1162,19 @@ def sub_admin_invoice_create(request, pk):
 @login_required
 def sub_admin_invoice_detail(request, pk):
     invoice = get_object_or_404(
-        Invoice.objects.select_related("shipment", "shipment__sender", "shipment__receiver")
-                       .prefetch_related("items"),
+        Invoice.objects.select_related(
+            "shipment", "shipment__sender", "shipment__receiver", "shipment__created_by"
+        ).prefetch_related("items"),
         pk=pk, shipment__created_by=request.user,
     )
-    return render(request, "admin/subadmin/invoice_detail.html", {"invoice": invoice})
-
+    branding = SubAdminSiteSettings.for_user(request.user)
+    context = {
+        "invoice":          invoice,
+        "site_name":        branding.get("site_name") or "TransEdge",
+        "site_logo":        branding.get("logo") or "",
+        "currency_choices": CURRENCY_CHOICES,
+    }
+    return render(request, "admin/subadmin/invoice_detail.html", context)
 
 @login_required
 @require_POST
@@ -1179,6 +1186,15 @@ def sub_admin_invoice_update(request, pk):
     invoice.bill_to_email   = p.get("bill_to_email", invoice.bill_to_email)
     invoice.bill_to_address = p.get("bill_to_address", invoice.bill_to_address)
     invoice.due_date        = p.get("due_date") or invoice.due_date
+
+    new_currency = p.get("currency", "").strip().upper()
+    if new_currency:
+        valid_codes = [code for code, _ in CURRENCY_CHOICES]
+        if new_currency in valid_codes:
+            invoice.currency = new_currency
+        else:
+            messages.error(request, f"Unsupported currency '{new_currency}'.")
+            return redirect("sub-admin-invoice-detail", pk=pk)
 
     tax_rate_raw = p.get("tax_rate")
     if tax_rate_raw:
@@ -1205,15 +1221,24 @@ def sub_admin_invoice_update(request, pk):
     return redirect("sub-admin-invoice-detail", pk=pk)
 
 
+
 @login_required
 @require_POST
 def sub_admin_invoice_add_item(request, pk):
     invoice = get_object_or_404(Invoice, pk=pk, shipment__created_by=request.user)
+
+    try:
+        quantity   = int(request.POST.get("quantity") or 1)
+        unit_price = Decimal(str(request.POST.get("unit_price") or 0))
+    except (ValueError, InvalidOperation):
+        messages.error(request, "Invalid quantity or unit price.")
+        return redirect("sub-admin-invoice-detail", pk=pk)
+
     InvoiceItem.objects.create(
         invoice     = invoice,
         description = request.POST.get("description", ""),
-        quantity    = request.POST.get("quantity") or 1,
-        unit_price  = request.POST.get("unit_price") or 0,
+        quantity    = quantity,
+        unit_price  = unit_price,
     )
     invoice.recalculate_totals()
     messages.success(request, "Line item added.")
@@ -1245,11 +1270,17 @@ def sub_admin_invoice_mark_paid(request, pk):
 @login_required
 def sub_admin_invoice_pdf(request, pk):
     invoice = get_object_or_404(
-        Invoice.objects.select_related("shipment", "shipment__sender", "shipment__receiver")
-                       .prefetch_related("items"),
+        Invoice.objects.select_related(
+            "shipment", "shipment__sender", "shipment__receiver", "shipment__created_by"
+        ).prefetch_related("items"),
         pk=pk, shipment__created_by=request.user,
     )
-    html = render_to_string("admin/subadmin/invoice_pdf.html", {"invoice": invoice})
+    branding = SubAdminSiteSettings.for_user(request.user)
+    html = render_to_string("admin/subadmin/invoice_pdf.html", {
+        "invoice":   invoice,
+        "site_name": branding.get("site_name") or "TransEdge",
+        "site_logo": branding.get("logo") or "",
+    })
 
     buffer = BytesIO()
     result = pisa.CreatePDF(html, dest=buffer, link_callback=link_callback)
@@ -1260,6 +1291,7 @@ def sub_admin_invoice_pdf(request, pk):
     response = HttpResponse(buffer.getvalue(), content_type="application/pdf")
     response["Content-Disposition"] = f'attachment; filename="{invoice.invoice_number}.pdf"'
     return response
+
 
 
 def link_callback(uri, rel):

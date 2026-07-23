@@ -113,22 +113,22 @@
   </a>
   <a href="{% url 'sub-admin-shipment-addons' pk=shipment.pk %}" class="btn btn-outline btn-sm">
     <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
-    Add-ons
+    chat-support
   </a>
   <a href="{% url 'sub-admin-shipment-list' %}" class="btn btn-outline btn-sm">← Back</a>
 </div>
 
 <!-- Client tracking link -->
 <div class="track-link-box">
-  <span class="tl-label">Client Tracking Link</span>
-  <span class="tl-url" id="trackUrl">{{ request.scheme }}://{{ request.get_host }}/track/{{ shipment.tracking_id }}/</span>
+  <span class="tl-label">Client Tracking ID</span>
+  <span class="tl-url" id="trackUrl">{{ shipment.tracking_id }}/</span>
   <button class="copy-btn" onclick="copyLink('trackUrl', this)">Copy link</button>
 </div>
 
 <!-- Client tracking site -->
 <div class="track-link-box">
   <span class="tl-label">Client Tracking Site</span>
-  <span class="tl-url" id="trackSiteUrl">{{ request.scheme }}://{{ request.get_host }}/shipping/</span>
+  <span class="tl-url" id="trackSiteUrl">{{ request.scheme }}://transedge.site{% url 'public-subadmin-landing' referral_code=request.user.sub_admin_profile.referral_code %}</span>
   <button class="copy-btn" onclick="copyLink('trackSiteUrl', this)">Copy link</button>
 </div>
 
