@@ -18,6 +18,7 @@
   .brand-bg { background-color: var(--brand); }
   .brand-text { color: var(--brand); }
   .brand-border { border-color: var(--brand); }
+  .brand-bg-soft { background-color: color-mix(in srgb, var(--brand) 12%, white); }
   .hero-gradient { background: linear-gradient(to bottom, rgba(0,0,0,.25) 0%, rgba(0,0,0,.55) 60%, rgba(0,0,0,.8) 100%); }
   .glass-card { background: rgba(255,255,255,.75); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
 
@@ -90,6 +91,19 @@
 
   /* ── smooth marquee-style trust strip (optional visual accent) ──── */
   .soft-divider { background: linear-gradient(90deg, transparent, rgba(0,0,0,.08), transparent); height: 1px; }
+
+  /* ── service icon badge ────────────────────────────────── */
+  .icon-badge { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
+
+  /* ── step connector line (how it works) ────────────────── */
+  .step-connector { display: none; }
+  @media (min-width: 768px) {
+    .step-connector { display: block; }
+  }
+
+  /* ── partner logo strip ────────────────────────────────── */
+  .partner-logo { filter: grayscale(1); opacity: .55; transition: filter .3s ease, opacity .3s ease, transform .3s ease; }
+  .partner-logo:hover { filter: grayscale(0); opacity: 1; transform: translateY(-2px); }
 </style>
 </head>
 <body class="bg-white text-neutral-900">
@@ -165,6 +179,65 @@
   </section>
   {% endif %}
 
+  <!-- ================= SERVICES (new — admin-managed via Service model, icon is a Material Symbol name not an image) ================= -->
+  {% if services %}
+  <section class="py-16 px-6 bg-white">
+    <div class="reveal flex flex-col md:flex-row md:items-end md:justify-between gap-4 max-w-5xl mx-auto mb-10">
+      <div>
+        <p class="text-xs uppercase tracking-widest brand-text font-semibold">{{ settings.services_eyebrow|default:"Our Services" }}</p>
+        <h2 class="text-xl md:text-2xl font-bold mt-2">{{ settings.services_title|default:"Logistics Solutions That Fit Your Needs" }}</h2>
+        {% if settings.services_subtitle %}<p class="text-neutral-500 text-sm mt-2 max-w-md">{{ settings.services_subtitle }}</p>{% endif %}
+      </div>
+      {% if settings.services_link_url %}
+      <a href="{{ settings.services_link_url }}" class="cta-btn brand-bg text-white text-sm font-semibold px-5 py-3 rounded-lg whitespace-nowrap">{{ settings.services_link_text|default:"View All Services" }}</a>
+      {% endif %}
+    </div>
+    <div class="reveal reveal-stagger grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 max-w-5xl mx-auto">
+      {% for s in services %}
+      <div class="lift-card bg-white border border-neutral-200 rounded-2xl overflow-hidden">
+        {% if s.image %}
+        <div class="aspect-[4/3] overflow-hidden">
+          <img src="{{ s.image.url }}" alt="{{ s.title }}" class="w-full h-full object-cover">
+        </div>
+        {% endif %}
+        <div class="p-5">
+          {% if s.icon %}
+          <div class="icon-badge brand-bg-soft mb-4 -mt-9 relative z-10 bg-white border border-neutral-200">
+            <span class="material-symbols-outlined brand-text">{{ s.icon }}</span>
+          </div>
+          {% endif %}
+          <h3 class="font-semibold text-sm mb-1">{{ s.title }}</h3>
+          <p class="text-neutral-500 text-xs leading-relaxed mb-3">{{ s.description }}</p>
+          {% if s.link_url %}<a href="{{ s.link_url }}" class="text-xs font-semibold brand-text">{{ s.link_text|default:"Learn More" }} →</a>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- ================= HOW IT WORKS (new — admin-managed via HowItWorksStep model) ================= -->
+  {% if how_it_works_steps %}
+  <section class="py-16 px-6 bg-neutral-50">
+    <div class="reveal text-center mb-12">
+      <p class="text-xs uppercase tracking-widest brand-text font-semibold">{{ settings.how_it_works_eyebrow|default:"How It Works" }}</p>
+      <h2 class="text-xl md:text-2xl font-bold mt-2">{{ settings.how_it_works_title|default:"Shipping Made Simple" }}</h2>
+    </div>
+    <div class="reveal reveal-stagger max-w-4xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-y-8 gap-x-4 items-start relative">
+      {% for step in how_it_works_steps %}
+      <div class="text-center relative">
+        <div class="icon-badge brand-bg-soft mx-auto mb-3">
+          {% if step.icon %}<span class="material-symbols-outlined brand-text">{{ step.icon }}</span>{% else %}<span class="font-bold brand-text">{{ forloop.counter }}</span>{% endif %}
+        </div>
+        {% if not forloop.last %}<span class="step-connector absolute top-[22px] left-1/2 w-full h-px bg-neutral-300"></span>{% endif %}
+        <h3 class="font-semibold text-xs mb-1">{{ step.title }}</h3>
+        <p class="text-neutral-500 text-xs leading-relaxed">{{ step.description }}</p>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
   <!-- ================= BRAND GALLERY (fixed — admin-managed, not editable per sub-admin) ================= -->
   {% if gallery_images %}
   <section class="py-16 bg-neutral-50">
@@ -215,6 +288,27 @@
     </div>
   </section>
 
+  <!-- ================= WHY CHOOSE US (new — admin-managed via Feature model) ================= -->
+  {% if features %}
+  <section class="py-16 px-6">
+    <div class="reveal text-center mb-12 max-w-xl mx-auto">
+      <p class="text-xs uppercase tracking-widest brand-text font-semibold">{{ settings.why_choose_us_eyebrow|default:"Why Choose Us" }}</p>
+      <h2 class="text-xl md:text-2xl font-bold mt-2">{{ settings.why_choose_us_title|default:"We Deliver More Than Just Packages" }}</h2>
+      {% if settings.why_choose_us_text %}<p class="text-neutral-500 text-sm mt-3">{{ settings.why_choose_us_text }}</p>{% endif %}
+    </div>
+    <div class="reveal reveal-stagger grid grid-cols-2 md:grid-cols-4 gap-6 max-w-4xl mx-auto text-center">
+      {% for f in features %}
+      <div>
+        <div class="icon-badge brand-bg-soft mx-auto mb-3">
+          <span class="material-symbols-outlined brand-text">{{ f.icon|default:"check_circle" }}</span>
+        </div>
+        <h3 class="font-semibold text-xs mb-1">{{ f.title }}</h3>
+        <p class="text-neutral-500 text-xs leading-relaxed">{{ f.description }}</p>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
 
   <!-- ================= TESTIMONIALS (admin-managed only — no sub-admin CRUD) ================= -->
   {% if testimonials %}
@@ -242,6 +336,20 @@
           </div>
         </div>
       </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- ================= PARTNERS (new — fixed, admin-managed via Partner model, logos are images) ================= -->
+  {% if partners %}
+  <section class="py-14 px-6 border-t border-neutral-100">
+    <p class="reveal text-center text-xs uppercase tracking-widest text-neutral-400 mb-8">{{ settings.partners_title|default:"Our Partners" }}</p>
+    <div class="reveal reveal-stagger flex flex-wrap items-center justify-center gap-x-10 gap-y-6 max-w-4xl mx-auto">
+      {% for p in partners %}
+        {% if p.link_url %}<a href="{{ p.link_url }}" target="_blank" rel="noopener">{% endif %}
+        <img src="{{ p.logo.url }}" alt="{{ p.name }}" class="partner-logo h-6 md:h-7 w-auto object-contain">
+        {% if p.link_url %}</a>{% endif %}
       {% endfor %}
     </div>
   </section>
