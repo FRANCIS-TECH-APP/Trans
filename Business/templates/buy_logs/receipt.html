@@ -1,101 +1,287 @@
 {% extends "admin/subadmin/base.html" %}
-{% block title %}Receipt — {{ purchase.product.title }} — TransEdge{% endblock %}
+{% block title %}Purchase Successful — TransEdge{% endblock %}
+{% block page_title %}Purchase{% endblock %}
 
 {% block extra_css %}
 <style>
-  .back-link { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--muted); text-decoration: none; margin-bottom: 14px; }
-  .back-link:hover { color: var(--sky); }
-
-  .receipt-head { padding: 16px; display: flex; align-items: center; justify-content: space-between; }
-  .receipt-head .name { font-size: 15px; font-weight: 800; margin-bottom: 3px; }
-  .receipt-head .meta { font-size: 11.5px; color: var(--muted); }
-  .receipt-head .amount { font-size: 15px; font-weight: 800; color: var(--sky); }
-
-  .cred-row {
-    display: flex; align-items: center; justify-content: space-between; gap: 10px;
-    padding: 12px 16px; border-top: 1px solid var(--border);
+  .success-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 70vh;
+    text-align: center;
+    padding: 24px 16px;
   }
-  .cred-row .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-bottom: 3px; }
-  .cred-row .val { font-size: 13px; font-weight: 600; font-family: 'SFMono-Regular', Consolas, monospace; word-break: break-all; }
-  .copy-btn {
-    flex-shrink: 0; background: var(--surface2); border: 1px solid var(--border); color: var(--text);
-    font-size: 11px; font-weight: 700; padding: 6px 12px; border-radius: 8px; cursor: pointer;
-  }
-  .copy-btn:hover { background: var(--sky-dim); color: var(--sky); }
 
-  .warn-note {
-    background: var(--amber-dim); border: 1px solid var(--amber);
-    border-radius: var(--radius-sm); padding: 12px 14px; font-size: 12px; color: var(--text);
-    margin-top: 14px; line-height: 1.5;
+  /* ── Animated checkmark circle ── */
+  .check-circle {
+    width: 90px;
+    height: 90px;
+    border-radius: 50%;
+    background: var(--green-dim);
+    border: 3px solid var(--green);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 24px;
+    animation: popIn .5s cubic-bezier(.175,.885,.32,1.275) forwards;
+    opacity: 0;
+  }
+
+  .check-circle svg {
+    animation: drawCheck .4s ease .4s forwards;
+    opacity: 0;
+  }
+
+  @keyframes popIn {
+    0%   { transform: scale(0); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  @keyframes drawCheck {
+    0%   { opacity: 0; transform: scale(0.5); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+
+  /* ── Text animations ── */
+  .success-title {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--text);
+    margin-bottom: 8px;
+    opacity: 0;
+    animation: fadeUp .4s ease .6s forwards;
+  }
+
+  .success-sub {
+    font-size: 14px;
+    color: var(--muted);
+    margin-bottom: 6px;
+    opacity: 0;
+    animation: fadeUp .4s ease .75s forwards;
+    max-width: 280px;
+    line-height: 1.6;
+  }
+
+  .success-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--amber-dim);
+    color: var(--amber);
+    border: 1px solid rgba(217,119,6,.25);
+    border-radius: 10px;
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    margin: 14px 0 28px;
+    opacity: 0;
+    animation: fadeUp .4s ease .9s forwards;
+  }
+
+  /* ── Order summary card ── */
+  .order-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    width: 100%;
+    max-width: 400px;
+    overflow: hidden;
+    margin-bottom: 20px;
+    opacity: 0;
+    animation: fadeUp .4s ease 1.05s forwards;
+  }
+
+  .order-card-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .6px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .order-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 11px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .order-row:last-child { border-bottom: none; }
+  .order-row .ol { color: var(--muted); }
+  .order-row .ov { font-weight: 600; }
+
+  /* ── Action buttons ── */
+  .action-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+    max-width: 400px;
+    opacity: 0;
+    animation: fadeUp .4s ease 1.2s forwards;
+  }
+
+  .btn-large {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 14px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 700;
+    text-decoration: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    transition: opacity .15s, transform .1s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn-large:active { opacity: .85; transform: scale(.98); }
+  .btn-primary-lg { background: var(--sky); color: #fff; }
+  .btn-ghost-lg   { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+
+  /* ── Confetti dots ── */
+  .confetti-wrap {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 999;
+    overflow: hidden;
+  }
+  .dot {
+    position: absolute;
+    top: -10px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    animation: fall linear forwards;
+  }
+  @keyframes fall {
+    0%   { transform: translateY(0) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+  }
+
+  @keyframes fadeUp {
+    0%   { opacity: 0; transform: translateY(14px); }
+    100% { opacity: 1; transform: translateY(0); }
   }
 </style>
 {% endblock %}
 
 {% block content %}
 
-<a href="{% url 'buy-logs-my-purchases' %}" class="back-link">← Back to My Purchases</a>
+<!-- Confetti container -->
+<div class="confetti-wrap" id="confetti"></div>
 
-<div class="section">
-  <div class="receipt-head">
-    <div>
-      <div class="name">{{ purchase.product.title }}</div>
-      <div class="meta">{{ purchase.product.get_category_display }} · Purchased {{ purchase.purchased_at|date:"M d, Y H:i" }}</div>
-    </div>
-    <div class="amount">₦{{ purchase.amount|floatformat:2 }}</div>
+<div class="success-wrap">
+
+  <!-- Animated checkmark -->
+  <div class="check-circle">
+    <svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="#16a34a" stroke-width="2.5">
+      <polyline points="20 6 9 17 4 12"/>
+    </svg>
   </div>
 
-  <div class="cred-row">
-    <div>
-      <div class="lbl">Email</div>
-      <div class="val" id="cred-email">{{ purchase.log.email }}</div>
-    </div>
-    <button type="button" class="copy-btn" data-copy="cred-email">Copy</button>
+  <div class="success-title">Purchase Successful!</div>
+  <div class="success-sub">Your order has been confirmed and is ready to access.</div>
+
+  <div class="success-hint">
+    <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="10"/>
+      <line x1="12" y1="8" x2="12" y2="12"/>
+      <line x1="12" y1="16" x2="12.01" y2="16"/>
+    </svg>
+    Check Purchase History for your credentials
   </div>
 
-  <div class="cred-row">
-    <div>
-      <div class="lbl">Password</div>
-      <div class="val" id="cred-password">{{ purchase.log.password }}</div>
+  <!-- Order summary -->
+  <div class="order-card">
+    <div class="order-card-header">Order Summary</div>
+    <div class="order-row">
+      <span class="ol">Product</span>
+      <span class="ov">{{ purchase.product.title }}</span>
     </div>
-    <button type="button" class="copy-btn" data-copy="cred-password">Copy</button>
+    <div class="order-row">
+      <span class="ol">Category</span>
+      <span class="ov">{{ purchase.product.category.name }}</span>
+    </div>
+    <div class="order-row">
+      <span class="ol">Amount Paid</span>
+      <span class="ov" style="color:var(--sky);">₦{{ purchase.amount|floatformat:2 }}</span>
+    </div>
+    <div class="order-row">
+      <span class="ol">Order ID</span>
+      <span class="ov" style="font-family:monospace;font-size:11px;">{{ purchase.pk }}</span>
+    </div>
+    <div class="order-row">
+      <span class="ol">Date</span>
+      <span class="ov">{{ purchase.purchased_at|date:"d M Y, H:i" }}</span>
+    </div>
+    <div class="order-row">
+      <span class="ol">Status</span>
+      <span class="ov" style="color:var(--green);">✓ Confirmed</span>
+    </div>
   </div>
 
-  {% if purchase.log.recovery_email %}
-  <div class="cred-row">
-    <div>
-      <div class="lbl">Recovery Email</div>
-      <div class="val" id="cred-recovery">{{ purchase.log.recovery_email }}</div>
-    </div>
-    <button type="button" class="copy-btn" data-copy="cred-recovery">Copy</button>
+  <!-- Action buttons -->
+  <div class="action-group">
+    <a href="{% url 'buy-logs-my-purchases' %}" class="btn-large btn-primary-lg">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+      </svg>
+      View Purchase History
+    </a>
+    <a href="{% url 'sub-admin-dashboard' %}" class="btn-large btn-ghost-lg">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+        <polyline points="9 22 9 12 15 12 15 22"/>
+      </svg>
+      Back to Dashboard
+    </a>
   </div>
-  {% endif %}
 
-  {% if purchase.log.two_factor_code %}
-  <div class="cred-row">
-    <div>
-      <div class="lbl">2FA Code</div>
-      <div class="val" id="cred-2fa">{{ purchase.log.two_factor_code }}</div>
-    </div>
-    <button type="button" class="copy-btn" data-copy="cred-2fa">Copy</button>
-  </div>
-  {% endif %}
 </div>
-
-<div class="warn-note">Save these credentials now — change the password on first login to secure the account.</div>
 
 {% endblock %}
 
 {% block extra_js %}
 <script>
-  document.querySelectorAll('.copy-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const text = document.getElementById(btn.dataset.copy).textContent.trim();
-      navigator.clipboard.writeText(text).then(() => {
-        const original = btn.textContent;
-        btn.textContent = 'Copied';
-        setTimeout(() => { btn.textContent = original; }, 1500);
-      });
-    });
-  });
+  // ── Confetti burst ─────────────────────────
+  const colors = [
+    'var(--sky)', 'var(--green)', 'var(--amber)',
+    '#f472b6', '#a78bfa', '#34d399', '#60a5fa'
+  ];
+
+  function launchConfetti() {
+    const container = document.getElementById('confetti');
+    const count = 60;
+
+    for (let i = 0; i < count; i++) {
+      setTimeout(() => {
+        const dot = document.createElement('div');
+        dot.className = 'dot';
+        dot.style.left        = Math.random() * 100 + 'vw';
+        dot.style.background  = colors[Math.floor(Math.random() * colors.length)];
+        dot.style.width       = (Math.random() * 8 + 4) + 'px';
+        dot.style.height      = (Math.random() * 8 + 4) + 'px';
+        dot.style.borderRadius= Math.random() > .5 ? '50%' : '2px';
+        dot.style.animationDuration = (Math.random() * 2 + 1.5) + 's';
+        dot.style.animationDelay    = '0s';
+        container.appendChild(dot);
+        setTimeout(() => dot.remove(), 3500);
+      }, i * 30);
+    }
+  }
+
+  // Fire confetti after check animation completes
+  setTimeout(launchConfetti, 500);
 </script>
 {% endblock %}

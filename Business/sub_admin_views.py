@@ -35,7 +35,7 @@ from .models import (
     Account, ForeignNumber, WalletDeposit,
     Notification, NotificationRead, SubAdminSiteSettings,
     DashboardAdvert, DashboardAnnouncement, Testimonial, BrandGalleryImage,
-    Invoice, InvoiceItem,SubAdminGalleryImage,Purchase,CURRENCY_CHOICES
+    Invoice, InvoiceItem,SubAdminGalleryImage,Purchase,CURRENCY_CHOICES,BuyLogDetails,BuyLogs
 )
 
 logger = logging.getLogger(__name__)
@@ -2448,3 +2448,67 @@ def sub_admin_purchase_detail_json(request, pk):
         "credentials": credentials,
     }
     return JsonResponse(data)
+
+
+
+@login_required
+@require_POST
+def buy_logs_purchase(request, pk):
+    """
+    Handle a sub-admin buying one unit of stock for a BuyLogs product.
+    Debits the NGN wallet (Account), locks and claims one unsold
+    BuyLogDetails unit, creates the Purchase record.
+    """
+    product = get_object_or_404(BuyLogs, pk=pk, active=True)
+    account = get_or_create_account(request.user)
+
+    with db_transaction.atomic():
+        # Lock the wallet row so two near-simultaneous purchases
+        # can't both read a stale balance and double-spend.
+        account = Account.objects.select_for_update().get(pk=account.pk)
+
+        if account.balance < product.price:
+            messages.error(request, "Insufficient wallet balance for this purchase.")
+            return redirect("buy-logs-detail", pk=product.pk)
+
+        # Lock and claim exactly one unsold unit — skip_locked means a
+        # concurrent buyer never blocks waiting on a unit someone else
+        # is already in the middle of purchasing; they just get the
+        # next available one instead.
+        detail = (
+            BuyLogDetails.objects
+            .select_for_update(skip_locked=True)
+            .filter(product=product, sold=False)
+            .first()
+        )
+        if not detail:
+            messages.error(request, "This product just sold out. Please try another.")
+            return redirect("buy-logs-detail", pk=product.pk)
+
+        account.balance -= product.price
+        account.save(update_fields=["balance"])
+
+        detail.sold = True
+        detail.sold_at = timezone.now()
+        detail.save(update_fields=["sold", "sold_at"])
+
+        purchase = Purchase.objects.create(
+            buyer=request.user,
+            product=product,
+            log=detail,
+            account=account,
+            amount=product.price,
+        )
+
+    messages.success(request, f"Purchase successful — {product.title} added to your purchases.")
+    return redirect("buy-logs-payment-success", pk=purchase.pk)
+
+
+@login_required
+def buy_logs_payment_success(request, pk):
+    """Animated success page shown right after a purchase completes."""
+    purchase = get_object_or_404(
+        Purchase.objects.select_related("product", "product__category"),
+        pk=pk, buyer=request.user,
+    )
+    return render(request, "admin/subadmin/payment_success.html", {"purchase": purchase})
