@@ -30,7 +30,7 @@ DATABASE_URL = config('DATABASE_URL')
 
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = config('DEBUG')
 
 ALLOWED_HOSTS = [
     'transedge.site',

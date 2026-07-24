@@ -1518,11 +1518,15 @@ def sub_admin_buy_foreign_number(request):
     selected_country = request.GET.get("country", "") or request.POST.get("country", "")
     selected_service = request.GET.get("service", "") or request.POST.get("service", "")
     prices = []
+    cheapest_price = None
     if selected_country and selected_service:
         prices = _fetch_5sim_prices(
             country=selected_country if selected_country in FOREIGN_COUNTRIES else None,
             service=selected_service if selected_service in FOREIGN_SERVICES  else None,
         )
+        available = [p for p in prices if p["count"] > 0]
+        if available:
+            cheapest_price = min(available, key=lambda x: x["price_ngn"])
 
     if request.method == "POST":
         country = request.POST.get("country", "").strip().lower()
@@ -1628,6 +1632,7 @@ def sub_admin_buy_foreign_number(request):
         "service_display":  FOREIGN_SERVICE_DISPLAY,
         "numbers":          numbers,
         "prices":           prices,
+        "cheapest_price":   cheapest_price,
         "selected_country": selected_country,
         "selected_service": selected_service,
     }

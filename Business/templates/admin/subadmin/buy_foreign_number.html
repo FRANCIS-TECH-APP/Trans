@@ -161,22 +161,22 @@
     </form>
 
     {% if selected_country and selected_service %}
-      {% if prices %}
-      <div class="prices-wrap">
-        <table>
-          <thead><tr><th>Operator</th><th class="r">Available</th><th class="r">Price</th></tr></thead>
-          <tbody>
-            {% for p in prices %}
-            <tr>
-              <td>{{ p.operator|capfirst }}</td>
-              <td class="r">{{ p.count }}</td>
-              <td class="r">₦{{ p.price_ngn|floatformat:0 }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      <form method="post" action="{% url 'sub-admin-buy-foreign-number' %}">
+  {% if cheapest_price %}
+  <div class="prices-wrap">
+    <table>
+      <tbody>
+        <tr>
+          <td style="font-weight:600;">Price</td>
+          <td class="r" style="font-size:15px;font-weight:800;color:var(--sky);">₦{{ cheapest_price.price_ngn|floatformat:0 }}</td>
+        </tr>
+        <tr>
+          <td style="color:var(--muted);font-size:12px;">Available numbers</td>
+          <td class="r" style="color:var(--muted);font-size:12px;">{{ cheapest_price.count }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <form method="post" action="{% url 'sub-admin-buy-foreign-number' %}">
         {% csrf_token %}
         <input type="hidden" name="country" value="{{ selected_country }}">
         <input type="hidden" name="service" value="{{ selected_service }}">
