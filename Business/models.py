@@ -1293,3 +1293,97 @@ class SubAdminGalleryImage(models.Model):
 
     def __str__(self):
         return self.caption or f"Gallery image #{self.pk}"
+
+
+
+
+
+# ══════════════════════════════════════════════════════
+#  ADD THESE TO YOUR EXISTING models.py
+# ══════════════════════════════════════════════════════
+import re
+
+class TutorialCategory(models.Model):
+    name       = models.CharField(max_length=100)
+    slug       = models.SlugField(max_length=120, unique=True, blank=True)
+    icon       = models.CharField(max_length=60, blank=True,
+                                  help_text="Font Awesome class e.g. 'fas fa-box'")
+    order      = models.PositiveIntegerField(default=0)
+    is_active  = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["order", "name"]
+        verbose_name = "Tutorial Category"
+        verbose_name_plural = "Tutorial Categories"
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            from django.utils.text import slugify
+            self.slug = slugify(self.name)
+        super().save(*args, **kwargs)
+
+
+class Tutorial(models.Model):
+    category    = models.ForeignKey(
+        TutorialCategory, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="tutorials"
+    )
+    title       = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    video_url   = models.URLField(
+        help_text="Paste the full YouTube URL e.g. https://www.youtube.com/watch?v=abc123"
+    )
+    order       = models.PositiveIntegerField(default=0)
+    is_active   = models.BooleanField(default=True)
+    created_at  = models.DateTimeField(auto_now_add=True)
+    updated_at  = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["category__order", "order", "title"]
+        verbose_name = "Tutorial"
+
+    def __str__(self):
+        return self.title
+
+    # ── YouTube helpers ──────────────────────────────
+
+    def _youtube_id(self):
+        """Extract video ID from any YouTube URL format."""
+        patterns = [
+            r'(?:v=|youtu\.be/|embed/)([A-Za-z0-9_-]{11})',
+        ]
+        for pat in patterns:
+            m = re.search(pat, self.video_url)
+            if m:
+                return m.group(1)
+        return None
+
+    @property
+    def youtube_id(self):
+        return self._youtube_id()
+
+    @property
+    def embed_url(self):
+        vid = self._youtube_id()
+        if vid:
+            return f"https://www.youtube.com/embed/{vid}?rel=0&modestbranding=1"
+        return self.video_url
+
+    @property
+    def thumbnail_url(self):
+        """Auto-generated YouTube thumbnail — no upload needed."""
+        vid = self._youtube_id()
+        if vid:
+            return f"https://img.youtube.com/vi/{vid}/mqdefault.jpg"
+        return ""
+
+    @property
+    def is_new(self):
+        """True if added in the last 7 days."""
+        from django.utils import timezone
+        from datetime import timedelta
+        return self.created_at >= timezone.now() - timedelta(days=7)

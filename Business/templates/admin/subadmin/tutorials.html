@@ -1,0 +1,257 @@
+
+{% extends "admin/subadmin/base.html" %}
+{% block title %}Tutorials — TransEdge{% endblock %}
+{% block page_title %}Tutorials{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* ── page head ──────────────────────────── */
+  .page-head { margin-bottom: 18px; }
+  .page-head h1 { font-size: 20px; font-weight: 800; margin-bottom: 4px; }
+  .page-head p  { font-size: 13px; color: var(--muted); }
+
+  /* ── search bar ─────────────────────────── */
+  .search-wrap { position: relative; margin-bottom: 18px; }
+  .search-wrap svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+  .search-input {
+    width: 100%; padding: 11px 14px 11px 38px;
+    background: var(--surface); border: 1.5px solid var(--border);
+    border-radius: 12px; font-size: 13.5px; color: var(--text);
+    outline: none; transition: border-color .2s; font-family: inherit;
+  }
+  .search-input:focus { border-color: var(--sky); }
+  .search-input::placeholder { color: var(--muted); }
+
+  /* ── category label ─────────────────────── */
+  .cat-label {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; font-weight: 700;
+    letter-spacing: .5px; text-transform: uppercase;
+    color: var(--muted); margin: 20px 0 10px;
+  }
+  .cat-label::after {
+    content: ''; flex: 1; height: 1px; background: var(--border);
+  }
+
+  /* ── tutorial card ──────────────────────── */
+  .tutorial-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-bottom: 12px;
+    text-decoration: none;
+    color: var(--text);
+    display: flex;
+    gap: 0;
+    transition: border-color .15s, box-shadow .15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .tutorial-card:hover {
+    border-color: var(--sky);
+    box-shadow: 0 4px 16px rgba(59,130,246,.1);
+  }
+  .tutorial-card:active { opacity: .9; }
+
+  /* thumbnail */
+  .tc-thumb {
+    width: 110px;
+    min-width: 110px;
+    aspect-ratio: 16/9;
+    background: var(--surface2);
+    position: relative;
+    overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .tc-thumb img {
+    width: 100%; height: 100%; object-fit: cover;
+    transition: transform .3s ease;
+  }
+  .tutorial-card:hover .tc-thumb img { transform: scale(1.05); }
+
+  /* play overlay */
+  .play-overlay {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,.3);
+    opacity: 0; transition: opacity .2s;
+  }
+  .tutorial-card:hover .play-overlay { opacity: 1; }
+  .play-btn {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: rgba(255,255,255,.9);
+    display: flex; align-items: center; justify-content: center;
+    color: #0f172a;
+  }
+
+  /* no thumbnail fallback */
+  .tc-thumb-placeholder {
+    width: 110px; min-width: 110px;
+    background: var(--sky-dim);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--sky);
+  }
+
+  /* card body */
+  .tc-body { flex: 1; padding: 12px 14px; min-width: 0; }
+  .tc-title {
+    font-size: 13.5px; font-weight: 700; margin-bottom: 4px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .tc-desc {
+    font-size: 12px; color: var(--muted); line-height: 1.5;
+    display: -webkit-box; -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical; overflow: hidden;
+    margin-bottom: 8px;
+  }
+  .tc-footer { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .tc-cat {
+    font-size: 10.5px; font-weight: 600; color: var(--sky);
+    background: var(--sky-dim); padding: 2px 8px; border-radius: 20px;
+  }
+  .tc-new {
+    font-size: 10.5px; font-weight: 700; color: #fff;
+    background: var(--green); padding: 2px 8px; border-radius: 20px;
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%,100% { opacity: 1; } 50% { opacity: .7; }
+  }
+  .tc-watch {
+    margin-left: auto; font-size: 12px; font-weight: 600;
+    color: var(--sky); display: flex; align-items: center; gap: 4px;
+  }
+
+  /* search results — flat list */
+  .search-result-label {
+    font-size: 13px; color: var(--muted);
+    margin-bottom: 14px;
+  }
+  .search-result-label strong { color: var(--text); }
+
+  /* empty state */
+  .empty-tut {
+    text-align: center; padding: 48px 16px; color: var(--muted);
+  }
+  .empty-tut svg { margin: 0 auto 12px; display: block; }
+  .empty-tut p   { font-size: 14px; font-weight: 500; margin-bottom: 4px; }
+  .empty-tut span{ font-size: 12px; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="page-head">
+  <h1>Tutorials</h1>
+  <p>Step-by-step guides to help you get the most out of TransEdge.</p>
+</div>
+
+<!-- Search -->
+<form method="get" action="">
+  <div class="search-wrap">
+    <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </svg>
+    <input
+      type="text" name="q" value="{{ query }}"
+      class="search-input" placeholder="Search tutorials..."
+      autocomplete="off"
+    />
+  </div>
+</form>
+
+<!-- ── SEARCH RESULTS ─────────────────────── -->
+{% if query %}
+  <p class="search-result-label">
+    Results for <strong>"{{ query }}"</strong>
+    {% if tutorials %}— {{ tutorials|length }} found{% endif %}
+  </p>
+  {% if tutorials %}
+    {% for t in tutorials %}
+    <a href="{% url 'sub-admin-tutorial-detail' pk=t.pk %}" class="tutorial-card">
+      {% if t.thumbnail_url %}
+      <div class="tc-thumb">
+        <img src="{{ t.thumbnail_url }}" alt="{{ t.title }}" loading="lazy"/>
+        <div class="play-overlay">
+          <div class="play-btn">
+            <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          </div>
+        </div>
+      </div>
+      {% else %}
+      <div class="tc-thumb-placeholder">
+        <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      </div>
+      {% endif %}
+      <div class="tc-body">
+        <div class="tc-title">{{ t.title }}</div>
+        {% if t.description %}<div class="tc-desc">{{ t.description }}</div>{% endif %}
+        <div class="tc-footer">
+          {% if t.category %}<span class="tc-cat">{{ t.category.name }}</span>{% endif %}
+          {% if t.is_new %}<span class="tc-new">New</span>{% endif %}
+          <span class="tc-watch">Watch <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
+        </div>
+      </div>
+    </a>
+    {% endfor %}
+  {% else %}
+  <div class="empty-tut">
+    <svg width="36" height="36" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </svg>
+    <p>No tutorials found for "{{ query }}"</p>
+    <span>Try a different keyword</span>
+  </div>
+  {% endif %}
+
+{% else %}
+<!-- ── GROUPED BY CATEGORY ─────────────────── -->
+  {% for cat in categories %}
+  {% if cat.active_tutorials %}
+  <div class="cat-label">
+    {% if cat.icon %}<i class="{{ cat.icon }}"></i>{% endif %}
+    {{ cat.name }}
+    <span style="font-size:10px;font-weight:500;color:var(--muted);text-transform:none;letter-spacing:0;">
+      {{ cat.active_tutorials|length }} tutorial{{ cat.active_tutorials|length|pluralize }}
+    </span>
+  </div>
+  {% for t in cat.active_tutorials %}
+  <a href="{% url 'sub-admin-tutorial-detail' pk=t.pk %}" class="tutorial-card">
+    {% if t.thumbnail_url %}
+    <div class="tc-thumb">
+      <img src="{{ t.thumbnail_url }}" alt="{{ t.title }}" loading="lazy"/>
+      <div class="play-overlay">
+        <div class="play-btn">
+          <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        </div>
+      </div>
+    </div>
+    {% else %}
+    <div class="tc-thumb-placeholder">
+      <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+    </div>
+    {% endif %}
+    <div class="tc-body">
+      <div class="tc-title">{{ t.title }}</div>
+      {% if t.description %}<div class="tc-desc">{{ t.description }}</div>{% endif %}
+      <div class="tc-footer">
+        <span class="tc-cat">{{ cat.name }}</span>
+        {% if t.is_new %}<span class="tc-new">New</span>{% endif %}
+        <span class="tc-watch">Watch <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
+      </div>
+    </div>
+  </a>
+  {% endfor %}
+  {% endif %}
+  {% empty %}
+  <div class="empty-tut">
+    <svg width="36" height="36" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+      <polygon points="5 3 19 12 5 21 5 3"/>
+    </svg>
+    <p>No tutorials yet</p>
+    <span>Check back soon — your admin will add guides here.</span>
+  </div>
+  {% endfor %}
+{% endif %}
+
+{% endblock %}

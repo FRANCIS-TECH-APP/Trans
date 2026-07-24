@@ -703,3 +703,99 @@ class DashboardAnnouncementAdmin(admin.ModelAdmin):
 @admin.register(BrandGalleryImage)
 class BrandGalleryImageAdmin(admin.ModelAdmin):
     list_display = ("caption", "sort_order", "is_active")
+
+
+
+
+
+# ══════════════════════════════════════════════════════
+#  ADD TO YOUR Business/admin.py
+# ══════════════════════════════════════════════════════
+from .models import Tutorial, TutorialCategory
+
+
+class TutorialInline(admin.TabularInline):
+    model       = Tutorial
+    extra       = 1
+    fields      = ["title", "video_url", "order", "is_active"]
+    ordering    = ["order"]
+
+
+@admin.register(TutorialCategory)
+class TutorialCategoryAdmin(admin.ModelAdmin):
+    list_display  = ["name", "order", "is_active", "tutorial_count"]
+    list_editable = ["order", "is_active"]
+    prepopulated_fields = {"slug": ("name",)}
+    inlines       = [TutorialInline]
+
+    def tutorial_count(self, obj):
+        return obj.tutorials.count()
+    tutorial_count.short_description = "Tutorials"
+
+    def has_add_permission(self, request):
+        return request.user.is_superuser or getattr(request.user, 'role', '') == 'admin'
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_superuser or getattr(request.user, 'role', '') == 'admin'
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser or getattr(request.user, 'role', '') == 'admin'
+
+
+@admin.register(Tutorial)
+class TutorialAdmin(admin.ModelAdmin):
+    list_display   = ["title", "category", "order", "is_active", "is_new_badge", "created_at"]
+    list_editable  = ["order", "is_active"]
+    list_filter    = ["category", "is_active"]
+    search_fields  = ["title", "description"]
+    readonly_fields = ["embed_preview", "thumbnail_preview", "created_at"]
+
+    fieldsets = [
+        ("Content", {
+            "fields": ["category", "title", "description", "video_url"]
+        }),
+        ("Preview", {
+            "fields": ["thumbnail_preview", "embed_preview"],
+            "classes": ["collapse"],
+        }),
+        ("Settings", {
+            "fields": ["order", "is_active", "created_at"]
+        }),
+    ]
+
+    def is_new_badge(self, obj):
+        from django.utils.html import format_html
+        if obj.is_new:
+            return format_html('<span style="background:#22c55e;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;">New</span>')
+        return "—"
+    is_new_badge.short_description = "New?"
+
+    def thumbnail_preview(self, obj):
+        from django.utils.html import format_html
+        if obj.thumbnail_url:
+            return format_html(
+                '<img src="{}" style="width:200px;border-radius:6px;" />',
+                obj.thumbnail_url
+            )
+        return "No thumbnail"
+    thumbnail_preview.short_description = "Thumbnail"
+
+    def embed_preview(self, obj):
+        from django.utils.html import format_html
+        if obj.embed_url:
+            return format_html(
+                '<iframe width="400" height="225" src="{}" frameborder="0" allowfullscreen style="border-radius:8px;"></iframe>',
+                obj.embed_url
+            )
+        return "No video"
+    embed_preview.short_description = "Video Preview"
+
+    def has_add_permission(self, request):
+        return request.user.is_superuser or getattr(request.user, 'role', '') == 'admin'
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_superuser or getattr(request.user, 'role', '') == 'admin'
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser or getattr(request.user, 'role', '') == 'admin'
+

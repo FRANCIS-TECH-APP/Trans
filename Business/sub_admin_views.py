@@ -2517,3 +2517,56 @@ def buy_logs_payment_success(request, pk):
         pk=pk, buyer=request.user,
     )
     return render(request, "admin/subadmin/payment_success.html", {"purchase": purchase})
+
+
+
+from django.db.models import Prefetch, Q
+from Business.models import Tutorial, TutorialCategory
+
+
+@login_required
+def tutorial_list(request):
+    query      = request.GET.get("q", "").strip()
+    categories = TutorialCategory.objects.filter(
+        is_active=True
+    ).prefetch_related(
+        Prefetch(
+            "tutorials",
+            queryset=Tutorial.objects.filter(is_active=True),
+            to_attr="active_tutorials"
+        )
+    )
+
+    if query:
+        tutorials = Tutorial.objects.filter(
+            is_active=True
+        ).filter(
+            Q(title__icontains=query) |
+            Q(description__icontains=query) |
+            Q(category__name__icontains=query)
+        ).select_related("category")
+    else:
+        tutorials = None
+
+    context = {
+        "categories": categories,
+        "tutorials":  tutorials,
+        "query":      query,
+    }
+    return render(request, "admin/subadmin/tutorials.html", context)
+
+
+@login_required
+def tutorial_detail(request, pk):
+    tutorial = get_object_or_404(Tutorial, pk=pk, is_active=True)
+
+    related = Tutorial.objects.filter(
+        is_active=True,
+        category=tutorial.category,
+    ).exclude(pk=pk).order_by("order")[:4]
+
+    context = {
+        "tutorial": tutorial,
+        "related":  related,
+    }
+    return render(request, "admin/subadmin/tutorial_detail.html", context)

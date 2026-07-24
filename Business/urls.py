@@ -174,6 +174,8 @@ urlpatterns = [
     path("sub-admin/purchases/<uuid:pk>/detail/",sv.sub_admin_purchase_detail_json, name="sub-admin-purchase-detail-json"),
     path("buy-logs/<uuid:pk>/purchase/", sv.buy_logs_purchase, name="buy-logs-purchase"),
     path("buy-logs/success/<uuid:pk>/", sv.buy_logs_payment_success, name="buy-logs-payment-success"),
+    path("shipping/sub-admin/tutorials/",sv.tutorial_list,   name="sub-admin-tutorials"),
+    path("shipping/sub-admin/tutorials/<int:pk>/",sv.tutorial_detail, name="sub-admin-tutorial-detail"),
 
 ]
 
