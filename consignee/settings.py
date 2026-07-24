@@ -27,7 +27,7 @@ PAYSTACK_SECRET_KEY = config('PAYSTACK_SECRET_KEY')
 PAYSTACK_PUBLIC_KEY = config('PAYSTACK_PUBLIC_KEY')
 FIVE_SIM_API_KEY = config("FIVE_SIM_API_KEY")
 DATABASE_URL = config('DATABASE_URL')
-
+STEADYSIM_API_KEY = config("STEADYSIM_API_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG')

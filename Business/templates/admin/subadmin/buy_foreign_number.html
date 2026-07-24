@@ -33,9 +33,21 @@
   .sh-count { font-size: 11.5px; color: var(--muted); margin-left: auto; flex-shrink: 0; }
   .section-body { padding: 16px; }
 
-  /* Server pill */
+  /* Server switcher — flip between providers without leaving the page flow */
+  .server-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+  .server-tab {
+    flex: 1; text-align: center; padding: 9px 10px; border-radius: var(--radius-sm);
+    border: 1.5px solid var(--border); background: var(--surface2); color: var(--muted);
+    font-size: 12px; font-weight: 700; text-decoration: none; transition: border-color .15s, color .15s;
+  }
+  .server-tab.active.p-5sim { border-color: var(--green); color: var(--green); background: var(--green-dim); }
+  .server-tab.active.p-steadysim { border-color: #7c5cff; color: #7c5cff; background: rgba(124,92,255,.08); }
+
+  /* Server pill — color follows selected provider */
   .server-pill { display: flex; align-items: center; justify-content: center; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 14px; font-size: 12.5px; font-weight: 600; margin-bottom: 12px; color: var(--text); gap: 8px; }
-  .server-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+  .server-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .server-dot.p-5sim { background: var(--green); }
+  .server-dot.p-steadysim { background: #7c5cff; }
 
   /* Inputs */
   .search-wrap { position: relative; margin-bottom: 10px; }
@@ -63,6 +75,8 @@
   .prices-wrap tbody td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
   .prices-wrap tbody td.r { text-align: right; font-weight: 600; }
   .prices-wrap tbody tr:last-child td { border-bottom: none; }
+  .prices-wrap tbody td.r.p-5sim { color: var(--sky); }
+  .prices-wrap tbody td.r.p-steadysim { color: #7c5cff; }
 
   .rent-btn { width: 100%; padding: 13px; font-size: 13.5px; font-weight: 700; justify-content: center; margin-top: 4px; }
   .rent-btn:disabled { opacity: .4; cursor: not-allowed; transform: none; }
@@ -92,6 +106,8 @@
   .b-received, .b-completed { background: var(--green-dim); color: var(--green); }
   .b-cancelled { background: rgba(139,143,153,.15); color: var(--muted); }
   .b-finished  { background: var(--sky-dim); color: var(--sky); }
+  .b-provider.p-5sim      { background: var(--green-dim); color: var(--green); }
+  .b-provider.p-steadysim { background: rgba(124,92,255,.12); color: #7c5cff; }
 
   .btn-check { background: var(--sky-dim); color: var(--sky); border: 1px solid rgba(59,130,246,.3); }
   .btn-cancel-num { background: transparent; color: var(--red); border: 1px solid rgba(220,38,38,.3); }
@@ -101,8 +117,8 @@
 
 {% block content %}
 
-<!-- Wallet Hero -->
-<div class="wallet-hero">
+<!-- Wallet Balance -->
+<div id="wallet-balance" class="wallet-hero">
   <div>
     <div class="wh-label">Wallet Balance</div>
     <div class="wh-amount">₦{{ account.balance|floatformat:2 }}</div>
@@ -124,12 +140,23 @@
   </div>
   <div class="section-body">
 
+    <!-- Server switcher — same URL/view, provider passed as a query param -->
+    <div class="server-tabs">
+      <a href="{% url 'sub-admin-buy-foreign-number' %}?provider=5sim"
+         class="server-tab {% if selected_provider == '5sim' %}active p-5sim{% endif %}">Server 1</a>
+      <a href="{% url 'sub-admin-buy-foreign-number' %}?provider=steadysim"
+         class="server-tab {% if selected_provider == 'steadysim' %}active p-steadysim{% endif %}">Server 2</a>
+    </div>
+
     <div class="server-pill">
-      <span class="server-dot"></span>
-      Ordering on <strong style="margin-left:4px;"> Server 1</strong>
+      <span class="server-dot p-{{ selected_provider }}"></span>
+      Ordering on <strong style="margin-left:4px;">
+        {% if selected_provider == 'steadysim' %}Server 2{% else %}Server 1{% endif %}
+      </strong>
     </div>
 
     <form method="get" action="{% url 'sub-admin-buy-foreign-number' %}" id="search-form">
+      <input type="hidden" name="provider" value="{{ selected_provider }}">
       <div class="search-wrap">
         <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
           <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -156,7 +183,11 @@
           {% endwith %}
           {% endfor %}
         </select>
+        {% if selected_provider == 'steadysim' %}
+        <div class="area-note">⚠ Server 2's confirmed country/service list is still smaller than Server 1's — if a combination shows no results, switch servers above to compare.</div>
+        {% else %}
         <div class="area-note">⚠ Optional area code may add about 20% to the price.</div>
+        {% endif %}
       </div>
     </form>
 
@@ -167,7 +198,7 @@
       <tbody>
         <tr>
           <td style="font-weight:600;">Price</td>
-          <td class="r" style="font-size:15px;font-weight:800;color:var(--sky);">₦{{ cheapest_price.price_ngn|floatformat:0 }}</td>
+          <td class="r p-{{ selected_provider }}" style="font-size:15px;font-weight:800;">₦{{ cheapest_price.price_ngn|floatformat:0 }}</td>
         </tr>
         <tr>
           <td style="color:var(--muted);font-size:12px;">Available numbers</td>
@@ -178,6 +209,7 @@
   </div>
   <form method="post" action="{% url 'sub-admin-buy-foreign-number' %}">
         {% csrf_token %}
+        <input type="hidden" name="provider" value="{{ selected_provider }}">
         <input type="hidden" name="country" value="{{ selected_country }}">
         <input type="hidden" name="service" value="{{ selected_service }}">
         <button type="submit" class="btn btn-primary rent-btn" {% if account.balance <= 0 %}disabled{% endif %}>
@@ -191,7 +223,12 @@
         {% endif %}
       </form>
       {% else %}
-      <div class="empty-cell">No numbers available for this combination. Try a different country or service.</div>
+      <div class="empty-cell">
+        No numbers available for this combination
+        {% if selected_provider == 'steadysim' %} on Server 2. Try a different country or service, or switch to Server 1 above.
+        {% else %} on Server 1. Try a different country or service, or switch to Server 2 above.
+        {% endif %}
+      </div>
       {% endif %}
     {% endif %}
 
@@ -208,7 +245,7 @@
     </div>
     <div class="sh-titles">
       <h3>Verification requests</h3>
-      <p>Codes update automatically. Tap a code to copy.</p>
+      <p>Codes update automatically. Tap a code to copy. Shown across both servers.</p>
     </div>
     <span class="sh-count">{{ numbers|length }} number{{ numbers|length|pluralize }}</span>
   </div>
@@ -227,13 +264,21 @@
       <div class="num-card filterable" data-order-id="{{ n.order_id }}">
         <div class="num-card-header">
           <span class="num-card-service">{{ ninfo.2 }} {{ n.service|capfirst }}</span>
-          {% if n.status == "PENDING" %}<span class="badge b-pending">Waiting SMS</span>
-          {% elif n.status == "RECEIVED" %}<span class="badge b-completed">Completed</span>
-          {% elif n.status == "CANCELLED" %}<span class="badge b-cancelled">Cancelled</span>
-          {% else %}<span class="badge b-finished">{{ n.get_status_display }}</span>
-          {% endif %}
+          <div style="display:flex;gap:6px;align-items:center;">
+            <span class="badge b-provider p-{{ n.provider }}">{% if n.provider == 'steadysim' %}Server 2{% else %}Server 1{% endif %}</span>
+            {% if n.status == "PENDING" %}<span class="badge b-pending">Waiting SMS</span>
+            {% elif n.status == "RECEIVED" %}<span class="badge b-completed">Completed</span>
+            {% elif n.status == "CANCELLED" %}<span class="badge b-cancelled">Cancelled</span>
+            {% else %}<span class="badge b-finished">{{ n.get_status_display }}</span>
+            {% endif %}
+          </div>
         </div>
         <div class="num-card-body">
+
+          <div class="num-row">
+            <span class="num-row-label">Server</span>
+            <span class="num-row-val">{% if n.provider == 'steadysim' %}Server 2{% else %}Server 1{% endif %}</span>
+          </div>
 
           <div class="num-row">
             <span class="num-row-label">Service</span>

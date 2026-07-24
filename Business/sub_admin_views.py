@@ -1313,8 +1313,9 @@ def link_callback(uri, rel):
 
 
 # ════════════════════════════════════════════════════════
-#  5SIM FOREIGN NUMBERS
+#  FOREIGN NUMBERS (SMS-verification numbers)
 #  Sub-admin only. Uses Account (NGN wallet), separate from points.
+#  Supports multiple providers: 5SIM and SteadySim.
 # ════════════════════════════════════════════════════════
 
 def get_or_create_account(user):
@@ -1432,6 +1433,14 @@ FOREIGN_SERVICE_DISPLAY = {
     "line":      ("Line",       "🟢"),
 }
 
+# ── Providers ──────────────────────────────────────────────────
+FOREIGN_PROVIDERS = ["5sim", "steadysim"]
+
+FOREIGN_PROVIDER_DISPLAY = {
+    "5sim":      "5SIM",
+    "steadysim": "SteadySim",
+}
+
 FIVESIM_COUNTRY_MAP = {
     "usa": "usa", "uk": "england", "canada": "canada", "russia": "russia",
     "india": "india", "indonesia": "indonesia", "afghanistan": "afghanistan",
@@ -1458,7 +1467,6 @@ FIVESIM_SERVICE_MAP = {
     "apple": "apple", "uber": "uber", "airbnb": "airbnb", "spotify": "spotify",
     "paypal": "paypal", "linkedin": "linkedin", "viber": "viber", "line": "line",
 }
-
 
 def _ngn_price(usd_price):
     def clean(val):
@@ -1512,25 +1520,219 @@ def _fetch_5sim_prices(country=None, service=None):
     return prices
 
 
+# SteadySim runs the same handler_api.php family as SMS-Activate: one
+# base URL, an action= query param, api_key on every call, plain-text
+# responses for actions/status, JSON for catalog lookups.
+STEADYSIM_BASE_URL = "https://steadysim.com/stubs/handler_api.php"
+
+# In-memory caches — countries rarely change (24h TTL); services are
+# cached per country_id for the life of the process. Fine for a
+# single-process deploy; swap for Django's cache framework if you
+# run multiple workers and want them to share the cache.
+_steadysim_countries_cache = {"data": None, "fetched_at": None}
+_steadysim_services_cache = {}   # {country_id: {service_name_lower: service_code}}
+
+
+def _steadysim_call(action, **params):
+    params["action"]  = action
+    params["api_key"] = config("STEADYSIM_API_KEY").strip()
+    return requests.get(STEADYSIM_BASE_URL, params=params, timeout=30)
+
+
+def _steadysim_get_countries():
+    """Fetch + cache {country_id: {country_id, name, iso}} from getCountries."""
+    now = timezone.now()
+    cache = _steadysim_countries_cache
+    if cache["data"] and cache["fetched_at"] and (now - cache["fetched_at"]).total_seconds() < 86400:
+        return cache["data"]
+    try:
+        data = _steadysim_call("getCountries").json()
+    except Exception as e:
+        logger.error(f"SteadySim getCountries error: {e}")
+        return cache["data"] or {}
+    cache["data"] = data
+    cache["fetched_at"] = now
+    return data
+
+
+def _steadysim_country_id(country_key):
+    """
+    Map our internal country key ('usa') to SteadySim's numeric
+    country_id, by matching FOREIGN_COUNTRY_DISPLAY's ISO2 code
+    against the 'iso' field SteadySim returns. Returns None if
+    SteadySim doesn't have a matching country.
+    """
+    info = FOREIGN_COUNTRY_DISPLAY.get(country_key)
+    if not info:
+        return None
+    iso2 = info[1].lower()
+    for cid, cinfo in _steadysim_get_countries().items():
+        if cinfo.get("iso", "").lower() == iso2:
+            return cid
+    return None
+
+
+def _steadysim_get_services(country_id):
+    """Fetch + cache {service_name_lower: service_code} for one country_id."""
+    if country_id in _steadysim_services_cache:
+        return _steadysim_services_cache[country_id]
+    try:
+        data = _steadysim_call("getServices", country=country_id).json()
+    except Exception as e:
+        logger.error(f"SteadySim getServices error: {e}")
+        return {}
+    lookup = {v.get("name", "").strip().lower(): k for k, v in data.items()}
+    _steadysim_services_cache[country_id] = lookup
+    return lookup
+
+
+def _steadysim_service_code(country_id, service_key):
+    """
+    Map our internal service key ('whatsapp') to SteadySim's
+    service_code, by matching FOREIGN_SERVICE_DISPLAY's name
+    against what getServices returns for that country. Falls back
+    to a substring match since SteadySim sometimes splits a brand
+    into several entries (e.g. Google Chat / Google Messenger /
+    GoogleVoice instead of one plain "Google") — in ambiguous
+    cases this takes the first match, which may not always be the
+    one you want; tighten the match here if that matters for you.
+    """
+    display_name = FOREIGN_SERVICE_DISPLAY.get(service_key, (service_key,))[0].lower()
+    services = _steadysim_get_services(country_id)
+    if display_name in services:
+        return services[display_name]
+    for name, code in services.items():
+        if display_name in name or name in display_name:
+            return code
+    return None
+
+
+def _fetch_steadysim_prices(country=None, service=None):
+    if not country or not service:
+        return []
+    country_id = _steadysim_country_id(country)
+    if not country_id:
+        return []
+    service_code = _steadysim_service_code(country_id, service)
+    if not service_code:
+        return []
+
+    try:
+        data = _steadysim_call("getPrices", service=service_code, country=country_id).json()
+    except Exception as e:
+        logger.error(f"SteadySim getPrices error: {e}")
+        return []
+
+    service_data = data.get(str(country_id), {}).get(service_code)
+    if not service_data:
+        return []
+
+    usd = float(service_data.get("cost", 0))
+    return [{
+        "country":   country,
+        "service":   service,
+        "operator":  "any",
+        "price_usd": usd,
+        "price_ngn": float(_ngn_price(usd)),
+        "price":     float(_ngn_price(usd)),
+        "count":     service_data.get("count", 0),
+    }]
+
+
+def _fetch_provider_prices(provider, country=None, service=None):
+    """Dispatch to the right provider's price-fetch function."""
+    if provider == "steadysim":
+        return _fetch_steadysim_prices(country=country, service=service)
+    return _fetch_5sim_prices(
+        country=country if country in FOREIGN_COUNTRIES else None,
+        service=service if service in FOREIGN_SERVICES else None,
+    )
+
+
+def _steadysim_buy(country, service):
+    """
+    Resolves codes then calls getNumber.
+    Returns (ok: bool, order_id: str|None, phone: str|None, error_msg: str|None)
+    """
+    country_id = _steadysim_country_id(country)
+    if not country_id:
+        return False, None, None, "Country not supported by SteadySim."
+    service_code = _steadysim_service_code(country_id, service)
+    if not service_code:
+        return False, None, None, "Service not supported by SteadySim for this country."
+
+    text = _steadysim_call("getNumber", service=service_code, country=country_id).text.strip()
+
+    if text.startswith("ACCESS_NUMBER:"):
+        _, order_id, phone = text.split(":", 2)
+        return True, order_id, phone, None
+
+    errors = {
+        "BAD_KEY":     "Invalid SteadySim API key.",
+        "BAD_SERVICE": "Invalid service or country.",
+        "NO_NUMBERS":  "No number is currently available.",
+        "NO_BALANCE":  "SteadySim wallet balance is insufficient.",
+    }
+    return False, None, None, errors.get(text, text or "Unknown SteadySim error.")
+
+
+def _steadysim_check(order_id):
+    """Returns (status, code) where status is PENDING | RECEIVED | CANCELLED | UNKNOWN."""
+    text = _steadysim_call("getStatus", id=order_id).text.strip()
+
+    if text.startswith("STATUS_OK:"):
+        return "RECEIVED", text.split(":", 1)[1]
+    if text == "STATUS_WAIT_CODE":
+        return "PENDING", None
+    if text == "STATUS_CANCEL":
+        return "CANCELLED", None
+    return "UNKNOWN", None  # covers NO_ACTIVATION and anything unexpected
+
+
+def _steadysim_cancel(order_id):
+    """status=8 cancels + triggers SteadySim's own refund logic. Returns True on ACCESS_CANCEL."""
+    text = _steadysim_call("setStatus", id=order_id, status=8).text.strip()
+    return text == "ACCESS_CANCEL"
+
+
+def _steadysim_complete(order_id):
+    """
+    status=6 marks the activation complete after you've used the
+    code. Optional — call this once you're confident the code
+    worked, so SteadySim can release/finalize the number on their
+    end. Safe to skip if you don't need that signal.
+    """
+    text = _steadysim_call("setStatus", id=order_id, status=6).text.strip()
+    return text == "STATUS_OK" or text == "ACCESS_ACTIVATION"
+
+
 @login_required
 def sub_admin_buy_foreign_number(request):
     account = get_or_create_account(request.user)
-    selected_country = request.GET.get("country", "") or request.POST.get("country", "")
-    selected_service = request.GET.get("service", "") or request.POST.get("service", "")
+    selected_country  = request.GET.get("country", "") or request.POST.get("country", "")
+    selected_service  = request.GET.get("service", "") or request.POST.get("service", "")
+    selected_provider = (
+        request.GET.get("provider", "") or request.POST.get("provider", "") or "5sim"
+    )
+    if selected_provider not in FOREIGN_PROVIDERS:
+        selected_provider = "5sim"
+
     prices = []
     cheapest_price = None
     if selected_country and selected_service:
-        prices = _fetch_5sim_prices(
-            country=selected_country if selected_country in FOREIGN_COUNTRIES else None,
-            service=selected_service if selected_service in FOREIGN_SERVICES  else None,
-        )
+        prices = _fetch_provider_prices(selected_provider, country=selected_country, service=selected_service)
         available = [p for p in prices if p["count"] > 0]
         if available:
             cheapest_price = min(available, key=lambda x: x["price_ngn"])
 
     if request.method == "POST":
-        country = request.POST.get("country", "").strip().lower()
-        service = request.POST.get("service", "").strip().lower()
+        country  = request.POST.get("country", "").strip().lower()
+        service  = request.POST.get("service", "").strip().lower()
+        provider = request.POST.get("provider", "5sim").strip().lower()
+
+        if provider not in FOREIGN_PROVIDERS:
+            messages.error(request, "Invalid provider selected.")
+            return redirect("sub-admin-buy-foreign-number")
         if not country or not service:
             messages.error(request, "Please select a country and service.")
             return redirect("sub-admin-buy-foreign-number")
@@ -1538,12 +1740,12 @@ def sub_admin_buy_foreign_number(request):
             messages.error(request, "Invalid country or service selected.")
             return redirect("sub-admin-buy-foreign-number")
 
-        plan_prices = _fetch_5sim_prices(country=country, service=service)
+        plan_prices = _fetch_provider_prices(provider, country=country, service=service)
         available   = [p for p in plan_prices if p["count"] > 0]
         if not available:
-            messages.error(request, "No available numbers right now. Try another country or service.")
+            messages.error(request, "No available numbers right now. Try another country, service, or server.")
             url = reverse("sub-admin-buy-foreign-number")
-            return redirect(f"{url}?country={country}&service={service}")
+            return redirect(f"{url}?country={country}&service={service}&provider={provider}")
 
         cheapest       = min(available, key=lambda x: x["price_ngn"])
         selected_price = Decimal(str(cheapest["price_ngn"]))
@@ -1562,93 +1764,108 @@ def sub_admin_buy_foreign_number(request):
                 owner_account.balance += selected_price
                 owner_account.save()
 
-        fivesim_country = FIVESIM_COUNTRY_MAP.get(country, country)
-        fivesim_service = FIVESIM_SERVICE_MAP.get(service, service)
-
-        try:
-            buy_url  = f"https://5sim.net/v1/user/buy/activation/{fivesim_country}/any/{fivesim_service}"
-            response = requests.get(buy_url, headers=_fivesim_headers(), timeout=30)
-
-            if response.status_code == 200:
-                data = response.json()
-                ForeignNumber.objects.create(
-                    user=request.user,
-                    order_id=data.get("id"),
-                    country=country,
-                    service=service,
-                    phone_number=data.get("phone"),
-                    price=selected_price,
-                    status=ForeignNumber.Status.PENDING,
-                    provider="5sim",
-                )
-                messages.success(request, f"Number {data.get('phone')} purchased successfully!")
-            else:
-                with db_transaction.atomic():
-                    account.balance += selected_price
-                    account.save()
-                    if owner_account and not is_owner_buying:
-                        owner_account.balance -= selected_price
-                        owner_account.save()
-                err_msg = f"HTTP {response.status_code}"
-                try:
-                    err_data = response.json()
-                    err_msg  = err_data.get("message") or err_data.get("error") or str(err_data)
-                except Exception:
-                    if response.text.strip():
-                        err_msg = response.text.strip()
-                logger.error(f"5SIM buy failed: HTTP {response.status_code} | {err_msg}")
-                err_lower = str(err_msg).lower()
-                if "no free phones" in err_lower or "no numbers" in err_lower:
-                    messages.error(request, "No available numbers right now. Try another country or service.")
-                elif "not enough" in err_lower and "balance" in err_lower:
-                    messages.error(request, "5SIM provider balance is low. Contact support.")
-                elif response.status_code == 401:
-                    messages.error(request, "5SIM authentication error. Contact support.")
-                else:
-                    messages.error(request, f"Purchase failed ({response.status_code}): {err_msg}. Balance refunded.")
-
-        except Exception as e:
+        def _refund():
             with db_transaction.atomic():
                 account.balance += selected_price
                 account.save()
                 if owner_account and not is_owner_buying:
                     owner_account.balance -= selected_price
                     owner_account.save()
-            logger.error(f"5SIM buy exception: {e}")
+
+        try:
+            if provider == "steadysim":
+                ok, order_id, phone, err = _steadysim_buy(country, service)
+                if ok:
+                    ForeignNumber.objects.create(
+                        user=request.user, order_id=order_id, country=country, service=service,
+                        phone_number=phone, price=selected_price,
+                        status=ForeignNumber.Status.PENDING, provider="steadysim",
+                    )
+                    messages.success(request, f"Number {phone} purchased successfully via SteadySim!")
+                else:
+                    _refund()
+                    logger.error(f"steadysim buy failed: {err}")
+                    if err and "balance" in err.lower():
+                        messages.error(request, "SteadySim provider balance is low. Contact support.")
+                    elif err and "not supported" in err.lower():
+                        messages.error(request, f"{err} Try Server 1 · 5SIM instead.")
+                    else:
+                        messages.error(request, f"Purchase failed: {err}. Balance refunded.")
+
+            else:
+                fivesim_country = FIVESIM_COUNTRY_MAP.get(country, country)
+                fivesim_service = FIVESIM_SERVICE_MAP.get(service, service)
+                buy_url  = f"https://5sim.net/v1/user/buy/activation/{fivesim_country}/any/{fivesim_service}"
+                response = requests.get(buy_url, headers=_fivesim_headers(), timeout=30)
+
+                if response.status_code == 200:
+                    data = response.json()
+                    ForeignNumber.objects.create(
+                        user=request.user, order_id=data.get("id"), country=country, service=service,
+                        phone_number=data.get("phone"), price=selected_price,
+                        status=ForeignNumber.Status.PENDING, provider="5sim",
+                    )
+                    messages.success(request, f"Number {data.get('phone')} purchased successfully via 5SIM!")
+                else:
+                    _refund()
+                    err_msg = f"HTTP {response.status_code}"
+                    try:
+                        err_data = response.json()
+                        err_msg  = err_data.get("message") or err_data.get("error") or str(err_data)
+                    except Exception:
+                        if response.text.strip():
+                            err_msg = response.text.strip()
+                    logger.error(f"5sim buy failed: HTTP {response.status_code} | {err_msg}")
+                    err_lower = str(err_msg).lower()
+                    if "no free phones" in err_lower or "no numbers" in err_lower:
+                        messages.error(request, "No available numbers right now. Try another country, service, or server.")
+                    elif "not enough" in err_lower and "balance" in err_lower:
+                        messages.error(request, "5SIM provider balance is low. Contact support.")
+                    elif response.status_code == 401:
+                        messages.error(request, "5SIM authentication error. Contact support.")
+                    else:
+                        messages.error(request, f"Purchase failed ({response.status_code}): {err_msg}. Balance refunded.")
+
+        except Exception as e:
+            _refund()
+            logger.error(f"{provider} buy exception: {e}")
             messages.error(request, "Something went wrong. Your balance has been refunded.")
 
         url = reverse("sub-admin-buy-foreign-number")
-        return redirect(f"{url}?country={country}&service={service}")
+        return redirect(f"{url}?country={country}&service={service}&provider={provider}")
 
     numbers = ForeignNumber.objects.filter(
-        user=request.user, provider="5sim"
+        user=request.user, provider__in=FOREIGN_PROVIDERS
     ).order_by("-created_at")
 
     context = {
-        "account":          account,
-        "countries":        FOREIGN_COUNTRIES,
-        "services":         FOREIGN_SERVICES,
-        "country_display":  FOREIGN_COUNTRY_DISPLAY,
-        "service_display":  FOREIGN_SERVICE_DISPLAY,
-        "numbers":          numbers,
-        "prices":           prices,
-        "cheapest_price":   cheapest_price,
-        "selected_country": selected_country,
-        "selected_service": selected_service,
+        "account":           account,
+        "countries":         FOREIGN_COUNTRIES,
+        "services":          FOREIGN_SERVICES,
+        "providers":         FOREIGN_PROVIDERS,
+        "provider_display":  FOREIGN_PROVIDER_DISPLAY,
+        "country_display":   FOREIGN_COUNTRY_DISPLAY,
+        "service_display":   FOREIGN_SERVICE_DISPLAY,
+        "numbers":           numbers,
+        "prices":            prices,
+        "cheapest_price":    cheapest_price,
+        "selected_country":  selected_country,
+        "selected_service":  selected_service,
+        "selected_provider": selected_provider,
     }
     return render(request, "admin/subadmin/buy_foreign_number.html", context)
 
 
 @login_required
 def sub_admin_foreign_number_prices(request):
-    country = request.GET.get("country", "").strip().lower()
-    service = request.GET.get("service", "").strip().lower()
+    country  = request.GET.get("country", "").strip().lower()
+    service  = request.GET.get("service", "").strip().lower()
+    provider = request.GET.get("provider", "5sim").strip().lower()
+    if provider not in FOREIGN_PROVIDERS:
+        provider = "5sim"
     if not country or not service:
         return JsonResponse({"prices": [], "error": "country and service required"})
-    prices = _fetch_5sim_prices(
-        country=country if country in FOREIGN_COUNTRIES else None,
-        service=service if service  in FOREIGN_SERVICES  else None,
-    )
+    prices = _fetch_provider_prices(provider, country=country, service=service)
     return JsonResponse({"prices": prices})
 
 
@@ -1665,12 +1882,17 @@ def sub_admin_cancel_foreign_number(request, order_id):
         return redirect("sub-admin-buy-foreign-number")
 
     try:
-        response = requests.get(
-            f"https://5sim.net/v1/user/cancel/{order_id}",
-            headers=_fivesim_headers(),
-            timeout=30,
-        )
-        if response.status_code != 200:
+        if foreign_number.provider == "steadysim":
+            cancelled_ok = _steadysim_cancel(order_id)
+        else:
+            response = requests.get(
+                f"https://5sim.net/v1/user/cancel/{order_id}",
+                headers=_fivesim_headers(),
+                timeout=30,
+            )
+            cancelled_ok = response.status_code == 200
+
+        if not cancelled_ok:
             messages.error(request, "Unable to cancel number. It may already be expired or cancelled.")
             return redirect("sub-admin-buy-foreign-number")
 
@@ -1699,7 +1921,7 @@ def sub_admin_cancel_foreign_number(request, order_id):
         messages.success(request, f"Number cancelled successfully. ₦{refund_amount:,.0f} refunded to your wallet.")
 
     except Exception as e:
-        logger.exception("5SIM cancel error")
+        logger.exception(f"{foreign_number.provider} cancel error")
         messages.error(request, f"Cancellation failed: {str(e)}")
 
     return redirect("sub-admin-buy-foreign-number")
@@ -1707,10 +1929,10 @@ def sub_admin_cancel_foreign_number(request, order_id):
 
 @login_required
 def sub_admin_check_sms_5sim(request, order_id):
-    """Poll 5SIM for an incoming SMS code and save it to the ForeignNumber record."""
+    """Poll the number's provider for an incoming SMS code and save it."""
     try:
         foreign_number = ForeignNumber.objects.get(
-            order_id=order_id, user=request.user, provider="5sim"
+            order_id=order_id, user=request.user, provider__in=FOREIGN_PROVIDERS
         )
     except ForeignNumber.DoesNotExist:
         return JsonResponse({"error": "Number not found."}, status=404)
@@ -1719,26 +1941,36 @@ def sub_admin_check_sms_5sim(request, order_id):
         return JsonResponse({"status": "received", "sms_code": foreign_number.sms_code})
 
     try:
-        response = requests.get(
-            f"https://5sim.net/v1/user/check/{order_id}",
-            headers=_fivesim_headers(),
-            timeout=15,
-        )
-        data = response.json()
+        if foreign_number.provider == "steadysim":
+            status, code = _steadysim_check(order_id)
+            if status == "RECEIVED" and code:
+                foreign_number.sms_code = code
+                foreign_number.status = ForeignNumber.Status.RECEIVED
+                foreign_number.save()
+                _steadysim_complete(order_id)  # best-effort — ignore failure
+                return JsonResponse({"status": "received", "sms_code": code})
+            return JsonResponse({"status": status, "sms_code": None})
+
+        else:
+            response = requests.get(
+                f"https://5sim.net/v1/user/check/{order_id}",
+                headers=_fivesim_headers(),
+                timeout=15,
+            )
+            data = response.json()
+            sms_list = data.get("sms", [])
+            if sms_list:
+                code = sms_list[-1].get("code") or sms_list[-1].get("text", "")
+                foreign_number.sms_code = code
+                foreign_number.status = ForeignNumber.Status.RECEIVED
+                foreign_number.save()
+                return JsonResponse({"status": "received", "sms_code": code})
+            api_status = data.get("status", "PENDING").upper()
+            return JsonResponse({"status": api_status, "sms_code": None})
+
     except Exception as e:
-        logger.error(f"5SIM check SMS error: {e}")
-        return JsonResponse({"error": "Could not reach 5SIM."}, status=502)
-
-    sms_list = data.get("sms", [])
-    if sms_list:
-        code = sms_list[-1].get("code") or sms_list[-1].get("text", "")
-        foreign_number.sms_code = code
-        foreign_number.status = ForeignNumber.Status.RECEIVED
-        foreign_number.save()
-        return JsonResponse({"status": "received", "sms_code": code})
-
-    api_status = data.get("status", "PENDING").upper()
-    return JsonResponse({"status": api_status, "sms_code": None})
+        logger.error(f"{foreign_number.provider} check SMS error: {e}")
+        return JsonResponse({"error": "Could not reach provider."}, status=502)
 
 
 # ════════════════════════════════════════════════════════
