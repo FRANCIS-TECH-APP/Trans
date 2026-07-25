@@ -30,7 +30,7 @@ DATABASE_URL = config('DATABASE_URL')
 STEADYSIM_API_KEY = config("STEADYSIM_API_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config('DEBUG')
+DEBUG = config("DEBUG", default=False, cast=bool)
 
 ALLOWED_HOSTS = [
     'transedge.site',

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>404 — Page Not Found | TransEdge</title>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<style>
+  :root { --brand: #3b82f6; --brand-dark: #1e3a5f; }
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', 'Hanken Grotesk', sans-serif; }
+
+  body {
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 24px;
+    background: linear-gradient(135deg, #1e3a5f 0%, #2d5a8c 55%, #3b6ea5 100%);
+    color: #0f172a;
+  }
+
+  .card {
+    width: 100%;
+    max-width: 620px;
+    background: #fff;
+    border-radius: 24px;
+    padding: 56px 44px;
+    text-align: center;
+    box-shadow: 0 30px 70px rgba(15, 23, 42, .35);
+    position: relative;
+    overflow: hidden;
+  }
+  .card::before {
+    content: '';
+    position: absolute;
+    top: -60px; right: -60px;
+    width: 180px; height: 180px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(59,130,246,.10), transparent 70%);
+  }
+
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 28px;
+    color: var(--brand-dark);
+  }
+  .brand .material-symbols-outlined {
+    font-variation-settings: 'FILL' 1, 'wght' 500;
+    color: var(--brand);
+    font-size: 22px;
+  }
+  .brand span.name { font-weight: 800; font-size: 15px; letter-spacing: -.2px; }
+
+  .icon-badge {
+    width: 76px; height: 76px;
+    border-radius: 20px;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 20px;
+    background: rgba(59, 130, 246, .10);
+  }
+  .icon-badge .material-symbols-outlined {
+    font-size: 38px;
+    color: var(--brand);
+    font-variation-settings: 'FILL' 0, 'wght' 500;
+  }
+
+  .code {
+    font-weight: 800;
+    font-size: 64px;
+    letter-spacing: -1px;
+    color: var(--brand);
+    line-height: 1;
+    margin-bottom: 8px;
+  }
+  h2 { font-size: 22px; font-weight: 700; color: #0f172a; margin-bottom: 14px; }
+  p { color: #64748b; line-height: 1.7; margin-bottom: 32px; font-size: 14.5px; }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 30px;
+    background: var(--brand);
+    color: #fff;
+    text-decoration: none;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 14px;
+    transition: transform .2s ease, box-shadow .2s ease, background .2s ease;
+  }
+  .btn:hover { background: #2563eb; transform: translateY(-2px); box-shadow: 0 12px 24px rgba(37,99,235,.25); }
+  .btn .material-symbols-outlined { font-size: 18px; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="brand">
+    <span class="material-symbols-outlined">local_shipping</span>
+    <span class="name">TransEdge</span>
+  </div>
+
+  <div class="icon-badge">
+    <span class="material-symbols-outlined">search_off</span>
+  </div>
+
+  <div class="code">404</div>
+  <h2>Page Not Found</h2>
+  <p>The page you're looking for doesn't exist, may have been moved, or the link might be broken.</p>
+
+  <a href="{% url 'sub-admin-dashboard' %}" class="btn">
+    <span class="material-symbols-outlined">dashboard</span>
+    Return to Dashboard
+  </a>
+</div>
+
+</body>
+</html>
