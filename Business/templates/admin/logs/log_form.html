@@ -1,0 +1,167 @@
+
+{% extends "admin/base_admin.html" %}
+{% block title %}{% if action == 'Edit' %}Edit {{ product.title }}{% else %}New Log Product{% endif %}{% endblock %}
+{% block page_title %}{% if action == 'Edit' %}Edit Product{% else %}New Product{% endif %}{% endblock %}
+{% block breadcrumb %}
+  <a href="{% url 'admin-dashboard' %}">Home</a> /
+  <a href="{% url 'admin-log-list' %}">Logs</a> /
+  {{ action }}
+{% endblock %}
+
+{% block content %}
+<div style="max-width:640px;">
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+
+    <div class="card" style="margin-bottom:14px;">
+      <div class="card-header"><h3>Product Information</h3></div>
+      <div class="card-body">
+        <div class="form-grid">
+          <div class="form-group span-2">
+            <label>Title *</label>
+            <input type="text" name="title" value="{{ product.title|default:'' }}" required placeholder="e.g. Facebook Account with 2FA"/>
+          </div>
+          <div class="form-group">
+            <label>Category *</label>
+            <select name="category" required>
+              <option value="">— Select —</option>
+              {% for cat in categories %}
+              <option value="{{ cat.pk }}" {% if product.category_id == cat.pk %}selected{% endif %}>
+                {{ cat.name }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Price (₦) *</label>
+            <input type="number" name="price" step="0.01" value="{{ product.price|default:'' }}" required placeholder="5000"/>
+          </div>
+          <div class="form-group span-2">
+            <label>Description</label>
+            <textarea name="description" rows="4" placeholder="Describe what the buyer gets...">{{ product.description|default:'' }}</textarea>
+          </div>
+          <div class="form-group span-2">
+            <label>Product Image</label>
+            {% if product.image %}
+            <div style="margin-bottom:8px;">
+              <img src="{{ product.image.url }}" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:1px solid var(--border);"/>
+            </div>
+            {% endif %}
+            <input type="file" name="image" accept="image/*" style="font-size:13px;padding:6px;"/>
+          </div>
+          <div class="form-group">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+              <input type="checkbox" name="active" {% if product.active or not product %}checked{% endif %} style="width:auto;"/>
+              Active (visible to sub-admins)
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <a href="{% if product %}{% url 'admin-log-detail' product.pk %}{% else %}{% url 'admin-log-list' %}{% endif %}" class="btn btn-ghost">Cancel</a>
+      <button type="submit" class="btn btn-primary">
+        <i class="fas fa-save"></i> {{ action }} Product
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}
+EOF
+
+cat > /mnt/user-data/outputs/logs_pages/category_list.html << 'EOF'
+{% extends "admin/base_admin.html" %}
+{% block title %}Log Categories{% endblock %}
+{% block page_title %}Log Categories{% endblock %}
+{% block breadcrumb %}<a href="{% url 'admin-dashboard' %}">Home</a> / <a href="{% url 'admin-log-list' %}">Logs</a> / Categories{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{% url 'admin-log-category-create' %}" class="btn btn-primary btn-sm">
+    <i class="fas fa-plus"></i> New Category
+  </a>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Name</th><th>Icon</th><th>Order</th><th>Products</th><th>Status</th><th>Actions</th></tr>
+      </thead>
+      <tbody>
+        {% for cat in categories %}
+        <tr>
+          <td style="font-size:13px;font-weight:500;">{{ cat.name }}</td>
+          <td>{% if cat.icon %}<i class="{{ cat.icon }}"></i> <code style="font-size:11px;color:var(--muted);">{{ cat.icon }}</code>{% else %}—{% endif %}</td>
+          <td style="font-size:13px;">{{ cat.order }}</td>
+          <td style="font-size:13px;">{{ cat.product_count }}</td>
+          <td>{% if cat.is_active %}<span class="badge badge-green">Active</span>{% else %}<span class="badge badge-red">Inactive</span>{% endif %}</td>
+          <td>
+            <div style="display:flex;gap:6px;">
+              <a href="{% url 'admin-log-category-edit' cat.pk %}" class="btn btn-ghost btn-sm">Edit</a>
+              <form method="post" action="{% url 'admin-log-category-delete' cat.pk %}" onsubmit="return confirm('Delete {{ cat.name }}?')">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger btn-sm"><i class="fas fa-trash"></i></button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:2rem;">No categories yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+EOF
+
+cat > /mnt/user-data/outputs/logs_pages/category_form.html << 'EOF'
+{% extends "admin/base_admin.html" %}
+{% block title %}{% if action == 'Edit' %}Edit {{ category.name }}{% else %}New Category{% endif %}{% endblock %}
+{% block page_title %}{{ action }} Category{% endblock %}
+{% block breadcrumb %}
+  <a href="{% url 'admin-dashboard' %}">Home</a> /
+  <a href="{% url 'admin-log-list' %}">Logs</a> /
+  <a href="{% url 'admin-log-category-list' %}">Categories</a> /
+  {{ action }}
+{% endblock %}
+
+{% block content %}
+<div style="max-width:480px;">
+  <form method="post">
+    {% csrf_token %}
+    <div class="card">
+      <div class="card-header"><h3>Category Details</h3></div>
+      <div class="card-body">
+        <div class="form-grid cols-1">
+          <div class="form-group">
+            <label>Name *</label>
+            <input type="text" name="name" value="{{ category.name|default:'' }}" required placeholder="e.g. Facebook"/>
+          </div>
+          <div class="form-group">
+            <label>Font Awesome Icon Class</label>
+            <input type="text" name="icon" value="{{ category.icon|default:'' }}" placeholder="fab fa-facebook"/>
+            <small style="color:var(--muted);font-size:11px;">Find icons at fontawesome.com</small>
+          </div>
+          <div class="form-group">
+            <label>Sort Order</label>
+            <input type="number" name="order" value="{{ category.order|default:0 }}" min="0"/>
+          </div>
+          <div class="form-group">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+              <input type="checkbox" name="is_active" {% if category.is_active or not category %}checked{% endif %} style="width:auto;"/>
+              Active
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:12px;">
+      <a href="{% url 'admin-log-category-list' %}" class="btn btn-ghost">Cancel</a>
+      <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> {{ action }} Category</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

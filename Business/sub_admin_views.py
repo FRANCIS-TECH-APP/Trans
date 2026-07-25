@@ -9,6 +9,7 @@ import requests
 from io import BytesIO
 from datetime import timedelta
 from decimal import Decimal, InvalidOperation
+from urllib.parse import urlencode
 
 from decouple import config
 from xhtml2pdf import pisa
@@ -18,8 +19,10 @@ from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
+from django.core.validators import validate_email
+from django.core.exceptions import ValidationError
 from django.db import transaction as db_transaction
-from django.db.models import Q
+from django.db.models import Q, Prefetch
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.template.loader import render_to_string
@@ -35,7 +38,8 @@ from .models import (
     Account, ForeignNumber, WalletDeposit,
     Notification, NotificationRead, SubAdminSiteSettings,
     DashboardAdvert, DashboardAnnouncement, Testimonial, BrandGalleryImage,
-    Invoice, InvoiceItem,SubAdminGalleryImage,Purchase,CURRENCY_CHOICES,BuyLogDetails,BuyLogs
+    Invoice, InvoiceItem, SubAdminGalleryImage, Purchase, CURRENCY_CHOICES,
+    BuyLogDetails, BuyLogs, Tutorial, TutorialCategory,
 )
 
 logger = logging.getLogger(__name__)
@@ -44,7 +48,6 @@ logger = logging.getLogger(__name__)
 # ════════════════════════════════════════════════════════
 #  DECORATORS
 # ════════════════════════════════════════════════════════
-
 
 def get_or_create_sub_admin_profile(user):
     """
@@ -81,7 +84,6 @@ def sub_admin_approved_required(view_func):
     return wrapper
 
 
-
 def sub_admin_has_points(view_func):
     """Approved + enough points to create a shipment."""
     def wrapper(request, *args, **kwargs):
@@ -106,7 +108,6 @@ def sub_admin_has_points(view_func):
     return wrapper
 
 
-
 def super_admin_required(view_func):
     def wrapper(request, *args, **kwargs):
         if not request.user.is_authenticated:
@@ -119,6 +120,18 @@ def super_admin_required(view_func):
     return wrapper
 
 
+def insufficient_funds_redirect(request, needed, reason, next_url=None):
+    """
+    Call this instead of `messages.error(...) + redirect('sub-admin-buy-points')`
+    anywhere a points/balance check fails. Shows a popup-style page instead
+    of a flash message.
+    """
+    params = {"needed": needed, "reason": reason}
+    if next_url:
+        params["next"] = next_url
+    return redirect(f"{reverse('sub-admin-insufficient-funds')}?{urlencode(params)}")
+
+
 # ════════════════════════════════════════════════════════
 #  AUTH
 # ════════════════════════════════════════════════════════
@@ -127,8 +140,6 @@ def sub_admin_register(request):
     if request.user.is_authenticated and request.user.role == User.Role.SUB_ADMIN:
         return redirect("sub-admin-dashboard")
 
-    # capture referral code from the link (?ref=A1B2C3D4), keep it
-    # through the form via a hidden input named "ref_code"
     ref_code = request.GET.get("ref", "").strip().upper()
 
     if request.method == "POST":
@@ -158,12 +169,9 @@ def sub_admin_register(request):
             is_active = True,
         )
 
-        # find referrer by code (if any)
         referrer = None
         if ref_code:
             referrer = SubAdminProfile.objects.filter(referral_code=ref_code).first()
-        
-
 
         SubAdminProfile.objects.create(
             user            = user,
@@ -244,9 +252,9 @@ def sub_admin_dashboard(request):
 #  POINTS — BUY & WEBHOOK
 # ════════════════════════════════════════════════════════
 
-
+@login_required
 def sub_admin_buy_points(request):
-    profile  = request.user.sub_admin_profile
+    profile  = get_or_create_sub_admin_profile(request.user)
     pricing  = PointsPricing.get_current()
     history  = profile.point_purchases.order_by("-created_at")[:10]
 
@@ -262,7 +270,7 @@ def sub_admin_buy_points(request):
 @require_POST
 def sub_admin_points_pay(request):
     """Initiate Paystack payment for points top-up."""
-    profile  = request.user.sub_admin_profile
+    profile  = get_or_create_sub_admin_profile(request.user)
     pricing  = PointsPricing.get_current()
 
     try:
@@ -287,7 +295,7 @@ def sub_admin_points_pay(request):
     )
 
     callback_url = request.build_absolute_uri(
-    reverse("sub-admin-points-verify", args=[reference])
+        reverse("sub-admin-points-verify", args=[reference])
     )
 
     try:
@@ -392,7 +400,7 @@ def sub_admin_shipment_list(request):
 
     paginator = Paginator(qs, 20)
     page_obj  = paginator.get_page(request.GET.get("page"))
-    profile   = request.user.sub_admin_profile
+    profile   = get_or_create_sub_admin_profile(request.user)
 
     context = {
         "page_obj":       page_obj,
@@ -405,6 +413,7 @@ def sub_admin_shipment_list(request):
     }
     return render(request, "admin/subadmin/shipment_list.html", context)
 
+
 @login_required
 def sub_admin_shipment_create(request):
     profile = get_or_create_sub_admin_profile(request.user)
@@ -413,7 +422,7 @@ def sub_admin_shipment_create(request):
     if request.method == "POST":
         p = request.POST
 
-        # This is now the ONLY points gate — form itself is always viewable
+        # This is the ONLY points gate — form itself is always viewable
         if not profile.can_create_shipment():
             return insufficient_funds_redirect(
                 request,
@@ -490,7 +499,6 @@ def sub_admin_shipment_create(request):
             first_img.is_primary = True
             first_img.save()
 
-        # Deduct points AFTER shipment is saved successfully
         profile.deduct_points(cost)
 
         messages.success(
@@ -507,9 +515,10 @@ def sub_admin_shipment_create(request):
         "payment_statuses":  Payment.Status.choices,
         "pricing":           pricing,
         "profile":           profile,
-        "can_create":        profile.can_create_shipment(),  # for an inline "low points" banner, not a block
+        "can_create":        profile.can_create_shipment(),
     }
     return render(request, "admin/subadmin/shipment_form.html", context)
+
 
 @login_required
 def sub_admin_shipment_detail(request, pk):
@@ -591,7 +600,7 @@ def reject_sub_admin(request, pk):
     return redirect("manage-sub-admins")
 
 
-@login_required
+@super_admin_required
 @require_POST
 def suspend_sub_admin(request, pk):
     profile = get_object_or_404(SubAdminProfile, pk=pk)
@@ -601,7 +610,7 @@ def suspend_sub_admin(request, pk):
     return redirect("manage-sub-admins")
 
 
-@login_required
+@super_admin_required
 @require_POST
 def reinstate_sub_admin(request, pk):
     profile = get_object_or_404(SubAdminProfile, pk=pk)
@@ -611,7 +620,7 @@ def reinstate_sub_admin(request, pk):
     return redirect("manage-sub-admins")
 
 
-@login_required
+@super_admin_required
 @require_POST
 def set_points_pricing(request):
     """Super admin updates point costs and price per point."""
@@ -640,7 +649,7 @@ def set_points_pricing(request):
     return redirect("manage-sub-admins")
 
 
-@login_required
+@super_admin_required
 @require_POST
 def admin_adjust_points(request, pk):
     """Super admin manually add or remove points from a sub-admin."""
@@ -689,8 +698,6 @@ def sub_admin_landing(request):
 #  CHECKPOINTS — sync shipment status from checkpoint events
 # ════════════════════════════════════════════════════════
 
-# Statuses that represent one of the 5 stepper stages shown on the
-# public tracking page.
 PROGRESS_STATUSES = {
     Shipment.Status.CREATED,
     Shipment.Status.PICKED_UP,
@@ -700,7 +707,6 @@ PROGRESS_STATUSES = {
     Shipment.Status.DELIVERED,
 }
 
-# Same statuses, in stepper order — used to prevent status moving backward.
 PROGRESS_ORDER = [
     Shipment.Status.CREATED,
     Shipment.Status.PICKED_UP,
@@ -721,7 +727,7 @@ CHECKPOINT_TO_STATUS = {
     TransitCheckpoint.EventType.DELIVERED:        Shipment.Status.DELIVERED,
     TransitCheckpoint.EventType.ATTEMPTED:        Shipment.Status.OUT_FOR_DELIVERY,
     TransitCheckpoint.EventType.HELD:             Shipment.Status.HELD,
-    TransitCheckpoint.EventType.EXCEPTION:        None,  # no direct status mapping
+    TransitCheckpoint.EventType.EXCEPTION:        None,
 }
 
 
@@ -763,19 +769,15 @@ def sub_admin_checkpoint_add(request, pk):
         added_by    = request.user,
     )
 
-    # ── Sync shipment.status from the checkpoint event_type ──────
     new_status = CHECKPOINT_TO_STATUS.get(p["event_type"])
     if new_status:
         if new_status in PROGRESS_STATUSES and shipment.status in PROGRESS_STATUSES:
-            # Only move forward along the stepper, never backward
             if PROGRESS_ORDER.index(new_status) > PROGRESS_ORDER.index(shipment.status):
                 shipment.status = new_status
                 shipment.save(update_fields=["status"])
         else:
-            # e.g. HELD — apply directly regardless of ordering
             shipment.status = new_status
             shipment.save(update_fields=["status"])
-    # ───────────────────────────────────────────────────────────
 
     messages.success(request, "Checkpoint added.")
     return redirect("sub-admin-shipment-detail", pk=pk)
@@ -792,7 +794,7 @@ def sub_admin_shipment_amend_form(request, pk):
         Shipment.objects.select_related("sender", "receiver", "payment"),
         pk=pk, created_by=request.user
     )
-    profile = request.user.sub_admin_profile
+    profile = get_or_create_sub_admin_profile(request.user)
     pricing = PointsPricing.get_current()
 
     context = {
@@ -807,6 +809,7 @@ def sub_admin_shipment_amend_form(request, pk):
     }
     return render(request, "admin/subadmin/shipment_amend.html", context)
 
+
 @login_required
 @require_POST
 def sub_admin_shipment_amend(request, pk):
@@ -815,7 +818,7 @@ def sub_admin_shipment_amend(request, pk):
         Shipment.objects.select_related("sender", "receiver"),
         pk=pk, created_by=request.user
     )
-    profile  = request.user.sub_admin_profile
+    profile  = get_or_create_sub_admin_profile(request.user)
     pricing  = PointsPricing.get_current()
     cost     = pricing.points_per_amendment
 
@@ -827,7 +830,6 @@ def sub_admin_shipment_amend(request, pk):
 
     p = request.POST
 
-    # ── Update sender ──────────────────────────────────────────
     sender = shipment.sender
     sender.full_name   = p.get("sender_name", sender.full_name)
     sender.email       = p.get("sender_email", sender.email)
@@ -840,7 +842,6 @@ def sub_admin_shipment_amend(request, pk):
     sender.company     = p.get("sender_company", sender.company)
     sender.save()
 
-    # ── Update receiver ─────────────────────────────────────────
     receiver = shipment.receiver
     receiver.full_name   = p.get("receiver_name", receiver.full_name)
     receiver.email       = p.get("receiver_email", receiver.email)
@@ -853,7 +854,6 @@ def sub_admin_shipment_amend(request, pk):
     receiver.company     = p.get("receiver_company", receiver.company)
     receiver.save()
 
-    # ── Update shipment fields ──────────────────────────────────
     shipment.shipment_type        = p.get("shipment_type", shipment.shipment_type)
     shipment.description          = p.get("description", shipment.description)
     shipment.weight_kg            = p.get("weight_kg") or None
@@ -870,7 +870,6 @@ def sub_admin_shipment_amend(request, pk):
     shipment.driver_phone         = p.get("driver_phone", shipment.driver_phone)
     shipment.driver_vehicle_info  = p.get("driver_vehicle_info", shipment.driver_vehicle_info)
 
-    # ── Update payment (create if missing) ──────────────────────
     payment = getattr(shipment, "payment", None)
     if payment:
         payment.amount   = p.get("payment_amount", payment.amount)
@@ -890,24 +889,20 @@ def sub_admin_shipment_amend(request, pk):
             due_date = p.get("payment_due_date") or None,
         )
 
-    # ── Remove images the user checked off ──────────────────────
     remove_ids = request.POST.getlist("remove_images")
     if remove_ids:
         ShipmentImage.objects.filter(shipment=shipment, id__in=remove_ids).delete()
 
-    # ── Add new images — NO LIMIT, every uploaded file is saved ──
     new_images = request.FILES.getlist("images")
     for img_file in new_images:
         ShipmentImage.objects.create(shipment=shipment, image=img_file)
 
-    # Ensure exactly one primary image if any images remain
     if not shipment.images.filter(is_primary=True).exists():
         first_img = shipment.images.first()
         if first_img:
             first_img.is_primary = True
             first_img.save()
 
-    # ── Deduct points and save ───────────────────────────────────
     profile.deduct_points(cost)
     shipment.amendment_count += 1
     shipment.points_spent    += cost
@@ -929,13 +924,12 @@ def sub_admin_shipment_amend(request, pk):
 
 @login_required
 def sub_admin_profile(request):
-    profile = request.user.sub_admin_profile
+    profile = get_or_create_sub_admin_profile(request.user)
     pricing = PointsPricing.get_current()
 
     if request.method == "POST":
         action = request.POST.get("action")
 
-        # ── Update profile info (name, email, whatsapp) ──────────
         if action == "update_profile":
             full_name = request.POST.get("full_name", "").strip()
             email     = request.POST.get("email", "").strip().lower()
@@ -957,7 +951,6 @@ def sub_admin_profile(request):
             messages.success(request, "Profile updated successfully.")
             return redirect("sub-admin-profile")
 
-        # ── Avatar upload ─────────────────────────────────────────
         elif action == "update_avatar":
             avatar = request.FILES.get("avatar")
             if not avatar:
@@ -973,7 +966,6 @@ def sub_admin_profile(request):
             messages.success(request, "Profile photo updated.")
             return redirect("sub-admin-profile")
 
-        # ── Change password ───────────────────────────────────────
         elif action == "change_password":
             old_password     = request.POST.get("old_password", "")
             new_password     = request.POST.get("new_password", "")
@@ -993,15 +985,12 @@ def sub_admin_profile(request):
 
             return redirect("sub-admin-profile")
 
-        # ── Delete account ────────────────────────────────────────
         elif action == "delete_account":
             user = request.user
             uid  = user.pk
 
             logout(request)
 
-            # Anonymize instead of hard-deleting, so historical
-            # shipments / payments keep a valid FK reference.
             user.full_name   = "Deleted User"
             user.email       = f"deleted_user_{uid}@transedge.invalid"
             user.is_active   = False
@@ -1022,15 +1011,12 @@ def sub_admin_profile(request):
 # ════════════════════════════════════════════════════════
 #  SHIPMENT ADD-ONS
 # ════════════════════════════════════════════════════════
-from django.core.validators import validate_email
-from django.core.exceptions import ValidationError
-
 
 @login_required
 def sub_admin_shipment_addons(request, pk):
     """Manage optional add-ons for a shipment (e.g. support contact link/email)."""
     shipment = get_object_or_404(Shipment, pk=pk, created_by=request.user)
-    profile  = request.user.sub_admin_profile
+    profile  = get_or_create_sub_admin_profile(request.user)
     pricing  = PointsPricing.get_current()
 
     if request.method == "POST":
@@ -1088,7 +1074,6 @@ def sub_admin_shipment_addons(request, pk):
             return redirect("sub-admin-shipment-addons", pk=pk)
 
         elif action == "toggle_support_link":
-            # Free toggle — no charge, just show/hide on client page
             shipment.support_link_active = not shipment.support_link_active
             shipment.save(update_fields=["support_link_active"])
             state = "enabled" if shipment.support_link_active else "disabled"
@@ -1102,9 +1087,11 @@ def sub_admin_shipment_addons(request, pk):
     }
     return render(request, "admin/subadmin/shipment_addons.html", context)
 
+
 # ════════════════════════════════════════════════════════
 #  INVOICES
 # ════════════════════════════════════════════════════════
+
 @login_required
 def sub_admin_invoice_create(request, pk):
     shipment = get_object_or_404(Shipment, pk=pk, created_by=request.user)
@@ -1113,7 +1100,7 @@ def sub_admin_invoice_create(request, pk):
         messages.info(request, "An invoice already exists for this shipment.")
         return redirect("sub-admin-invoice-detail", pk=shipment.invoice.pk)
 
-    profile = request.user.sub_admin_profile
+    profile = get_or_create_sub_admin_profile(request.user)
     pricing = PointsPricing.get_current()
     cost    = pricing.points_per_invoice
 
@@ -1129,7 +1116,7 @@ def sub_admin_invoice_create(request, pk):
         bill_to_name    = shipment.receiver.full_name,
         bill_to_email   = shipment.receiver.email,
         bill_to_address = f"{shipment.receiver.address}, {shipment.receiver.city}, {shipment.receiver.country}".strip(", "),
-        currency        = shipment.currency,
+        currency        = "USD",
         due_date        = timezone.now().date() + timedelta(days=7),
     )
     InvoiceItem.objects.create(
@@ -1149,7 +1136,6 @@ def sub_admin_invoice_create(request, pk):
 
     invoice.recalculate_totals()
 
-    # Deduct points AFTER invoice is fully created — mirrors shipment_create
     profile.deduct_points(cost)
 
     messages.success(
@@ -1176,6 +1162,7 @@ def sub_admin_invoice_detail(request, pk):
         "currency_choices": CURRENCY_CHOICES,
     }
     return render(request, "admin/subadmin/invoice_detail.html", context)
+
 
 @login_required
 @require_POST
@@ -1220,7 +1207,6 @@ def sub_admin_invoice_update(request, pk):
 
     messages.success(request, "Invoice updated.")
     return redirect("sub-admin-invoice-detail", pk=pk)
-
 
 
 @login_required
@@ -1294,7 +1280,6 @@ def sub_admin_invoice_pdf(request, pk):
     return response
 
 
-
 def link_callback(uri, rel):
     """
     Resolves static/media URLs to absolute filesystem paths so
@@ -1305,7 +1290,7 @@ def link_callback(uri, rel):
     elif uri.startswith(settings.MEDIA_URL):
         path = os.path.join(settings.MEDIA_ROOT, uri.replace(settings.MEDIA_URL, ""))
     else:
-        return uri  # already an absolute path or external URL
+        return uri
 
     if not os.path.isfile(path):
         raise Exception(f"Static/media file not found for PDF: {path}")
@@ -1324,11 +1309,6 @@ def get_or_create_account(user):
 
 
 def get_owner_account():
-    """
-    Optional revenue-tracking account. Returns None if unconfigured
-    rather than blocking purchases — set SITE_OWNER_EMAIL in .env
-    to enable it.
-    """
     owner_email = config("SITE_OWNER_EMAIL", default="")
     if not owner_email:
         return None
@@ -1433,7 +1413,6 @@ FOREIGN_SERVICE_DISPLAY = {
     "line":      ("Line",       "🟢"),
 }
 
-# ── Providers ──────────────────────────────────────────────────
 FOREIGN_PROVIDERS = ["5sim", "steadysim"]
 
 FOREIGN_PROVIDER_DISPLAY = {
@@ -1467,6 +1446,7 @@ FIVESIM_SERVICE_MAP = {
     "apple": "apple", "uber": "uber", "airbnb": "airbnb", "spotify": "spotify",
     "paypal": "paypal", "linkedin": "linkedin", "viber": "viber", "line": "line",
 }
+
 
 def _ngn_price(usd_price):
     def clean(val):
@@ -1520,17 +1500,10 @@ def _fetch_5sim_prices(country=None, service=None):
     return prices
 
 
-# SteadySim runs the same handler_api.php family as SMS-Activate: one
-# base URL, an action= query param, api_key on every call, plain-text
-# responses for actions/status, JSON for catalog lookups.
 STEADYSIM_BASE_URL = "https://steadysim.com/stubs/handler_api.php"
 
-# In-memory caches — countries rarely change (24h TTL); services are
-# cached per country_id for the life of the process. Fine for a
-# single-process deploy; swap for Django's cache framework if you
-# run multiple workers and want them to share the cache.
 _steadysim_countries_cache = {"data": None, "fetched_at": None}
-_steadysim_services_cache = {}   # {country_id: {service_name_lower: service_code}}
+_steadysim_services_cache = {}
 
 
 def _steadysim_call(action, **params):
@@ -1540,7 +1513,6 @@ def _steadysim_call(action, **params):
 
 
 def _steadysim_get_countries():
-    """Fetch + cache {country_id: {country_id, name, iso}} from getCountries."""
     now = timezone.now()
     cache = _steadysim_countries_cache
     if cache["data"] and cache["fetched_at"] and (now - cache["fetched_at"]).total_seconds() < 86400:
@@ -1556,12 +1528,6 @@ def _steadysim_get_countries():
 
 
 def _steadysim_country_id(country_key):
-    """
-    Map our internal country key ('usa') to SteadySim's numeric
-    country_id, by matching FOREIGN_COUNTRY_DISPLAY's ISO2 code
-    against the 'iso' field SteadySim returns. Returns None if
-    SteadySim doesn't have a matching country.
-    """
     info = FOREIGN_COUNTRY_DISPLAY.get(country_key)
     if not info:
         return None
@@ -1573,7 +1539,6 @@ def _steadysim_country_id(country_key):
 
 
 def _steadysim_get_services(country_id):
-    """Fetch + cache {service_name_lower: service_code} for one country_id."""
     if country_id in _steadysim_services_cache:
         return _steadysim_services_cache[country_id]
     try:
@@ -1587,16 +1552,6 @@ def _steadysim_get_services(country_id):
 
 
 def _steadysim_service_code(country_id, service_key):
-    """
-    Map our internal service key ('whatsapp') to SteadySim's
-    service_code, by matching FOREIGN_SERVICE_DISPLAY's name
-    against what getServices returns for that country. Falls back
-    to a substring match since SteadySim sometimes splits a brand
-    into several entries (e.g. Google Chat / Google Messenger /
-    GoogleVoice instead of one plain "Google") — in ambiguous
-    cases this takes the first match, which may not always be the
-    one you want; tighten the match here if that matters for you.
-    """
     display_name = FOREIGN_SERVICE_DISPLAY.get(service_key, (service_key,))[0].lower()
     services = _steadysim_get_services(country_id)
     if display_name in services:
@@ -1640,7 +1595,6 @@ def _fetch_steadysim_prices(country=None, service=None):
 
 
 def _fetch_provider_prices(provider, country=None, service=None):
-    """Dispatch to the right provider's price-fetch function."""
     if provider == "steadysim":
         return _fetch_steadysim_prices(country=country, service=service)
     return _fetch_5sim_prices(
@@ -1650,10 +1604,6 @@ def _fetch_provider_prices(provider, country=None, service=None):
 
 
 def _steadysim_buy(country, service):
-    """
-    Resolves codes then calls getNumber.
-    Returns (ok: bool, order_id: str|None, phone: str|None, error_msg: str|None)
-    """
     country_id = _steadysim_country_id(country)
     if not country_id:
         return False, None, None, "Country not supported by SteadySim."
@@ -1677,7 +1627,6 @@ def _steadysim_buy(country, service):
 
 
 def _steadysim_check(order_id):
-    """Returns (status, code) where status is PENDING | RECEIVED | CANCELLED | UNKNOWN."""
     text = _steadysim_call("getStatus", id=order_id).text.strip()
 
     if text.startswith("STATUS_OK:"):
@@ -1686,28 +1635,97 @@ def _steadysim_check(order_id):
         return "PENDING", None
     if text == "STATUS_CANCEL":
         return "CANCELLED", None
-    return "UNKNOWN", None  # covers NO_ACTIVATION and anything unexpected
+    return "UNKNOWN", None
 
 
 def _steadysim_cancel(order_id):
-    """status=8 cancels + triggers SteadySim's own refund logic. Returns True on ACCESS_CANCEL."""
     text = _steadysim_call("setStatus", id=order_id, status=8).text.strip()
     return text == "ACCESS_CANCEL"
 
 
 def _steadysim_complete(order_id):
-    """
-    status=6 marks the activation complete after you've used the
-    code. Optional — call this once you're confident the code
-    worked, so SteadySim can release/finalize the number on their
-    end. Safe to skip if you don't need that signal.
-    """
     text = _steadysim_call("setStatus", id=order_id, status=6).text.strip()
     return text == "STATUS_OK" or text == "ACCESS_ACTIVATION"
 
 
+# ── Expiry: cancel + refund a rented number if no code arrives in time ──
+
+FOREIGN_NUMBER_EXPIRY_MINUTES = int(config("FOREIGN_NUMBER_EXPIRY_MINUTES", default=20))
+
+
+def _refund_foreign_number_wallet(foreign_number):
+    """
+    Credits the wallet back for one cancelled/expired number.
+    Locked + idempotent — returns False if it was already refunded
+    by a concurrent request instead of double-crediting.
+    """
+    refund_amount = abs(Decimal(str(foreign_number.price)))
+    with db_transaction.atomic():
+        fn = ForeignNumber.objects.select_for_update().get(pk=foreign_number.pk)
+        if fn.status == ForeignNumber.Status.CANCELLED:
+            return False
+
+        account = Account.objects.select_for_update().get(user=fn.user)
+        owner_account = get_owner_account()
+
+        fn.status = ForeignNumber.Status.CANCELLED
+        fn.save()
+
+        account.balance += refund_amount
+        account.save()
+
+        if owner_account and owner_account.pk != account.pk:
+            owner_acc = Account.objects.select_for_update().get(pk=owner_account.pk)
+            owner_acc.balance -= refund_amount
+            owner_acc.save()
+    return True
+
+
+def _expire_number(foreign_number):
+    """
+    Called for one PENDING number whose expires_at has passed.
+    Best-effort cancel with the provider first — a genuine timeout
+    usually means there's nothing left on their side to cancel, so a
+    provider-side failure here never blocks the wallet refund.
+    """
+    try:
+        if foreign_number.provider == "steadysim":
+            _steadysim_cancel(foreign_number.order_id)
+        else:
+            requests.get(
+                f"https://5sim.net/v1/user/cancel/{foreign_number.order_id}",
+                headers=_fivesim_headers(),
+                timeout=15,
+            )
+    except Exception as e:
+        logger.warning(f"Provider-side cancel on expiry failed for {foreign_number.order_id}: {e}")
+
+    if _refund_foreign_number_wallet(foreign_number):
+        logger.info(f"Auto-expired + refunded {foreign_number.provider} number {foreign_number.order_id}")
+
+
+def _expire_stale_foreign_numbers(user=None):
+    """
+    Sweeps PENDING numbers past their expires_at and expires each
+    one. Pass `user` to scope the sweep to one sub-admin (cheap,
+    called on every page load); omit it for a full sweep across
+    everyone (used by the management command / cron job).
+    """
+    qs = ForeignNumber.objects.filter(
+        status=ForeignNumber.Status.PENDING,
+        expires_at__isnull=False,
+        expires_at__lte=timezone.now(),
+    )
+    if user is not None:
+        qs = qs.filter(user=user)
+    for fn in qs:
+        _expire_number(fn)
+
+
 @login_required
 def sub_admin_buy_foreign_number(request):
+    _expire_stale_foreign_numbers(user=request.user)
+
     account = get_or_create_account(request.user)
     selected_country  = request.GET.get("country", "") or request.POST.get("country", "")
     selected_service  = request.GET.get("service", "") or request.POST.get("service", "")
@@ -1780,6 +1798,7 @@ def sub_admin_buy_foreign_number(request):
                         user=request.user, order_id=order_id, country=country, service=service,
                         phone_number=phone, price=selected_price,
                         status=ForeignNumber.Status.PENDING, provider="steadysim",
+                        expires_at=timezone.now() + timedelta(minutes=FOREIGN_NUMBER_EXPIRY_MINUTES),
                     )
                     messages.success(request, f"Number {phone} purchased successfully via SteadySim!")
                 else:
@@ -1804,6 +1823,7 @@ def sub_admin_buy_foreign_number(request):
                         user=request.user, order_id=data.get("id"), country=country, service=service,
                         phone_number=data.get("phone"), price=selected_price,
                         status=ForeignNumber.Status.PENDING, provider="5sim",
+                        expires_at=timezone.now() + timedelta(minutes=FOREIGN_NUMBER_EXPIRY_MINUTES),
                     )
                     messages.success(request, f"Number {data.get('phone')} purchased successfully via 5SIM!")
                 else:
@@ -1896,29 +1916,13 @@ def sub_admin_cancel_foreign_number(request, order_id):
             messages.error(request, "Unable to cancel number. It may already be expired or cancelled.")
             return redirect("sub-admin-buy-foreign-number")
 
-        refund_amount = abs(Decimal(str(foreign_number.price)))
-
-        with db_transaction.atomic():
-            fn = ForeignNumber.objects.select_for_update().get(pk=foreign_number.pk)
-            if fn.status == ForeignNumber.Status.CANCELLED:
-                messages.error(request, "This number was already cancelled.")
-                return redirect("sub-admin-buy-foreign-number")
-
-            account = Account.objects.select_for_update().get(user=request.user)
-            owner_account = get_owner_account()
-
-            fn.status = ForeignNumber.Status.CANCELLED
-            fn.save()
-
-            account.balance += refund_amount
-            account.save()
-
-            if owner_account and owner_account.pk != account.pk:
-                owner_acc = Account.objects.select_for_update().get(pk=owner_account.pk)
-                owner_acc.balance -= refund_amount
-                owner_acc.save()
-
-        messages.success(request, f"Number cancelled successfully. ₦{refund_amount:,.0f} refunded to your wallet.")
+        if _refund_foreign_number_wallet(foreign_number):
+            messages.success(
+                request,
+                f"Number cancelled successfully. ₦{abs(Decimal(str(foreign_number.price))):,.0f} refunded to your wallet."
+            )
+        else:
+            messages.error(request, "This number was already cancelled.")
 
     except Exception as e:
         logger.exception(f"{foreign_number.provider} cancel error")
@@ -1940,6 +1944,11 @@ def sub_admin_check_sms_5sim(request, order_id):
     if foreign_number.sms_code:
         return JsonResponse({"status": "received", "sms_code": foreign_number.sms_code})
 
+    if foreign_number.status == ForeignNumber.Status.PENDING \
+            and foreign_number.expires_at and timezone.now() >= foreign_number.expires_at:
+        _expire_number(foreign_number)
+        return JsonResponse({"status": "expired", "sms_code": None})
+
     try:
         if foreign_number.provider == "steadysim":
             status, code = _steadysim_check(order_id)
@@ -1947,7 +1956,7 @@ def sub_admin_check_sms_5sim(request, order_id):
                 foreign_number.sms_code = code
                 foreign_number.status = ForeignNumber.Status.RECEIVED
                 foreign_number.save()
-                _steadysim_complete(order_id)  # best-effort — ignore failure
+                _steadysim_complete(order_id)
                 return JsonResponse({"status": "received", "sms_code": code})
             return JsonResponse({"status": status, "sms_code": None})
 
@@ -2143,7 +2152,7 @@ def admin_notification_list(request):
         "sender", "recipient"
     ).order_by("-created_at")
 
-    target = request.GET.get("target", "")  # "" | "private" | "public"
+    target = request.GET.get("target", "")
     if target == "private":
         notifications = notifications.filter(recipient__isnull=False)
     elif target == "public":
@@ -2289,7 +2298,7 @@ def sub_admin_notifications_poll(request):
     """
     JSON endpoint polled every ~30s from the sub-admin dashboard.
     Returns still-unread notifications so JS can pop a toast for each
-    one, then immediately mark it read (see notifications_toast.html).
+    one, then immediately mark it read.
     """
     unread_private = Notification.objects.filter(recipient=request.user, is_read=False)
 
@@ -2360,7 +2369,7 @@ SITE_SETTINGS_TEXT_FIELDS = [
     "address", "google_maps_url", "whatsapp_number",
     "twitter_url", "instagram_url", "facebook_url", "linkedin_url", "tiktok_url",
     "copyright_text", "meta_description", "meta_keywords",
-    "logo_url",  # fallback if they don't upload a file
+    "logo_url",
 ]
 
 SITE_SETTINGS_DEFAULT_FIELDS = [
@@ -2373,6 +2382,7 @@ SITE_SETTINGS_DEFAULT_FIELDS = [
     "copyright_text", "meta_description", "meta_keywords",
 ]
 
+
 @login_required
 def sub_admin_site_settings(request):
     """
@@ -2381,7 +2391,7 @@ def sub_admin_site_settings(request):
     Resetting (deleting their override row) is free and reverts
     them to the admin's global default.
     """
-    profile = request.user.sub_admin_profile
+    profile = get_or_create_sub_admin_profile(request.user)
     pricing = PointsPricing.get_current()
     cost    = pricing.points_per_site_customization
 
@@ -2410,7 +2420,6 @@ def sub_admin_site_settings(request):
 
             obj.save()
 
-            # ── Save any new gallery images uploaded alongside branding ──
             gallery_files = request.FILES.getlist("gallery_images")
             if gallery_files:
                 existing_count = profile.gallery_images.count()
@@ -2429,8 +2438,6 @@ def sub_admin_site_settings(request):
             return redirect("sub-admin-site-settings")
 
         elif action == "reset":
-            # Free — removes their overrides, falls back to the
-            # admin-created default name/branding.
             deleted, _ = SubAdminSiteSettings.objects.filter(sub_admin=profile).delete()
             if deleted:
                 messages.success(request, "Landing page reset to the default site branding.")
@@ -2485,7 +2492,7 @@ def public_subadmin_landing(request, referral_code):
     global default automatically.
     """
     profile = get_object_or_404(SubAdminProfile, referral_code=referral_code.upper())
-    request.session["active_referral_code"] = profile.referral_code 
+    request.session["active_referral_code"] = profile.referral_code
     settings_ctx = SubAdminSiteSettings.for_user(profile.user)
     return render(request, "public/landing.html", {
         "settings":     settings_ctx,
@@ -2553,8 +2560,6 @@ def tracking_shipment_info(request, tracking_id):
     })
 
 
-# Business/sub_admin_views.py
-
 def subadmin_domain_required(view_func):
     """Redirect to correct subdomain if accessing from wrong domain."""
     def wrapper(request, *args, **kwargs):
@@ -2566,12 +2571,11 @@ def subadmin_domain_required(view_func):
     return wrapper
 
 
-
 @login_required
 @require_POST
 def sub_admin_gallery_upload(request):
     """Add one or more images to the sub-admin's own gallery."""
-    profile = request.user.sub_admin_profile
+    profile = get_or_create_sub_admin_profile(request.user)
     files = request.FILES.getlist("gallery_images")
 
     if not files:
@@ -2594,99 +2598,16 @@ def sub_admin_gallery_upload(request):
 @require_POST
 def sub_admin_gallery_delete(request, pk):
     """Remove one image from the sub-admin's own gallery."""
-    image = get_object_or_404(
-        SubAdminGalleryImage, pk=pk, sub_admin=request.user.sub_admin_profile
-    )
+    profile = get_or_create_sub_admin_profile(request.user)
+    image = get_object_or_404(SubAdminGalleryImage, pk=pk, sub_admin=profile)
     image.delete()
     messages.success(request, "Image removed.")
     return redirect("sub-admin-site-settings")
 
 
-
 # ════════════════════════════════════════════════════════
-#  BUY LOGS — PURCHASE RECEIPT (full page)
+#  BUY LOGS — MARKETPLACE, PURCHASE, RECEIPT
 # ════════════════════════════════════════════════════════
-@login_required
-def buy_logs_receipt(request, pk):
-    """Full-page receipt for one log purchase, with credentials."""
-    purchase = get_object_or_404(
-        Purchase.objects.select_related("product", "product__category", "log", "account")
-                        .prefetch_related("log__credential_fields"),
-        pk=pk,
-        buyer=request.user,
-    )
-    return render(request, "admin/subadmin/buy_logs_receipt.html", {"purchase": purchase})
-
-
-
-from urllib.parse import urlencode
-
-
-def insufficient_funds_redirect(request, needed, reason, next_url=None):
-    """
-    Call this instead of `messages.error(...) + redirect('sub-admin-buy-points')`
-    anywhere a points/balance check fails. Shows a popup-style page instead
-    of a flash message.
-    """
-    profile = request.user.sub_admin_profile
-    params = {"needed": needed, "reason": reason}
-    if next_url:
-        params["next"] = next_url
-    return redirect(f"{reverse('sub-admin-insufficient-funds')}?{urlencode(params)}")
-
-
-@login_required
-def sub_admin_insufficient_funds(request):
-    """Popup-style 'you don't have enough points' page."""
-    profile = request.user.sub_admin_profile
-    try:
-        needed = int(request.GET.get("needed", 0))
-    except (TypeError, ValueError):
-        needed = 0
-
-    have      = profile.points_balance
-    shortfall = max(needed - have, 0)
-
-    context = {
-        "profile":   profile,
-        "needed":    needed,
-        "have":      have,
-        "shortfall": shortfall,
-        "reason":    request.GET.get("reason", "complete this action"),
-        "next_url":  request.GET.get("next", ""),
-    }
-    return render(request, "admin/subadmin/insufficient_funds.html", context)
-
-@sub_admin_approved_required
-def sub_admin_purchase_detail_json(request, pk):
-    """
-    JSON detail for one log purchase — powers the slide-up receipt
-    drawer on the purchases list page.
-    """
-    purchase = get_object_or_404(
-        Purchase.objects.select_related("product", "product__category", "log")
-                        .prefetch_related("log__credential_fields"),
-        pk=pk,
-        buyer=request.user,
-    )
-
-    credentials = []
-    if purchase.log:
-        for field in purchase.log.credential_fields.all():
-            credentials.append({"key": field.label, "value": field.value})
-
-    data = {
-        "pk": str(purchase.pk),
-        "title": purchase.product.title,
-        "category": purchase.product.category.name,
-        "amount": f"{purchase.amount:.2f}",
-        "date": purchase.purchased_at.strftime("%b %d, %Y %H:%M"),
-        "description": purchase.product.description,
-        "credentials": credentials,
-    }
-    return JsonResponse(data)
-
-
 
 @login_required
 @require_POST
@@ -2700,18 +2621,12 @@ def buy_logs_purchase(request, pk):
     account = get_or_create_account(request.user)
 
     with db_transaction.atomic():
-        # Lock the wallet row so two near-simultaneous purchases
-        # can't both read a stale balance and double-spend.
         account = Account.objects.select_for_update().get(pk=account.pk)
 
         if account.balance < product.price:
             messages.error(request, "Insufficient wallet balance for this purchase.")
             return redirect("buy-logs-detail", pk=product.pk)
 
-        # Lock and claim exactly one unsold unit — skip_locked means a
-        # concurrent buyer never blocks waiting on a unit someone else
-        # is already in the middle of purchasing; they just get the
-        # next available one instead.
         detail = (
             BuyLogDetails.objects
             .select_for_update(skip_locked=True)
@@ -2751,10 +2666,78 @@ def buy_logs_payment_success(request, pk):
     return render(request, "admin/subadmin/payment_success.html", {"purchase": purchase})
 
 
+@login_required
+def buy_logs_receipt(request, pk):
+    """Full-page receipt for one log purchase, with credentials."""
+    purchase = get_object_or_404(
+        Purchase.objects.select_related("product", "product__category", "log", "account")
+                        .prefetch_related("log__credential_fields"),
+        pk=pk,
+        buyer=request.user,
+    )
+    return render(request, "admin/subadmin/buy_logs_receipt.html", {"purchase": purchase})
 
-from django.db.models import Prefetch, Q
-from Business.models import Tutorial, TutorialCategory
 
+@login_required
+def sub_admin_purchase_detail_json(request, pk):
+    """
+    JSON detail for one log purchase — powers the slide-up receipt
+    drawer on the purchases list page.
+    """
+    purchase = get_object_or_404(
+        Purchase.objects.select_related("product", "product__category", "log")
+                        .prefetch_related("log__credential_fields"),
+        pk=pk,
+        buyer=request.user,
+    )
+
+    credentials = []
+    if purchase.log:
+        for field in purchase.log.credential_fields.all():
+            credentials.append({"key": field.label, "value": field.value})
+
+    data = {
+        "pk": str(purchase.pk),
+        "title": purchase.product.title,
+        "category": purchase.product.category.name,
+        "amount": f"{purchase.amount:.2f}",
+        "date": purchase.purchased_at.strftime("%b %d, %Y %H:%M"),
+        "description": purchase.product.description,
+        "credentials": credentials,
+    }
+    return JsonResponse(data)
+
+
+# ════════════════════════════════════════════════════════
+#  INSUFFICIENT FUNDS POPUP
+# ════════════════════════════════════════════════════════
+
+@login_required
+def sub_admin_insufficient_funds(request):
+    """Popup-style 'you don't have enough points' page."""
+    profile = get_or_create_sub_admin_profile(request.user)
+    try:
+        needed = int(request.GET.get("needed", 0))
+    except (TypeError, ValueError):
+        needed = 0
+
+    have      = profile.points_balance
+    shortfall = max(needed - have, 0)
+
+    context = {
+        "profile":   profile,
+        "needed":    needed,
+        "have":      have,
+        "shortfall": shortfall,
+        "reason":    request.GET.get("reason", "complete this action"),
+        "next_url":  request.GET.get("next", ""),
+    }
+    return render(request, "admin/subadmin/insufficient_funds.html", context)
+
+
+# ════════════════════════════════════════════════════════
+#  TUTORIALS
+# ════════════════════════════════════════════════════════
 
 @login_required
 def tutorial_list(request):

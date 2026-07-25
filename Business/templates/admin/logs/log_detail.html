@@ -1,0 +1,178 @@
+
+
+{% extends "admin/base_admin.html" %}
+{% block title %}{{ product.title }}{% endblock %}
+{% block page_title %}{{ product.title }}{% endblock %}
+{% block breadcrumb %}
+  <a href="{% url 'admin-dashboard' %}">Home</a> /
+  <a href="{% url 'admin-log-list' %}">Logs</a> /
+  {{ product.title|truncatechars:25 }}
+{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{% url 'admin-log-edit' product.pk %}" class="btn btn-ghost btn-sm">
+    <i class="fas fa-pen"></i> Edit
+  </a>
+  <form method="post" action="{% url 'admin-log-toggle' product.pk %}" style="display:inline;">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-ghost btn-sm" style="color:{% if product.active %}var(--danger){% else %}var(--accent2){% endif %};">
+      {% if product.active %}<i class="fas fa-eye-slash"></i> Deactivate{% else %}<i class="fas fa-eye"></i> Activate{% endif %}
+    </button>
+  </form>
+  <form method="post" action="{% url 'admin-log-delete' product.pk %}" style="display:inline;" onsubmit="return confirm('Delete {{ product.title }}?')">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-danger btn-sm"><i class="fas fa-trash"></i></button>
+  </form>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  .detail-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .field label { display:block; font-size:11px; color:var(--muted); text-transform:uppercase; margin-bottom:2px; }
+  .field span  { font-size:13px; }
+  .tabs { display:flex; gap:2px; margin-bottom:16px; background:var(--bg3); border-radius:var(--border-radius-md); padding:3px; }
+  .tab  { flex:1; padding:7px 0; font-size:13px; border:none; background:none; cursor:pointer; border-radius:6px; color:var(--muted); }
+  .tab.active { background:var(--bg2); color:var(--text); font-weight:500; }
+  .tab-content { display:none; }
+  .tab-content.active { display:block; }
+  .cred-row { font-family:monospace; font-size:12px; padding:3px 0; color:var(--muted); }
+  .cred-row span { color:var(--text); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;align-items:start;">
+
+  <!-- LEFT -->
+  <div>
+    <!-- Product info -->
+    <div class="card" style="margin-bottom:14px;">
+      <div class="card-header">
+        <h3>Product Details</h3>
+        {% if product.active %}
+        <span class="badge badge-green" style="margin-left:auto;">Active</span>
+        {% else %}
+        <span class="badge badge-red" style="margin-left:auto;">Inactive</span>
+        {% endif %}
+      </div>
+      <div class="card-body">
+        <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;">
+          {% if product.image %}
+          <img src="{{ product.image.url }}" style="width:100px;height:100px;object-fit:cover;border-radius:10px;border:1px solid var(--border);flex-shrink:0;"/>
+          {% endif %}
+          <div class="detail-grid" style="flex:1;">
+            <div class="field"><label>Title</label><span>{{ product.title }}</span></div>
+            <div class="field"><label>Category</label><span>{{ product.category.name|default:"—" }}</span></div>
+            <div class="field"><label>Price</label><span style="color:var(--accent);font-weight:600;">₦{{ product.price }}</span></div>
+            <div class="field"><label>Available</label><span style="color:{% if product.available > 0 %}var(--accent2){% else %}var(--danger){% endif %};font-weight:600;">{{ product.available }} / {{ product.total_stock }}</span></div>
+            {% if product.description %}
+            <div class="field" style="grid-column:span 2"><label>Description</label><span>{{ product.description }}</span></div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Credentials -->
+    <div class="card">
+      <div class="card-header">
+        <h3>Credential Stock</h3>
+        <span style="font-size:12px;color:var(--muted);margin-left:auto;">{{ page_obj.paginator.count }} row{{ page_obj.paginator.count|pluralize }}</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              {% for field in detail_fields %}
+              <th>{{ field|title }}</th>
+              {% endfor %}
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for d in page_obj %}
+            <tr>
+              {% for field in detail_fields %}
+              <td style="font-family:monospace;font-size:12px;">{{ d|get_attr:field|default:"—" }}</td>
+              {% endfor %}
+              <td>
+                {% if d.sold %}
+                <span class="badge badge-red">Sold</span>
+                {% else %}
+                <span class="badge badge-green">Available</span>
+                {% endif %}
+              </td>
+              <td>
+                <div style="display:flex;gap:4px;">
+                  <form method="post" action="{% url 'admin-log-detail-sold' d.pk %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-ghost btn-sm" style="font-size:11px;">
+                      {% if d.sold %}Unmark{% else %}Mark Sold{% endif %}
+                    </button>
+                  </form>
+                  <form method="post" action="{% url 'admin-log-detail-delete' d.pk %}" onsubmit="return confirm('Delete row?')">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger btn-sm" style="font-size:11px;"><i class="fas fa-times"></i></button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="{{ detail_fields|length|add:2 }}" style="text-align:center;color:var(--muted);padding:2rem;">No credentials yet. Add some below.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if page_obj.has_other_pages %}
+      <div class="pagination">
+        {% if page_obj.has_previous %}<a class="page-btn" href="?page={{ page_obj.previous_page_number }}"><i class="fas fa-chevron-left"></i></a>{% endif %}
+        {% for num in page_obj.paginator.page_range %}<a class="page-btn {% if page_obj.number == num %}active{% endif %}" href="?page={{ num }}">{{ num }}</a>{% endfor %}
+        {% if page_obj.has_next %}<a class="page-btn" href="?page={{ page_obj.next_page_number }}"><i class="fas fa-chevron-right"></i></a>{% endif %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div>
+    <!-- Add single row -->
+    <div class="card" style="margin-bottom:14px;">
+      <div class="card-header"><h3>Add Credential Row</h3></div>
+      <div class="card-body">
+        <form method="post" action="{% url 'admin-log-detail-add' product.pk %}">
+          {% csrf_token %}
+          {% for field in detail_fields %}
+          <div class="form-group" style="margin-bottom:10px;">
+            <label>{{ field|title }}</label>
+            <input type="text" name="field_{{ field }}" placeholder="{{ field }}..."/>
+          </div>
+          {% endfor %}
+          <button type="submit" class="btn btn-primary" style="width:100%;margin-top:6px;">
+            <i class="fas fa-plus"></i> Add Row
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Bulk upload -->
+    <div class="card">
+      <div class="card-header"><h3>Bulk Upload</h3></div>
+      <div class="card-body">
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px;">
+          One credential per line. Format:<br>
+          <code style="font-size:11px;">email:user@gmail.com | password:abc123</code>
+        </p>
+        <form method="post" action="{% url 'admin-log-detail-bulk' product.pk %}">
+          {% csrf_token %}
+          <textarea name="bulk_data" rows="8" placeholder="email:user@gmail.com | password:abc123&#10;email:user2@gmail.com | password:xyz456"></textarea>
+          <button type="submit" class="btn btn-primary" style="width:100%;margin-top:8px;">
+            <i class="fas fa-upload"></i> Upload Bulk
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

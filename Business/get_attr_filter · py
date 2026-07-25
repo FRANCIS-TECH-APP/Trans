@@ -1,0 +1,13 @@
+# Add this to Business/templatetags/business_extras.py, alongside get_item.
+# get_item does dictionary.get(key) — fine for dicts, but `d` in
+# log_detail.html is a BuyLogDetails model instance, so you need a
+# filter that calls getattr() on it instead.
+
+from django import template
+register = template.Library()
+
+@register.filter
+def get_attr(obj, attr_name):
+    if obj is None:
+        return None
+    return getattr(obj, attr_name, None)

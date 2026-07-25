@@ -1,6 +1,7 @@
 from django.urls import path
 from . import views
 from . import sub_admin_views as sv
+from Business import views as business_views
 
 urlpatterns = [
 
@@ -176,6 +177,64 @@ urlpatterns = [
     path("buy-logs/success/<uuid:pk>/", sv.buy_logs_payment_success, name="buy-logs-payment-success"),
     path("shipping/sub-admin/tutorials/",sv.tutorial_list,   name="sub-admin-tutorials"),
     path("shipping/sub-admin/tutorials/<int:pk>/",sv.tutorial_detail, name="sub-admin-tutorial-detail"),
+    path("accounts/", business_views.admin_account_list, name="admin-account-list"),
+    path("categories/", business_views.admin_category_list, name="admin-category-list"),
+    path("categories/create/", business_views.admin_category_create, name="admin-category-create"),
+    path("categories/<int:pk>/edit/", business_views.admin_category_edit, name="admin-category-edit"),
+    path("categories/<int:pk>/delete/", business_views.admin_category_delete, name="admin-category-delete"),
+
+
+    
+# ══════════════════════════════════════════════════════
+#  ADD THESE TO YOUR Business/urls.py urlpatterns
+# ══════════════════════════════════════════════════════
+
+# ── Log Products ──────────────────────────────────────
+path("admin-portal/logs/",
+     views.log_list,   name="admin-log-list"),
+
+path("admin-portal/logs/create/",
+     views.log_create, name="admin-log-create"),
+
+path("admin-portal/logs/<uuid:pk>/",
+     views.log_detail, name="admin-log-detail"),
+
+path("admin-portal/logs/<uuid:pk>/edit/",
+     views.log_edit,   name="admin-log-edit"),
+
+path("admin-portal/logs/<uuid:pk>/delete/",
+     views.log_delete, name="admin-log-delete"),
+
+path("admin-portal/logs/<uuid:pk>/toggle/",
+     views.log_toggle_active, name="admin-log-toggle"),
+
+# ── Credential Rows ───────────────────────────────────
+path("admin-portal/logs/<uuid:product_pk>/details/add/",
+     views.log_detail_add,  name="admin-log-detail-add"),
+
+path("admin-portal/logs/<uuid:product_pk>/details/bulk/",
+     views.log_detail_bulk, name="admin-log-detail-bulk"),
+
+path("admin-portal/logs/details/<int:pk>/delete/",
+     views.log_detail_delete,    name="admin-log-detail-delete"),
+
+path("admin-portal/logs/details/<int:pk>/sold/",
+     views.log_detail_mark_sold, name="admin-log-detail-sold"),
+
+# ── Categories ────────────────────────────────────────
+path("admin-portal/logs/categories/",
+     views.log_category_list, name="admin-log-category-list"),
+
+path("admin-portal/logs/categories/create/",
+     views.log_category_form, name="admin-log-category-create"),
+
+path("admin-portal/logs/categories/<int:pk>/edit/",
+     views.log_category_form, name="admin-log-category-edit"),
+
+path("admin-portal/logs/categories/<int:pk>/delete/",
+     views.log_category_delete, name="admin-log-category-delete"),
 
 ]
+
+
 

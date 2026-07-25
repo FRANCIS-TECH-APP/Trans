@@ -959,3 +959,545 @@ def error_403(request, exception):
 
 def error_400(request, exception):
     return render(request, "400.html", status=400)
+
+
+
+
+# ══════════════════════════════════════════════════════════════════
+#  ADD TO Business/views.py (admin-panel side, alongside admin_dashboard)
+#  Two worked examples of the generic_list.html / generic_form.html
+#  pattern — copy-paste-adjust for the rest of your model list.
+# ══════════════════════════════════════════════════════════════════
+
+from django.urls import reverse
+from .models import Account, Category
+
+
+# ── ACCOUNTS — read-only list (wallets shouldn't be hand-edited) ───
+
+@admin_required
+def admin_account_list(request):
+    query = request.GET.get("q", "").strip()
+    qs = Account.objects.select_related("user").order_by("-created_at")
+    if query:
+        qs = qs.filter(
+            Q(account_number__icontains=query)
+            | Q(user__email__icontains=query)
+            | Q(user__full_name__icontains=query)
+        )
+
+    paginator = Paginator(qs, 20)
+    page_obj  = paginator.get_page(request.GET.get("page"))
+
+    rows = [
+        {
+            "account_number": a.account_number,
+            "user":           getattr(a.user, "full_name", "—"),
+            "email":          getattr(a.user, "email", "—"),
+            "balance":        f"₦{a.balance:,.2f}",
+            "created":        a.created_at.strftime("%d %b %Y"),
+            # no edit/delete — deliberately read-only
+        }
+        for a in page_obj
+    ]
+
+    context = {
+        "page_title":  "Accounts",
+        "singular_name": "Account",
+        "add_url":     None,                       # hides the "Add" button
+        "query":       query,
+        "columns": [
+            {"key": "account_number", "label": "Account #", "type": "mono"},
+            {"key": "user",           "label": "User"},
+            {"key": "email",          "label": "Email"},
+            {"key": "balance",        "label": "Balance"},
+            {"key": "created",        "label": "Created"},
+        ],
+        "rows": rows,
+        "row_actions_enabled": False,
+        "page_obj": page_obj,
+    }
+    return render(request, "admin/generic_list.html", context)
+
+
+# ── CATEGORIES — full add/edit/delete CRUD ──────────────────────────
+
+@admin_required
+def admin_category_list(request):
+    qs = Category.objects.all().order_by("order", "name")
+    rows = [
+        {
+            "name":       c.name,
+            "slug":       c.slug,
+            "order":      c.order,
+            "is_active":  {"text": "Active", "class": "b-green"} if c.is_active else {"text": "Inactive", "class": "b-gray"},
+            "edit_url":   reverse("admin-category-edit", args=[c.pk]),
+            "delete_url": reverse("admin-category-delete", args=[c.pk]),
+        }
+        for c in qs
+    ]
+    context = {
+        "page_title": "Categories",
+        "singular_name": "Category",
+        "add_url": reverse("admin-category-create"),
+        "columns": [
+            {"key": "name",  "label": "Name"},
+            {"key": "slug",  "label": "Slug", "type": "mono"},
+            {"key": "order", "label": "Order"},
+            {"key": "is_active", "label": "Status", "type": "badge"},
+        ],
+        "rows": rows,
+        "row_actions_enabled": True,
+    }
+    return render(request, "admin/generic_list.html", context)
+
+
+def _category_field_groups(category=None):
+    return [
+        {
+            "title": None,
+            "fields": [
+                {"name": "name", "label": "Name", "value": category.name if category else "", "required": True},
+                {"name": "icon", "label": "Icon (Font Awesome class)", "value": category.icon if category else ""},
+                {"name": "order", "label": "Sort Order", "type": "number", "value": category.order if category else 0},
+                {"name": "is_active", "label": "Active", "type": "checkbox", "help": "Visible to sub-admins", "value": category.is_active if category else True},
+            ],
+        },
+    ]
+
+
+@admin_required
+def admin_category_create(request):
+    if request.method == "POST":
+        Category.objects.create(
+            name=request.POST.get("name", "").strip(),
+            icon=request.POST.get("icon", "").strip(),
+            order=int(request.POST.get("order") or 0),
+            is_active="is_active" in request.POST,
+        )
+        messages.success(request, "Category created.")
+        return redirect("admin-category-list")
+
+    context = {
+        "page_title": "Add Category",
+        "singular_name": "Category",
+        "list_url": reverse("admin-category-list"),
+        "is_edit": False,
+        "field_groups": _category_field_groups(),
+    }
+    return render(request, "admin/generic_form.html", context)
+
+
+@admin_required
+def admin_category_edit(request, pk):
+    category = get_object_or_404(Category, pk=pk)
+    if request.method == "POST":
+        category.name = request.POST.get("name", category.name).strip()
+        category.icon = request.POST.get("icon", category.icon).strip()
+        category.order = int(request.POST.get("order") or category.order)
+        category.is_active = "is_active" in request.POST
+        category.save()
+        messages.success(request, "Category updated.")
+        return redirect("admin-category-list")
+
+    context = {
+        "page_title": f"Edit — {category.name}",
+        "singular_name": "Category",
+        "list_url": reverse("admin-category-list"),
+        "is_edit": True,
+        "field_groups": _category_field_groups(category),
+    }
+    return render(request, "admin/generic_form.html", context)
+
+
+@admin_required
+@require_POST
+def admin_category_delete(request, pk):
+    category = get_object_or_404(Category, pk=pk)
+    name = category.name
+    category.delete()
+    messages.success(request, f"Category '{name}' deleted.")
+    return redirect("admin-category-list")
+
+
+# ══════════════════════════════════════════════════════════════════
+#  urls.py additions for the two examples above:
+#
+#  path("accounts/", admin_account_list, name="admin-account-list"),
+#  path("categories/", admin_category_list, name="admin-category-list"),
+#  path("categories/create/", admin_category_create, name="admin-category-create"),
+#  path("categories/<pk>/edit/", admin_category_edit, name="admin-category-edit"),
+#  path("categories/<pk>/delete/", admin_category_delete, name="admin-category-delete"),
+# ══════════════════════════════════════════════════════════════════
+
+
+
+
+
+# ══════════════════════════════════════════════════════
+#  ADD THESE TO YOUR admin views file (wherever your
+#  custom admin views live — e.g. views.py or admin_views.py)
+# ══════════════════════════════════════════════════════
+
+from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib import messages
+from django.core.paginator import Paginator
+from django.db.models import Q, Count, Sum
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+from Business.models import BuyLogs, BuyLogDetails, Category
+
+
+# ── helper ────────────────────────────────────────────
+def admin_required(view_func):
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect('admin-login')
+        if getattr(request.user, 'role', '') not in ('admin', 'staff'):
+            messages.error(request, 'Access denied.')
+            return redirect('admin-login')
+        return view_func(request, *args, **kwargs)
+    wrapper.__name__ = view_func.__name__
+    return wrapper
+
+
+# ── LOG PRODUCT LIST ──────────────────────────────────
+@admin_required
+def log_list(request):
+    """
+    GET /admin-portal/logs/
+    Lists all BuyLogs products with search, category filter,
+    status filter, and pagination.
+    """
+    qs = BuyLogs.objects.select_related('category').annotate(
+        total_stock=Count('details'),
+        available=Count('details', filter=Q(details__sold=False)),
+    ).order_by('category__name', 'title')
+
+    query    = request.GET.get('q', '').strip()
+    cat_id   = request.GET.get('category', '')
+    status   = request.GET.get('status', '')   # 'active' | 'inactive' | ''
+
+    if query:
+        qs = qs.filter(
+            Q(title__icontains=query) |
+            Q(description__icontains=query) |
+            Q(category__name__icontains=query)
+        )
+    if cat_id:
+        qs = qs.filter(category_id=cat_id)
+    if status == 'active':
+        qs = qs.filter(active=True)
+    elif status == 'inactive':
+        qs = qs.filter(active=False)
+
+    paginator = Paginator(qs, 20)
+    page_obj  = paginator.get_page(request.GET.get('page'))
+
+    categories = Category.objects.filter(is_active=True).order_by('order', 'name')
+
+    # Summary stats
+    total_products   = BuyLogs.objects.count()
+    total_stock      = BuyLogDetails.objects.count()
+    available_stock  = BuyLogDetails.objects.filter(sold=False).count()
+    total_categories = Category.objects.count()
+
+    context = {
+        'page_obj':        page_obj,
+        'query':           query,
+        'cat_id':          cat_id,
+        'status':          status,
+        'categories':      categories,
+        'total_products':  total_products,
+        'total_stock':     total_stock,
+        'available_stock': available_stock,
+        'total_categories':total_categories,
+    }
+    return render(request, 'admin/logs/log_list.html', context)
+
+
+# ── LOG PRODUCT CREATE ────────────────────────────────
+@admin_required
+def log_create(request):
+    """
+    GET  /admin-portal/logs/create/  → blank form
+    POST /admin-portal/logs/create/  → create product
+    """
+    categories = Category.objects.filter(is_active=True).order_by('order', 'name')
+
+    if request.method == 'POST':
+        p = request.POST
+        try:
+            product = BuyLogs.objects.create(
+                category_id = p.get('category'),
+                title       = p.get('title', '').strip(),
+                description = p.get('description', '').strip(),
+                price       = p.get('price', 0),
+                active      = 'active' in p,
+                image       = request.FILES.get('image'),
+            )
+            messages.success(request, f'"{product.title}" created successfully.')
+            return redirect('admin-log-detail', pk=product.pk)
+        except Exception as e:
+            messages.error(request, f'Error creating product: {e}')
+
+    return render(request, 'admin/logs/log_form.html', {
+        'categories': categories,
+        'action':     'Create',
+    })
+
+
+# ── LOG PRODUCT DETAIL ────────────────────────────────
+@admin_required
+def log_detail(request, pk):
+    """
+    GET /admin-portal/logs/<pk>/
+    Shows product info + all detail (credential) rows.
+    Admin can add/delete individual credential rows here.
+    """
+    product = get_object_or_404(
+        BuyLogs.objects.select_related('category').annotate(
+            total_stock=Count('details'),
+            available=Count('details', filter=Q(details__sold=False)),
+        ),
+        pk=pk
+    )
+    details  = product.details.all().order_by('-id')
+    paginator = Paginator(details, 30)
+    page_obj  = paginator.get_page(request.GET.get('page'))
+
+    context = {
+        'product': product,
+        'page_obj': page_obj,
+        'detail_fields': _get_detail_fields(),
+    }
+    return render(request, 'admin/logs/log_detail.html', context)
+
+
+# ── LOG PRODUCT EDIT ──────────────────────────────────
+@admin_required
+def log_edit(request, pk):
+    """
+    GET  /admin-portal/logs/<pk>/edit/  → pre-filled form
+    POST /admin-portal/logs/<pk>/edit/  → save changes
+    """
+    product    = get_object_or_404(BuyLogs, pk=pk)
+    categories = Category.objects.filter(is_active=True).order_by('order', 'name')
+
+    if request.method == 'POST':
+        p = request.POST
+        product.category_id = p.get('category', product.category_id)
+        product.title       = p.get('title', product.title).strip()
+        product.description = p.get('description', product.description).strip()
+        product.price       = p.get('price', product.price)
+        product.active      = 'active' in p
+        if request.FILES.get('image'):
+            product.image = request.FILES['image']
+        product.save()
+        messages.success(request, f'"{product.title}" updated.')
+        return redirect('admin-log-detail', pk=product.pk)
+
+    return render(request, 'admin/logs/log_form.html', {
+        'product':    product,
+        'categories': categories,
+        'action':     'Edit',
+    })
+
+
+# ── LOG PRODUCT DELETE ────────────────────────────────
+@admin_required
+@require_POST
+def log_delete(request, pk):
+    product = get_object_or_404(BuyLogs, pk=pk)
+    name    = product.title
+    product.delete()
+    messages.success(request, f'"{name}" deleted.')
+    return redirect('admin-log-list')
+
+
+# ── LOG PRODUCT TOGGLE ACTIVE ─────────────────────────
+@admin_required
+@require_POST
+def log_toggle_active(request, pk):
+    product        = get_object_or_404(BuyLogs, pk=pk)
+    product.active = not product.active
+    product.save()
+    state = 'activated' if product.active else 'deactivated'
+    messages.success(request, f'"{product.title}" {state}.')
+    return redirect('admin-log-detail', pk=pk)
+
+
+# ── DETAIL ROW (CREDENTIAL) ADD ───────────────────────
+@admin_required
+@require_POST
+def log_detail_add(request, product_pk):
+    """
+    POST /admin-portal/logs/<pk>/details/add/
+    Adds a new credential row to a product.
+    Accepts dynamic key/value pairs from the form.
+    """
+    product = get_object_or_404(BuyLogs, pk=product_pk)
+    p       = request.POST
+
+    # Collect all field_ prefixed POST values dynamically
+    data = {}
+    for key, val in p.items():
+        if key.startswith('field_') and val.strip():
+            field_name = key[6:]   # strip 'field_' prefix
+            data[field_name] = val.strip()
+
+    if not data:
+        messages.error(request, 'No credential data provided.')
+        return redirect('admin-log-detail', pk=product_pk)
+
+    try:
+        BuyLogDetails.objects.create(product=product, **data)
+        messages.success(request, 'Credential row added.')
+    except Exception as e:
+        messages.error(request, f'Error: {e}')
+
+    return redirect('admin-log-detail', pk=product_pk)
+
+
+# ── DETAIL ROW DELETE ─────────────────────────────────
+@admin_required
+@require_POST
+def log_detail_delete(request, pk):
+    detail      = get_object_or_404(BuyLogDetails, pk=pk)
+    product_pk  = detail.product.pk
+    detail.delete()
+    messages.success(request, 'Credential row deleted.')
+    return redirect('admin-log-detail', pk=product_pk)
+
+
+# ── DETAIL ROW MARK SOLD ──────────────────────────────
+@admin_required
+@require_POST
+def log_detail_mark_sold(request, pk):
+    detail      = get_object_or_404(BuyLogDetails, pk=pk)
+    product_pk  = detail.product.pk
+    detail.sold = not detail.sold
+    detail.save()
+    state = 'sold' if detail.sold else 'available'
+    messages.success(request, f'Row marked as {state}.')
+    return redirect('admin-log-detail', pk=product_pk)
+
+
+# ── BULK UPLOAD DETAILS ───────────────────────────────
+@admin_required
+@require_POST
+def log_detail_bulk(request, product_pk):
+    """
+    POST /admin-portal/logs/<pk>/details/bulk/
+    Accepts textarea with one credential per line.
+    Format: field1:value1 | field2:value2 | field3:value3
+    Example: email:user@gmail.com | password:abc123 | recovery:backup@gmail.com
+    """
+    product = get_object_or_404(BuyLogs, pk=product_pk)
+    raw     = request.POST.get('bulk_data', '').strip()
+
+    if not raw:
+        messages.error(request, 'No data provided.')
+        return redirect('admin-log-detail', pk=product_pk)
+
+    lines   = [l.strip() for l in raw.splitlines() if l.strip()]
+    created = 0
+    errors  = 0
+
+    for line in lines:
+        try:
+            data = {}
+            parts = [p.strip() for p in line.split('|')]
+            for part in parts:
+                if ':' in part:
+                    k, v = part.split(':', 1)
+                    data[k.strip()] = v.strip()
+            if data:
+                BuyLogDetails.objects.create(product=product, **data)
+                created += 1
+        except Exception:
+            errors += 1
+
+    if created:
+        messages.success(request, f'{created} credential row{"s" if created != 1 else ""} added.')
+    if errors:
+        messages.warning(request, f'{errors} row{"s" if errors != 1 else ""} failed — check format.')
+
+    return redirect('admin-log-detail', pk=product_pk)
+
+
+# ── CATEGORY LIST ─────────────────────────────────────
+@admin_required
+def log_category_list(request):
+    """
+    GET /admin-portal/logs/categories/
+    """
+    categories = Category.objects.annotate(
+        product_count=Count('products')
+    ).order_by('order', 'name')
+
+    return render(request, 'admin/logs/category_list.html', {
+        'categories': categories,
+    })
+
+
+# ── CATEGORY CREATE/EDIT ──────────────────────────────
+@admin_required
+def log_category_form(request, pk=None):
+    """
+    GET/POST /admin-portal/logs/categories/create/
+    GET/POST /admin-portal/logs/categories/<pk>/edit/
+    """
+    category = get_object_or_404(Category, pk=pk) if pk else None
+
+    if request.method == 'POST':
+        p    = request.POST
+        name = p.get('name', '').strip()
+        if not name:
+            messages.error(request, 'Name is required.')
+        else:
+            if category:
+                category.name      = name
+                category.icon      = p.get('icon', category.icon)
+                category.order     = p.get('order', category.order)
+                category.is_active = 'is_active' in p
+                category.save()
+                messages.success(request, f'Category "{category.name}" updated.')
+            else:
+                category = Category.objects.create(
+                    name      = name,
+                    icon      = p.get('icon', ''),
+                    order     = p.get('order', 0),
+                    is_active = 'is_active' in p,
+                )
+                messages.success(request, f'Category "{category.name}" created.')
+            return redirect('admin-log-category-list')
+
+    return render(request, 'admin/logs/category_form.html', {
+        'category': category,
+        'action':   'Edit' if category else 'Create',
+    })
+
+
+# ── CATEGORY DELETE ───────────────────────────────────
+@admin_required
+@require_POST
+def log_category_delete(request, pk):
+    category = get_object_or_404(Category, pk=pk)
+    name     = category.name
+    category.delete()
+    messages.success(request, f'Category "{name}" deleted.')
+    return redirect('admin-log-category-list')
+
+
+# ── HELPER ────────────────────────────────────────────
+def _get_detail_fields():
+    """
+    Returns the actual field names on BuyLogDetails
+    (excluding system fields) for the add-row form.
+    """
+    exclude = {'id', 'product', 'sold', 'created_at', 'updated_at'}
+    return [
+        f.name for f in BuyLogDetails._meta.get_fields()
+        if hasattr(f, 'column') and f.name not in exclude
+    ]

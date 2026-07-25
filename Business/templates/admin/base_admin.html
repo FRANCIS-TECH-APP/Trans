@@ -166,6 +166,16 @@
     <i class="fas fa-plus-circle"></i> New Shipment
   </a>
 
+  <div class="nav-group">logs</div>
+  <a href="{% url "admin-log-list" %}" class="nav-item {% if 'email' in request.resolver_match.url_name %}active{% endif %}">
+    <i class="fas fa-envelope"></i> Add logs
+  </a>
+  <a href="{% url 'admin-log-category-list' %}" class="nav-item">
+
+    <i class="fas fa-paper-plane"></i> Category list
+  </a>
+
+
   <div class="nav-group">Finance</div>
   <a href="{% url 'payment-list' %}" class="nav-item {% if 'payment' in request.resolver_match.url_name %}active{% endif %}">
     <i class="fas fa-credit-card"></i> Payments

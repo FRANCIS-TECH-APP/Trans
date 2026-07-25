@@ -738,6 +738,7 @@ class ForeignNumber(models.Model):
     status       = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     provider     = models.CharField(max_length=20, default="5sim")
     created_at   = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["-created_at"]

@@ -1,0 +1,117 @@
+{% extends "admin/base.html" %}
+{% load business_extras %}
+
+{% block title %}{{ page_title }}{% endblock %}
+{% block page_title %}{{ page_title }}{% endblock %}
+{% block breadcrumb %}
+  <a href="{% url 'admin-dashboard' %}">Home</a> / {{ page_title }}
+{% endblock %}
+
+{% block topbar_actions %}
+  {% if add_url %}
+  <a href="{{ add_url }}" class="btn btn-primary btn-sm">
+    <i class="fas fa-plus"></i> Add {{ singular_name }}
+  </a>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+
+{% if stat_cards %}
+<div class="stat-grid">
+  {% for card in stat_cards %}
+  <div class="stat-card">
+    <div class="stat-label">{{ card.label }}</div>
+    <div class="stat-value {{ card.color_class }}">{{ card.value }}</div>
+    {% if card.sub %}<div class="stat-sub">{{ card.sub }}</div>{% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-header">
+    <h3>{{ page_title }}</h3>
+    <div class="card-actions">
+      <form method="get" class="search-bar">
+        <i class="fas fa-search"></i>
+        <input type="text" name="q" value="{{ query|default:'' }}" placeholder="Search..." style="width:220px;">
+      </form>
+      {% if status_choices %}
+      <form method="get" style="display:inline;">
+        {% if query %}<input type="hidden" name="q" value="{{ query }}">{% endif %}
+        <select name="status" onchange="this.form.submit()">
+          <option value="">All statuses</option>
+          {% for val, label in status_choices %}
+          <option value="{{ val }}" {% if status_filter == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          {% for col in columns %}
+          <th>{{ col.label }}</th>
+          {% endfor %}
+          {% if row_actions_enabled %}<th>Actions</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          {% for col in columns %}
+          <td>
+            {% with val=row|get_item:col.key %}
+              {% if col.type == "badge" %}
+                <span class="badge {{ val.class }}">{{ val.text }}</span>
+              {% elif col.type == "mono" %}
+                <code style="font-size:11px;">{{ val }}</code>
+              {% elif col.type == "img" %}
+                {% if val %}<img src="{{ val }}" style="width:34px;height:34px;border-radius:6px;object-fit:cover;">{% else %}—{% endif %}
+              {% else %}
+                {{ val|default:"—" }}
+              {% endif %}
+            {% endwith %}
+          </td>
+          {% endfor %}
+          {% if row_actions_enabled %}
+          <td>
+            <div style="display:flex;gap:6px;">
+              {% if row.edit_url %}<a href="{{ row.edit_url }}" class="btn btn-ghost btn-sm"><i class="fas fa-pen"></i></a>{% endif %}
+              {% if row.view_url %}<a href="{{ row.view_url }}" class="btn btn-ghost btn-sm"><i class="fas fa-eye"></i></a>{% endif %}
+              {% if row.delete_url %}
+              <form method="post" action="{{ row.delete_url }}" onsubmit="return confirm('Delete this {{ singular_name|lower }}?');" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger btn-sm"><i class="fas fa-trash"></i></button>
+              </form>
+              {% endif %}
+            </div>
+          </td>
+          {% endif %}
+        </tr>
+        {% empty %}
+        <tr><td colspan="{{ columns|length|add:1 }}" style="text-align:center;color:var(--muted);padding:2rem;">No {{ page_title|lower }} found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if page_obj %}
+  <div class="pagination">
+    {% if page_obj.has_previous %}
+    <a href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query }}{% endif %}" class="page-btn"><i class="fas fa-chevron-left"></i></a>
+    {% endif %}
+    <span class="page-btn active">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}
+    <a href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query }}{% endif %}" class="page-btn"><i class="fas fa-chevron-right"></i></a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

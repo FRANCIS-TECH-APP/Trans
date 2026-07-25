@@ -112,6 +112,11 @@
   .btn-check { background: var(--sky-dim); color: var(--sky); border: 1px solid rgba(59,130,246,.3); }
   .btn-cancel-num { background: transparent; color: var(--red); border: 1px solid rgba(220,38,38,.3); }
   .num-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+
+  /* Live expiry countdown */
+  .countdown { font-family: 'Courier New', monospace; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .countdown.expiring-soon { color: var(--amber); }
+  .countdown.expired-tag { color: var(--red); }
 </style>
 {% endblock %}
 
@@ -253,7 +258,7 @@
 
     {% if numbers %}
     <div class="active-banner">
-      <strong>Active numbers</strong> — you do not need to refresh the page to receive codes.
+      <strong>Active numbers</strong> — you do not need to refresh the page to receive codes. Unclaimed numbers cancel and refund automatically once their timer runs out.
     </div>
 
     <input type="text" class="filter-input" id="filter-input" placeholder="Filter table..."/>
@@ -266,10 +271,10 @@
           <span class="num-card-service">{{ ninfo.2 }} {{ n.service|capfirst }}</span>
           <div style="display:flex;gap:6px;align-items:center;">
             <span class="badge b-provider p-{{ n.provider }}">{% if n.provider == 'steadysim' %}Server 2{% else %}Server 1{% endif %}</span>
-            {% if n.status == "PENDING" %}<span class="badge b-pending">Waiting SMS</span>
-            {% elif n.status == "RECEIVED" %}<span class="badge b-completed">Completed</span>
-            {% elif n.status == "CANCELLED" %}<span class="badge b-cancelled">Cancelled</span>
-            {% else %}<span class="badge b-finished">{{ n.get_status_display }}</span>
+            {% if n.status == "PENDING" %}<span class="badge status-badge b-pending">Waiting SMS</span>
+            {% elif n.status == "RECEIVED" %}<span class="badge status-badge b-completed">Completed</span>
+            {% elif n.status == "CANCELLED" %}<span class="badge status-badge b-cancelled">Cancelled</span>
+            {% else %}<span class="badge status-badge b-finished">{{ n.get_status_display }}</span>
             {% endif %}
           </div>
         </div>
@@ -320,13 +325,22 @@
           <div class="num-row">
             <span class="num-row-label">Status</span>
             <span class="num-row-val">
-              {% if n.status == "PENDING" %}<span class="badge b-pending">Waiting for SMS</span>
-              {% elif n.status == "RECEIVED" %}<span class="badge b-completed">Completed</span>
-              {% elif n.status == "CANCELLED" %}<span class="badge b-cancelled">Cancelled</span>
-              {% else %}<span class="badge b-finished">{{ n.get_status_display }}</span>
+              {% if n.status == "PENDING" %}<span class="badge status-badge b-pending">Waiting for SMS</span>
+              {% elif n.status == "RECEIVED" %}<span class="badge status-badge b-completed">Completed</span>
+              {% elif n.status == "CANCELLED" %}<span class="badge status-badge b-cancelled">Cancelled</span>
+              {% else %}<span class="badge status-badge b-finished">{{ n.get_status_display }}</span>
               {% endif %}
             </span>
           </div>
+
+          {% if n.status == "PENDING" and n.expires_at %}
+          <div class="num-row">
+            <span class="num-row-label">Expires</span>
+            <span class="num-row-val">
+              <span class="countdown" data-expires="{{ n.expires_at|date:'c' }}">--:--</span>
+            </span>
+          </div>
+          {% endif %}
 
           <div class="num-row">
             <span class="num-row-label">Date</span>
@@ -408,6 +422,22 @@
     });
   }
 
+  // ── Mark a card cancelled/expired in the UI without a page reload ──
+  function markCardExpired(card) {
+    card.querySelectorAll('.status-badge').forEach(badge => {
+      badge.className = 'badge status-badge b-cancelled';
+      badge.textContent = 'Expired & Refunded';
+    });
+    const countdownEl = card.querySelector('.countdown');
+    if (countdownEl) {
+      countdownEl.textContent = 'Expired';
+      countdownEl.classList.remove('expiring-soon');
+      countdownEl.classList.add('expired-tag');
+    }
+    const actions = card.querySelector('.num-actions');
+    if (actions) actions.remove();
+  }
+
   function checkSms(btn) {
     const url = btn.dataset.url;
     const orig = btn.innerHTML;
@@ -416,10 +446,13 @@
     fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
       .then(r => r.json())
       .then(data => {
+        const card = btn.closest('.num-card');
+
         if (data.status === 'received' && data.sms_code) {
-          const card = btn.closest('.num-card');
-          const badge = card.querySelector('.badge');
-          if (badge) { badge.className = 'badge b-completed'; badge.textContent = 'Completed'; }
+          card.querySelectorAll('.status-badge').forEach(badge => {
+            badge.className = 'badge status-badge b-completed';
+            badge.textContent = 'Completed';
+          });
           const rows = card.querySelectorAll('.num-row');
           const phoneRow = rows[1];
           const codeRow = document.createElement('div');
@@ -428,6 +461,10 @@
           phoneRow.insertAdjacentElement('afterend', codeRow);
           const actions = card.querySelector('.num-actions');
           if (actions) actions.remove();
+
+        } else if (data.status === 'expired') {
+          markCardExpired(card);
+
         } else {
           btn.disabled = false;
           btn.innerHTML = orig;
@@ -440,5 +477,39 @@
   setInterval(() => {
     document.querySelectorAll('.check-sms-btn:not([disabled])').forEach(btn => checkSms(btn));
   }, 10000);
+
+  // ── Live "expires in mm:ss" countdown on every pending card ─────────
+  function startCountdowns() {
+    document.querySelectorAll('.countdown[data-expires]').forEach(el => {
+      const expiresAt = new Date(el.dataset.expires).getTime();
+
+      function tick() {
+        const diff = expiresAt - Date.now();
+
+        if (diff <= 0) {
+          el.textContent = 'Expired';
+          el.classList.add('expired-tag');
+          clearInterval(el._timer);
+          // Let the backend do the actual cancel+refund — this just
+          // triggers it immediately instead of waiting up to 10s for
+          // the regular poll.
+          const card = el.closest('.num-card');
+          const btn = card ? card.querySelector('.check-sms-btn') : null;
+          if (btn && !btn.disabled) checkSms(btn);
+          return;
+        }
+
+        const mins = Math.floor(diff / 60000);
+        const secs = Math.floor((diff % 60000) / 1000);
+        el.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+        el.classList.toggle('expiring-soon', diff <= 60000);
+      }
+
+      tick();
+      el._timer = setInterval(tick, 1000);
+    });
+  }
+
+  startCountdowns();
 </script>
 {% endblock %}

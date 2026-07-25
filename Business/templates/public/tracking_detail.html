@@ -52,43 +52,50 @@
     padding: 12px 16px; margin-bottom: 16px;
   }
 
-  /* Progress stepper */
-  .progress-card {
-    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 20px; margin-bottom: 16px;
+  /* Circular action buttons */
+  .circle-actions {
+    display: flex;
+    justify-content: center;
+    gap: 32px;
+    margin: 24px 0 8px;
   }
-  .progress-card h2 {
-    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
-    color: var(--muted); margin-bottom: 22px;
+  .circle-action {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    color: var(--text);
   }
-  .stepper { display: flex; align-items: flex-start; justify-content: space-between; list-style: none; margin: 0; padding: 0; }
-  .stepper li { flex: 1; display: flex; flex-direction: column; align-items: center; position: relative; text-align: center; }
-  .stepper li::before {
-    content: ''; width: 22px; height: 22px; border-radius: 50%;
-    background: var(--surface2); border: 2px solid var(--border);
-    margin-bottom: 8px; z-index: 1;
+  .circle-action .circle-btn {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: border-color .15s, background .15s, transform .1s;
   }
-  .stepper li::after {
-    content: ''; position: absolute; top: 10px; left: 50%; width: 100%; height: 2px;
-    background: var(--border); z-index: 0;
+  .circle-action .circle-btn svg {
+    width: 26px;
+    height: 26px;
+    color: var(--accent);
   }
-  .stepper li:last-child::after { display: none; }
-  .stepper li[aria-current="step"]::before,
-  .stepper li.done::before { background: var(--accent); border-color: var(--accent); }
-  .stepper li.done::after { background: var(--accent); }
-  .stepper li[aria-current="step"]::before { box-shadow: 0 0 0 4px var(--accent-dim); }
-  .stepper li span { font-size: 10.5px; color: var(--muted); font-weight: 600; }
-  .stepper li[aria-current="step"] span { color: var(--accent); font-weight: 700; }
-
-  /* Link rows */
-  .link-row {
-    display: flex; align-items: center; justify-content: space-between; gap: 10px;
-    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm);
-    padding: 14px 16px; margin-bottom: 10px; text-decoration: none; color: var(--text);
-    font-size: 13.5px; font-weight: 500; transition: border-color .15s, background .15s;
+  .circle-action:hover .circle-btn {
+    border-color: var(--accent);
+    background: var(--surface2);
+    transform: translateY(-2px);
   }
-  .link-row:hover { border-color: var(--accent); background: var(--surface2); }
-  .link-row .arrow { color: var(--accent); font-weight: 700; flex-shrink: 0; }
+  .circle-action span.label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    text-align: center;
+    max-width: 100px;
+  }
+  .circle-action:hover span.label { color: var(--text); }
 
   /* Support */
   .support-card {
@@ -143,27 +150,26 @@
 </div>
 {% endif %}
 
-<div class="progress-card">
-  <h2>Shipment Progress</h2>
-  <ol class="stepper">
-    <li class="{% if progress_index > 0 %}done{% endif %}" {% if progress_index == 0 %}aria-current="step"{% endif %}><span>Order Placed</span></li>
-    <li class="{% if progress_index > 1 %}done{% endif %}" {% if progress_index == 1 %}aria-current="step"{% endif %}><span>Processing</span></li>
-    <li class="{% if progress_index > 2 %}done{% endif %}" {% if progress_index == 2 %}aria-current="step"{% endif %}><span>In Transit</span></li>
-    <li class="{% if progress_index > 3 %}done{% endif %}" {% if progress_index == 3 %}aria-current="step"{% endif %}><span>At Customs</span></li>
-    <li class="{% if progress_index >= 5 %}done{% endif %}" {% if progress_index == 4 %}aria-current="step"{% endif %}><span>Out for Delivery</span></li>
-    <li class="{% if progress_index >= 5 %}done{% endif %}" {% if progress_index == 5 %}aria-current="step"{% endif %}><span>Delivered</span></li>
-  </ol>
+<div class="circle-actions">
+  <a href="{% url 'tracking-shipment-info' tracking_id=shipment.tracking_id %}" class="circle-action">
+    <span class="circle-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0 1 18 0Z"/>
+        <circle cx="12" cy="10" r="3"/>
+      </svg>
+    </span>
+    <span class="label">Shipment details &amp; live map</span>
+  </a>
+
+  <a href="{% url 'tracking-driver' tracking_id=shipment.tracking_id %}" class="circle-action">
+    <span class="circle-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+        <circle cx="12" cy="7" r="4"/>
+      </svg>
+    </span>
+    <span class="label">Delivery partner details</span>
+  </a>
 </div>
-
-<a href="{% url 'tracking-shipment-info' tracking_id=shipment.tracking_id %}" class="link-row">
-  <span>View shipment details, sender/receiver &amp; live map</span>
-  <span class="arrow">→</span>
-</a>
-<a href="{% url 'tracking-driver' tracking_id=shipment.tracking_id %}" class="link-row">
-  <span>View delivery partner details</span>
-  <span class="arrow">→</span>
-</a>
-
-
 
 {% endblock %}

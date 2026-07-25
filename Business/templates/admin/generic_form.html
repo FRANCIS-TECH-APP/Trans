@@ -1,0 +1,62 @@
+{% extends "admin/base.html" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+{% block page_title %}{{ page_title }}{% endblock %}
+{% block breadcrumb %}
+  <a href="{% url 'admin-dashboard' %}">Home</a> / <a href="{{ list_url }}">{{ singular_name }}s</a> / {{ is_edit|yesno:"Edit,Add" }}
+{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header"><h3>{{ is_edit|yesno:"Edit,Add" }} {{ singular_name }}</h3></div>
+  <div class="card-body">
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+
+      {% for group in field_groups %}
+      {% if group.title %}<div class="section-title">{{ group.title }}</div>{% endif %}
+      <div class="form-grid {{ group.grid_class|default:'' }}">
+        {% for f in group.fields %}
+        <div class="form-group {{ f.span_class|default:'' }}">
+          <label for="id_{{ f.name }}">{{ f.label }}</label>
+
+          {% if f.type == "select" %}
+          <select name="{{ f.name }}" id="id_{{ f.name }}">
+            {% for val, label in f.choices %}
+            <option value="{{ val }}" {% if f.value == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+
+          {% elif f.type == "textarea" %}
+          <textarea name="{{ f.name }}" id="id_{{ f.name }}" {% if f.required %}required{% endif %}>{{ f.value|default:"" }}</textarea>
+
+          {% elif f.type == "checkbox" %}
+          <label style="flex-direction:row;align-items:center;gap:6px;font-size:13px;color:var(--text);">
+            <input type="checkbox" name="{{ f.name }}" id="id_{{ f.name }}" {% if f.value %}checked{% endif %} style="width:auto;">
+            {{ f.help|default:"" }}
+          </label>
+
+          {% elif f.type == "file" %}
+          <input type="file" name="{{ f.name }}" id="id_{{ f.name }}" accept="{{ f.accept|default:'*' }}">
+          {% if f.value %}<small style="color:var(--muted);">Current: {{ f.value }}</small>{% endif %}
+
+          {% else %}
+          <input type="{{ f.type|default:'text' }}" name="{{ f.name }}" id="id_{{ f.name }}"
+                 value="{{ f.value|default:'' }}" {% if f.required %}required{% endif %}
+                 {% if f.step %}step="{{ f.step }}"{% endif %}>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% endfor %}
+
+      <div style="display:flex;gap:10px;margin-top:1.25rem;">
+        <button type="submit" class="btn btn-primary">
+          <i class="fas fa-check"></i> {{ is_edit|yesno:"Save Changes,Create" }}
+        </button>
+        <a href="{{ list_url }}" class="btn btn-ghost">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

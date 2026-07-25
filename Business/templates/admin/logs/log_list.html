@@ -1,0 +1,151 @@
+
+{% extends "admin/base_admin.html" %}
+{% block title %}Log Products{% endblock %}
+{% block page_title %}Log Products{% endblock %}
+{% block breadcrumb %}<a href="{% url 'admin-dashboard' %}">Home</a> / Logs{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{% url 'admin-log-category-list' %}" class="btn btn-ghost btn-sm">
+    <i class="fas fa-tags"></i> Categories
+  </a>
+  <a href="{% url 'admin-log-create' %}" class="btn btn-primary btn-sm">
+    <i class="fas fa-plus"></i> New Product
+  </a>
+{% endblock %}
+
+{% block content %}
+
+<!-- Stats -->
+<div class="stat-grid" style="margin-bottom:16px;">
+  <div class="stat-card accent">
+    <div class="stat-label">Products</div>
+    <div class="stat-value">{{ total_products }}</div>
+  </div>
+  <div class="stat-card green">
+    <div class="stat-label">Available Stock</div>
+    <div class="stat-value">{{ available_stock }}</div>
+  </div>
+  <div class="stat-card accent">
+    <div class="stat-label">Total Stock</div>
+    <div class="stat-value">{{ total_stock }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Categories</div>
+    <div class="stat-value">{{ total_categories }}</div>
+  </div>
+</div>
+
+<!-- Filters -->
+<form method="get" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
+  <div class="search-bar" style="flex:1;min-width:200px;">
+    <i class="fas fa-search"></i>
+    <input type="text" name="q" value="{{ query }}" placeholder="Search products..."/>
+  </div>
+  <select name="category" style="min-width:150px;">
+    <option value="">All Categories</option>
+    {% for cat in categories %}
+    <option value="{{ cat.pk }}" {% if cat_id == cat.pk|stringformat:"s" %}selected{% endif %}>
+      {{ cat.name }}
+    </option>
+    {% endfor %}
+  </select>
+  <select name="status" style="min-width:130px;">
+    <option value="">All Status</option>
+    <option value="active"   {% if status == 'active' %}selected{% endif %}>Active</option>
+    <option value="inactive" {% if status == 'inactive' %}selected{% endif %}>Inactive</option>
+  </select>
+  <button type="submit" class="btn btn-ghost btn-sm">Filter</button>
+  {% if query or cat_id or status %}
+  <a href="{% url 'admin-log-list' %}" class="btn btn-ghost btn-sm">Clear</a>
+  {% endif %}
+</form>
+
+<!-- Table -->
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Product</th>
+          <th>Category</th>
+          <th>Price</th>
+          <th>Available</th>
+          <th>Total Stock</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in page_obj %}
+        <tr>
+          <td>
+            <div style="display:flex;align-items:center;gap:10px;">
+              {% if p.image %}
+              <img src="{{ p.image.url }}" style="width:36px;height:36px;object-fit:cover;border-radius:6px;border:1px solid var(--border);flex-shrink:0;"/>
+              {% else %}
+              <div style="width:36px;height:36px;border-radius:6px;background:var(--bg3);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <i class="fas fa-box" style="color:var(--muted);font-size:13px;"></i>
+              </div>
+              {% endif %}
+              <div>
+                <div style="font-size:13px;font-weight:500;">{{ p.title }}</div>
+                <div style="font-size:11px;color:var(--muted);">{{ p.description|truncatechars:40 }}</div>
+              </div>
+            </div>
+          </td>
+          <td>
+            {% if p.category %}
+            <span class="badge badge-gray">
+              {% if p.category.icon %}<i class="{{ p.category.icon }}"></i>{% endif %}
+              {{ p.category.name }}
+            </span>
+            {% else %}—{% endif %}
+          </td>
+          <td style="font-size:13px;font-weight:600;color:var(--accent);">₦{{ p.price }}</td>
+          <td>
+            <span style="font-size:13px;font-weight:600;
+              color:{% if p.available > 0 %}var(--accent2){% else %}var(--danger){% endif %};">
+              {{ p.available }}
+            </span>
+          </td>
+          <td style="font-size:13px;">{{ p.total_stock }}</td>
+          <td>
+            {% if p.active %}
+            <span class="badge badge-green">Active</span>
+            {% else %}
+            <span class="badge badge-red">Inactive</span>
+            {% endif %}
+          </td>
+          <td>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <a href="{% url 'admin-log-detail' p.pk %}" class="btn btn-ghost btn-sm">View</a>
+              <a href="{% url 'admin-log-edit' p.pk %}" class="btn btn-ghost btn-sm">Edit</a>
+              <form method="post" action="{% url 'admin-log-toggle' p.pk %}" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-ghost btn-sm" style="color:{% if p.active %}var(--danger){% else %}var(--accent2){% endif %};">
+                  {% if p.active %}Hide{% else %}Show{% endif %}
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7" style="text-align:center;color:var(--muted);padding:2rem;">
+            No products found.
+            <a href="{% url 'admin-log-create' %}" style="color:var(--accent);margin-left:6px;">Create one</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if page_obj.has_other_pages %}
+  <div class="pagination">
+    {% if page_obj.has_previous %}<a class="page-btn" href="?page={{ page_obj.previous_page_number }}&q={{ query }}&category={{ cat_id }}&status={{ status }}"><i class="fas fa-chevron-left"></i></a>{% endif %}
+    {% for num in page_obj.paginator.page_range %}<a class="page-btn {% if page_obj.number == num %}active{% endif %}" href="?page={{ num }}&q={{ query }}&category={{ cat_id }}&status={{ status }}">{{ num }}</a>{% endfor %}
+    {% if page_obj.has_next %}<a class="page-btn" href="?page={{ page_obj.next_page_number }}&q={{ query }}&category={{ cat_id }}&status={{ status }}"><i class="fas fa-chevron-right"></i></a>{% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
