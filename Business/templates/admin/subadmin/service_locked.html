@@ -1,136 +1,156 @@
-{% extends "admin/subadmin/base.html" %}
-{% block title %}Service Unavailable{% endblock %}
-{% block content %}
-<style>
-  .lock-page {
-    max-width: 480px;
-    margin: 56px auto;
-    text-align: center;
-  }
-  .lock-card {
-    background: #fff;
-    border-radius: 16px;
-    padding: 40px 32px 32px;
-    box-shadow: 0 4px 24px rgba(16, 24, 38, 0.08);
-    border: 1px solid #ECE9E2;
-  }
-  .lock-crate {
-    width: 132px;
-    margin: 0 auto 22px;
-    filter: drop-shadow(0 8px 14px rgba(16, 24, 38, 0.18));
-  }
-  .lock-eyebrow {
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: #B98A2E;
-    margin-bottom: 8px;
-  }
-  .lock-title {
-    font-size: 20px;
-    font-weight: 700;
-    color: #101826;
-    margin-bottom: 6px;
-    letter-spacing: -0.01em;
-  }
-  .lock-sub {
-    font-size: 13px;
-    color: #8592A6;
-    margin-bottom: 22px;
-  }
-  .lock-manifest {
-    text-align: left;
-    background: #FAF8F3;
-    border: 1px dashed #D8CFB8;
-    border-radius: 10px;
-    padding: 14px 16px;
-    margin-bottom: 24px;
-  }
-  .lock-manifest-label {
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: #B0793D;
-    margin-bottom: 4px;
-  }
-  .lock-manifest-text {
-    font-size: 13.5px;
-    color: #364157;
-    line-height: 1.5;
-  }
-  .lock-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    background: #101826;
-    color: #fff;
-    font-size: 13px;
-    font-weight: 600;
-    padding: 10px 20px;
-    border-radius: 8px;
-    text-decoration: none;
-    transition: background 0.15s ease;
-  }
-  .lock-btn:hover {
-    background: #1B2536;
-    color: #fff;
-  }
-</style>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Service Unavailable</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #10182699;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .lock-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(16, 24, 38, 0.6);
+      backdrop-filter: blur(3px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .lock-modal {
+      background: #fff;
+      border-radius: 18px;
+      padding: 36px 30px 28px;
+      max-width: 380px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(16, 24, 38, 0.35);
+      animation: pop 0.22s ease-out;
+    }
+    @keyframes pop {
+      from { opacity: 0; transform: scale(0.94) translateY(6px); }
+      to   { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .lock-crate {
+      width: 108px;
+      margin: 0 auto 18px;
+      filter: drop-shadow(0 6px 12px rgba(16, 24, 38, 0.18));
+    }
+    .lock-eyebrow {
+      font-size: 10.5px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: #B98A2E;
+      margin-bottom: 6px;
+    }
+    .lock-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #101826;
+      margin-bottom: 4px;
+      letter-spacing: -0.01em;
+    }
+    .lock-sub {
+      font-size: 12.5px;
+      color: #8592A6;
+      margin-bottom: 18px;
+    }
+    .lock-manifest {
+      text-align: left;
+      background: #FAF8F3;
+      border: 1px dashed #D8CFB8;
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 22px;
+    }
+    .lock-manifest-label {
+      font-size: 9.5px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #B0793D;
+      margin-bottom: 4px;
+    }
+    .lock-manifest-text {
+      font-size: 13px;
+      color: #364157;
+      line-height: 1.5;
+    }
+    .lock-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      background: #101826;
+      color: #fff;
+      font-size: 12.5px;
+      font-weight: 600;
+      padding: 10px 22px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .lock-btn:hover { background: #1B2536; }
+  </style>
+</head>
+<body>
+  <div class="lock-backdrop">
+    <div class="lock-modal">
+      <svg class="lock-crate" viewBox="0 0 200 170" xmlns="http://www.w3.org/2000/svg">
+        <rect x="34" y="46" width="132" height="98" rx="6" fill="#1B2536"/>
+        <line x1="34" y1="72" x2="166" y2="72" stroke="#2B394F" stroke-width="2"/>
+        <line x1="34" y1="98" x2="166" y2="98" stroke="#2B394F" stroke-width="2"/>
+        <line x1="34" y1="124" x2="166" y2="124" stroke="#2B394F" stroke-width="2"/>
+        <line x1="76" y1="46" x2="76" y2="144" stroke="#2B394F" stroke-width="2"/>
+        <line x1="124" y1="46" x2="124" y2="144" stroke="#2B394F" stroke-width="2"/>
+        <rect x="30" y="42" width="18" height="18" rx="3" fill="#8592A6"/>
+        <rect x="152" y="42" width="18" height="18" rx="3" fill="#8592A6"/>
+        <rect x="30" y="130" width="18" height="18" rx="3" fill="#8592A6"/>
+        <rect x="152" y="130" width="18" height="18" rx="3" fill="#8592A6"/>
+        <g transform="rotate(-8 160 40)">
+          <rect x="150" y="26" width="34" height="22" rx="3" fill="#FAF8F3" stroke="#D8CFB8"/>
+          <circle cx="157" cy="33" r="2" fill="#B0793D"/>
+          <line x1="163" y1="32" x2="180" y2="32" stroke="#C9BE9E" stroke-width="2"/>
+          <line x1="163" y1="39" x2="176" y2="39" stroke="#C9BE9E" stroke-width="2"/>
+        </g>
+        <g>
+          <rect x="20" y="80" width="160" height="26" fill="#F0A93B" transform="rotate(-4 100 93)"/>
+          <rect x="20" y="80" width="160" height="26" fill="url(#tapeStripes)" opacity="0.5" transform="rotate(-4 100 93)"/>
+        </g>
+        <defs>
+          <pattern id="tapeStripes" width="16" height="16" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+            <rect width="8" height="16" fill="#101826"/>
+          </pattern>
+        </defs>
+        <circle cx="100" cy="93" r="22" fill="#D65A4A" stroke="#fff" stroke-width="3"/>
+        <path d="M92 90v-4a8 8 0 0116 0v4" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+        <rect x="90" y="90" width="20" height="14" rx="2.5" fill="#fff"/>
+        <circle cx="100" cy="96" r="2" fill="#D65A4A"/>
+      </svg>
 
-<div class="lock-page">
-  <div class="lock-card">
-    <svg class="lock-crate" viewBox="0 0 200 170" xmlns="http://www.w3.org/2000/svg">
-      <!-- crate body -->
-      <rect x="34" y="46" width="132" height="98" rx="6" fill="#1B2536"/>
-      <!-- wood plank lines -->
-      <line x1="34" y1="72" x2="166" y2="72" stroke="#2B394F" stroke-width="2"/>
-      <line x1="34" y1="98" x2="166" y2="98" stroke="#2B394F" stroke-width="2"/>
-      <line x1="34" y1="124" x2="166" y2="124" stroke="#2B394F" stroke-width="2"/>
-      <line x1="76" y1="46" x2="76" y2="144" stroke="#2B394F" stroke-width="2"/>
-      <line x1="124" y1="46" x2="124" y2="144" stroke="#2B394F" stroke-width="2"/>
-      <!-- corner brackets -->
-      <rect x="30" y="42" width="18" height="18" rx="3" fill="#8592A6"/>
-      <rect x="152" y="42" width="18" height="18" rx="3" fill="#8592A6"/>
-      <rect x="30" y="130" width="18" height="18" rx="3" fill="#8592A6"/>
-      <rect x="152" y="130" width="18" height="18" rx="3" fill="#8592A6"/>
-      <!-- hanging manifest tag -->
-      <g transform="rotate(-8 160 40)">
-        <rect x="150" y="26" width="34" height="22" rx="3" fill="#FAF8F3" stroke="#D8CFB8"/>
-        <circle cx="157" cy="33" r="2" fill="#B0793D"/>
-        <line x1="163" y1="32" x2="180" y2="32" stroke="#C9BE9E" stroke-width="2"/>
-        <line x1="163" y1="39" x2="176" y2="39" stroke="#C9BE9E" stroke-width="2"/>
-      </g>
-      <!-- hazard tape band -->
-      <g>
-        <rect x="20" y="80" width="160" height="26" fill="#F0A93B" transform="rotate(-4 100 93)"/>
-        <rect x="20" y="80" width="160" height="26" fill="url(#tapeStripes)" opacity="0.5" transform="rotate(-4 100 93)"/>
-      </g>
-      <defs>
-        <pattern id="tapeStripes" width="16" height="16" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
-          <rect width="8" height="16" fill="#101826"/>
-        </pattern>
-      </defs>
-      <!-- lock seal badge -->
-      <circle cx="100" cy="93" r="22" fill="#D65A4A" stroke="#fff" stroke-width="3"/>
-      <path d="M92 90v-4a8 8 0 0116 0v4" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
-      <rect x="90" y="90" width="20" height="14" rx="2.5" fill="#fff"/>
-      <circle cx="100" cy="96" r="2" fill="#D65A4A"/>
-    </svg>
+      <div class="lock-eyebrow">Held at the dock</div>
+      <div class="lock-title">This feature is temporarily locked</div>
+      <div class="lock-sub">An admin has paused access while work is done.</div>
 
-    <div class="lock-eyebrow">Held at the dock</div>
-    <div class="lock-title">This feature is temporarily locked</div>
-    <div class="lock-sub">An admin has paused access while work is done.</div>
+      <div class="lock-manifest">
+        <div class="lock-manifest-label">Manifest note</div>
+        <div class="lock-manifest-text">{{ reason }}</div>
+      </div>
 
-    <div class="lock-manifest">
-      <div class="lock-manifest-label">Manifest note</div>
-      <div class="lock-manifest-text">{{ reason }}</div>
+      <button class="lock-btn" onclick="history.back()">
+        ← Back
+      </button>
     </div>
-
-    <a href="{% url 'sub-admin-dashboard' %}" class="lock-btn">
-      <i class="fas fa-arrow-left"></i> Back to dashboard
-    </a>
   </div>
-</div>
-{% endblock %}
+</body>
+</html>
