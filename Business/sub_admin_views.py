@@ -30,6 +30,8 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
+import base64
+from .decorators import check_lock
 
 from .models import (
     User, Shipment, ContactInfo, ShipmentImage,
@@ -251,7 +253,7 @@ def sub_admin_dashboard(request):
 # ════════════════════════════════════════════════════════
 #  POINTS — BUY & WEBHOOK
 # ════════════════════════════════════════════════════════
-
+@check_lock('buy_points')
 @login_required
 def sub_admin_buy_points(request):
     profile  = get_or_create_sub_admin_profile(request.user)
@@ -413,7 +415,7 @@ def sub_admin_shipment_list(request):
     }
     return render(request, "admin/subadmin/shipment_list.html", context)
 
-
+@check_lock('shipments')
 @login_required
 def sub_admin_shipment_create(request):
     profile = get_or_create_sub_admin_profile(request.user)
@@ -1721,7 +1723,7 @@ def _expire_stale_foreign_numbers(user=None):
     for fn in qs:
         _expire_number(fn)
 
-
+@check_lock('foreign_numbers')
 @login_required
 def sub_admin_buy_foreign_number(request):
     _expire_stale_foreign_numbers(user=request.user)
@@ -1985,7 +1987,7 @@ def sub_admin_check_sms_5sim(request, order_id):
 # ════════════════════════════════════════════════════════
 #  WALLET DEPOSIT (Paystack)
 # ════════════════════════════════════════════════════════
-
+@check_lock('wallet_deposit')
 @login_required
 def sub_admin_wallet_deposit(request):
     account = get_or_create_account(request.user)
@@ -1993,12 +1995,14 @@ def sub_admin_wallet_deposit(request):
     context = {"account": account, "history": history}
     return render(request, "admin/subadmin/wallet_deposit.html", context)
 
-
 @login_required
 @require_POST
 def sub_admin_wallet_deposit_pay(request):
-    """Initiate Paystack payment to fund the NGN wallet."""
-    account = get_or_create_account(request.user)
+    """Initiate a payment (Paystack or Monnify) to fund the NGN wallet."""
+    account  = get_or_create_account(request.user)
+    provider = request.POST.get("provider", "paystack").strip().lower()
+    if provider not in (WalletDeposit.Provider.PAYSTACK, WalletDeposit.Provider.MONNIFY):
+        provider = WalletDeposit.Provider.PAYSTACK
 
     try:
         amount = Decimal(str(request.POST.get("amount", "0")))
@@ -2008,25 +2012,48 @@ def sub_admin_wallet_deposit_pay(request):
         messages.error(request, "Enter a valid amount.")
         return redirect("sub-admin-wallet-deposit")
 
-    amount_kobo = int(amount * 100)
-    reference   = f"WAL-{request.user.pk}-{uuid.uuid4().hex[:10].upper()}"
+    prefix    = "MNF" if provider == WalletDeposit.Provider.MONNIFY else "WAL"
+    reference = f"{prefix}-{request.user.pk}-{uuid.uuid4().hex[:10].upper()}"
 
     deposit = WalletDeposit.objects.create(
-        account            = account,
-        amount             = amount,
-        currency           = "NGN",
-        paystack_reference = reference,
-        status             = WalletDeposit.Status.PENDING,
+        account             = account,
+        amount              = amount,
+        currency            = "NGN",
+        paystack_reference  = reference,
+        provider            = provider,
+        status              = WalletDeposit.Status.PENDING,
     )
 
+    if provider == WalletDeposit.Provider.MONNIFY:
+        callback_url = request.build_absolute_uri(
+            reverse("sub-admin-monnify-deposit-verify", args=[reference])
+        )
+        try:
+            result = _monnify_init_transaction(
+                reference=reference,
+                amount=amount,
+                email=request.user.email,
+                name=request.user.full_name or request.user.email,
+                description="Wallet top-up",
+                redirect_url=callback_url,
+            )
+            deposit.provider_transaction_ref = result.get("transactionReference", "")
+            deposit.save(update_fields=["provider_transaction_ref"])
+            return redirect(result["checkoutUrl"])
+        except Exception as e:
+            deposit.status = WalletDeposit.Status.FAILED
+            deposit.save()
+            messages.error(request, f"Could not initiate payment: {e}")
+            return redirect("sub-admin-wallet-deposit")
+
+    # Paystack — unchanged behaviour
     callback_url = request.build_absolute_uri(
         reverse("sub-admin-wallet-deposit-verify", args=[reference])
     )
-
     try:
         payload = {
             "email":        request.user.email,
-            "amount":       amount_kobo,
+            "amount":       int(amount * 100),
             "reference":    reference,
             "callback_url": callback_url,
             "metadata": {
@@ -2056,7 +2083,7 @@ def sub_admin_wallet_deposit_pay(request):
         deposit.save()
         messages.error(request, f"Could not initiate payment: {e}")
         return redirect("sub-admin-wallet-deposit")
-
+    
 
 def sub_admin_wallet_deposit_verify(request, reference):
     """Paystack redirects here after payment. Verify and credit the wallet."""
@@ -2139,6 +2166,163 @@ def sub_admin_paystack_webhook(request):
                 pass
 
     return HttpResponse(status=200)
+
+
+
+
+
+# ════════════════════════════════════════════════════════
+#  MONNIFY — wallet deposit only
+# ════════════════════════════════════════════════════════
+
+MONNIFY_BASE_URL = config("MONNIFY_BASE_URL", default="https://sandbox.monnify.com").rstrip("/")
+
+_monnify_token_cache = {"token": None, "expires_at": None}
+
+# ════════════════════════════════════════════════════════
+#  MONNIFY — wallet deposit only
+# ════════════════════════════════════════════════════════
+
+MONNIFY_BASE_URL = config("MONNIFY_BASE_URL", default="https://sandbox.monnify.com").rstrip("/")
+
+_monnify_token_cache = {"token": None, "expires_at": None}
+
+
+def _monnify_get_token():
+    """OAuth2 bearer token, cached in-process. Tokens are valid ~1hr; refresh early."""
+    cache = _monnify_token_cache
+    now = timezone.now()
+    if cache["token"] and cache["expires_at"] and now < cache["expires_at"]:
+        return cache["token"]
+
+    api_key    = config("MONNIFY_API_KEY").strip()
+    secret_key = config("MONNIFY_SECRET_KEY").strip()
+    credentials = base64.b64encode(f"{api_key}:{secret_key}".encode()).decode()
+
+    resp = requests.post(
+        f"{MONNIFY_BASE_URL}/api/v1/auth/login",
+        headers={"Authorization": f"Basic {credentials}"},
+        timeout=15,
+    )
+    data = resp.json()
+    if not data.get("requestSuccessful"):
+        raise Exception(data.get("responseMessage", "Monnify authentication failed"))
+
+    token = data["responseBody"]["accessToken"]
+    cache["token"]      = token
+    cache["expires_at"] = now + timedelta(minutes=50)
+    return token
+
+
+def _monnify_headers():
+    return {
+        "Authorization": f"Bearer {_monnify_get_token()}",
+        "Content-Type": "application/json",
+    }
+
+
+def _monnify_init_transaction(reference, amount, email, name, description, redirect_url):
+    payload = {
+        "amount":             float(amount),
+        "customerName":       name,
+        "customerEmail":      email,
+        "paymentReference":   reference,
+        "paymentDescription": description,
+        "currencyCode":       "NGN",
+        "contractCode":       config("MONNIFY_CONTRACT_CODE").strip(),
+        "redirectUrl":        redirect_url,
+        "paymentMethods":     ["CARD", "ACCOUNT_TRANSFER"],
+    }
+    resp = requests.post(
+        f"{MONNIFY_BASE_URL}/api/v1/merchant/transactions/init-transaction",
+        json=payload,
+        headers=_monnify_headers(),
+        timeout=15,
+    )
+    data = resp.json()
+    if not data.get("requestSuccessful"):
+        raise Exception(data.get("responseMessage", "Monnify init failed"))
+    return data["responseBody"]  # checkoutUrl, transactionReference, paymentReference
+
+
+def _monnify_verify_transaction(reference):
+    """Query by our own paymentReference — the safe server-side check."""
+    resp = requests.get(
+        f"{MONNIFY_BASE_URL}/api/v2/merchant/transactions/query",
+        params={"paymentReference": reference},
+        headers=_monnify_headers(),
+        timeout=15,
+    )
+    return resp.json()
+
+
+def sub_admin_monnify_deposit_verify(request, reference):
+    """Monnify redirects here after payment. Verify server-side and credit the wallet."""
+    deposit = get_object_or_404(
+        WalletDeposit, paystack_reference=reference, provider=WalletDeposit.Provider.MONNIFY
+    )
+
+    if deposit.status == WalletDeposit.Status.SUCCESS:
+        messages.info(request, "This payment was already processed.")
+        return redirect("sub-admin-wallet-deposit")
+
+    try:
+        data = _monnify_verify_transaction(reference)
+        body = data.get("responseBody", {})
+        if data.get("requestSuccessful") and body.get("paymentStatus") == "PAID":
+            paid_amount = Decimal(str(body.get("amountPaid", "0")))
+            if paid_amount < deposit.amount:
+                messages.error(request, "Amount paid didn't match the expected amount. Contact support.")
+                return redirect("sub-admin-wallet-deposit")
+            _credit_wallet(deposit)
+            messages.success(request, f"Payment confirmed! ₦{deposit.amount:,} added to your wallet.")
+        else:
+            deposit.status = WalletDeposit.Status.FAILED
+            deposit.save()
+            messages.error(request, "Payment was not successful. Please try again.")
+    except Exception as e:
+        messages.error(request, f"Verification error: {e}")
+
+    return redirect("sub-admin-wallet-deposit")
+
+
+@csrf_exempt
+def sub_admin_monnify_webhook(request):
+    """Monnify webhook — handles SUCCESSFUL_TRANSACTION events for wallet deposits."""
+    if request.method != "POST":
+        return HttpResponse(status=405)
+
+    secret_key = config("MONNIFY_SECRET_KEY").strip().encode("utf-8")
+    signature  = request.headers.get("monnify-signature", "")
+    computed   = hmac.new(secret_key, request.body, hashlib.sha512).hexdigest()
+
+    if not hmac.compare_digest(computed, signature):
+        return HttpResponse(status=400)
+
+    try:
+        payload = json.loads(request.body)
+    except json.JSONDecodeError:
+        return HttpResponse(status=400)
+
+    event_type = payload.get("eventType", "")
+    event_data = payload.get("eventData", {})
+    reference  = event_data.get("paymentReference", "")
+
+    if event_type == "SUCCESSFUL_TRANSACTION" and reference.startswith("MNF-"):
+        try:
+            deposit = WalletDeposit.objects.get(
+                paystack_reference=reference, provider=WalletDeposit.Provider.MONNIFY
+            )
+            if deposit.status != WalletDeposit.Status.SUCCESS:
+                paid_amount = Decimal(str(event_data.get("amountPaid", "0")))
+                if paid_amount >= deposit.amount:
+                    _credit_wallet(deposit)
+        except WalletDeposit.DoesNotExist:
+            pass
+
+    return HttpResponse(status=200)
+
+
 
 
 # ════════════════════════════════════════════════════════
@@ -2610,6 +2794,7 @@ def sub_admin_gallery_delete(request, pk):
 # ════════════════════════════════════════════════════════
 
 @login_required
+@check_lock('buy_logs')
 @require_POST
 def buy_logs_purchase(request, pk):
     """

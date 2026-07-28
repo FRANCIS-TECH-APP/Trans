@@ -1,0 +1,71 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Service Locks{% endblock %}
+{% block page_title %}Service Locks{% endblock %}
+{% block breadcrumb %}<a href="{% url 'admin-dashboard' %}">Home</a> / Service Locks{% endblock %}
+
+{% block content %}
+<div style="max-width:680px;">
+  <div class="alert alert-info" style="margin-bottom:16px;">
+    <i class="fas fa-info-circle"></i>
+    Locking a service instantly prevents all sub-admins from accessing it.
+    Locking <strong>Entire Platform</strong> blocks everything.
+  </div>
+
+  {% for lock in locks %}
+  <div class="card" style="margin-bottom:12px;">
+    <div class="card-body" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+
+      <!-- Icon -->
+      <div style="width:40px;height:40px;border-radius:10px;
+        background:{% if lock.is_locked %}var(--red-dim){% else %}var(--green-dim){% endif %};
+        display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <i class="fas fa-{% if lock.is_locked %}lock{% else %}lock-open{% endif %}"
+           style="color:{% if lock.is_locked %}var(--danger){% else %}var(--accent2){% endif %};"></i>
+      </div>
+
+      <!-- Info -->
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:14px;font-weight:600;margin-bottom:2px;">
+          {{ lock.get_service_display }}
+        </div>
+        {% if lock.is_locked %}
+        <div style="font-size:11.5px;color:var(--danger);">
+          Locked{% if lock.locked_by %} by {{ lock.locked_by.full_name }}{% endif %}
+          {% if lock.locked_at %}· {{ lock.locked_at|date:"d M Y, H:i" }}{% endif %}
+        </div>
+        {% if lock.reason %}
+        <div style="font-size:11.5px;color:var(--muted);margin-top:2px;">
+          "{{ lock.reason }}"
+        </div>
+        {% endif %}
+        {% else %}
+        <div style="font-size:11.5px;color:var(--accent2);">Available</div>
+        {% endif %}
+      </div>
+
+      <!-- Toggle form -->
+      <form method="post" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        {% csrf_token %}
+        <input type="hidden" name="service" value="{{ lock.service }}"/>
+        <input type="hidden" name="is_locked" value="{% if lock.is_locked %}0{% else %}1{% endif %}"/>
+        {% if not lock.is_locked %}
+        <input type="text" name="reason"
+               placeholder="Reason (shown to users)..."
+                required
+               style="font-size:12px;padding:7px 10px;min-width:200px;"/>
+        {% endif %}
+        <button type="submit"
+          class="btn {% if lock.is_locked %}btn-success{% else %}btn-danger{% endif %} btn-sm">
+          {% if lock.is_locked %}
+          <i class="fas fa-lock-open"></i> Unlock
+          {% else %}
+          <i class="fas fa-lock"></i> Lock
+          {% endif %}
+        </button>
+      </form>
+
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

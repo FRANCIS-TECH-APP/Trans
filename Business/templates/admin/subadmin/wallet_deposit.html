@@ -24,6 +24,20 @@
   .section-body { padding: 16px; }
   .sh-icon { width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 
+  /* Provider select */
+  .provider-select { display: flex; gap: 10px; margin-bottom: 14px; }
+  .provider-option { flex: 1; position: relative; }
+  .provider-option input { position: absolute; opacity: 0; pointer-events: none; }
+  .provider-option label {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 12px 10px; border-radius: 8px; border: 1.5px solid var(--border);
+    background: var(--surface2); font-size: 13px; font-weight: 600; color: var(--text);
+    cursor: pointer; transition: border-color .15s, color .15s, background .15s;
+  }
+  .provider-option input:checked + label {
+    border-color: var(--green); color: var(--green); background: var(--green-dim);
+  }
+
   /* Amount presets */
   .amount-presets { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
   .preset-btn { padding: 8px 15px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--surface2); font-size: 12.5px; font-weight: 600; cursor: pointer; color: var(--text); font-family: inherit; transition: border-color .15s, color .15s, background .15s; }
@@ -51,6 +65,8 @@
   .b-success { background: var(--green-dim); color: var(--green); }
   .b-pending { background: var(--amber-dim); color: var(--amber); }
   .b-failed  { background: var(--red-dim); color: var(--red); }
+  .b-monnify  { background: var(--sky-dim); color: var(--sky); }
+  .b-paystack { background: var(--green-dim); color: var(--green); }
 </style>
 {% endblock %}
 
@@ -74,6 +90,18 @@
   <div class="section-body">
     <form method="post" action="{% url 'sub-admin-wallet-deposit-pay' %}" id="depositForm">
       {% csrf_token %}
+
+      <div class="provider-select">
+        <div class="provider-option">
+          <input type="radio" name="provider" value="paystack" id="prov-paystack" checked>
+          <label for="prov-paystack">Paystack</label>
+        </div>
+        <div class="provider-option">
+          <input type="radio" name="provider" value="monnify" id="prov-monnify">
+          <label for="prov-monnify">Monnify</label>
+        </div>
+      </div>
+
       <div class="amount-presets">
         <button type="button" class="preset-btn" data-amount="1000">₦1,000</button>
         <button type="button" class="preset-btn" data-amount="5000">₦5,000</button>
@@ -84,9 +112,9 @@
         <label>Amount (NGN)</label>
         <input type="number" name="amount" id="amountInput" min="100" step="1" placeholder="Enter amount" required>
       </div>
-      <button type="submit" class="btn btn-green">
+      <button type="submit" class="btn btn-green" id="payButton">
         <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
-        Pay with Paystack
+        <span id="payButtonLabel">Pay with Paystack</span>
       </button>
     </form>
   </div>
@@ -104,12 +132,16 @@
     {% if history %}
     <table class="history-table">
       <thead>
-        <tr><th>Date</th><th class="num">Amount</th><th>Status</th></tr>
+        <tr><th>Date</th><th>Provider</th><th class="num">Amount</th><th>Status</th></tr>
       </thead>
       <tbody>
         {% for d in history %}
         <tr>
           <td>{{ d.created_at|date:"d M Y, H:i" }}</td>
+          <td>
+            {% if d.provider == "monnify" %}<span class="badge b-monnify">Monnify</span>
+            {% else %}<span class="badge b-paystack">Paystack</span>{% endif %}
+          </td>
           <td class="num">₦{{ d.amount|floatformat:0 }}</td>
           <td>
             {% if d.status == "success" %}<span class="badge b-success">Success</span>
@@ -135,6 +167,13 @@
       document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       document.getElementById('amountInput').value = btn.dataset.amount;
+    });
+  });
+
+  document.querySelectorAll('input[name="provider"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      const label = radio.value === 'monnify' ? 'Pay with Monnify' : 'Pay with Paystack';
+      document.getElementById('payButtonLabel').textContent = label;
     });
   });
 </script>

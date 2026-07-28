@@ -1249,12 +1249,7 @@ def log_create(request):
 
 # ── LOG PRODUCT DETAIL ────────────────────────────────
 @admin_required
-def log_detail(request, pk):
-    """
-    GET /admin-portal/logs/<pk>/
-    Shows product info + all detail (credential) rows.
-    Admin can add/delete individual credential rows here.
-    """
+def admin_log_detail(request, pk):
     product = get_object_or_404(
         BuyLogs.objects.select_related('category').annotate(
             total_stock=Count('details'),
@@ -1272,7 +1267,6 @@ def log_detail(request, pk):
         'detail_fields': _get_detail_fields(),
     }
     return render(request, 'admin/logs/log_detail.html', context)
-
 
 # ── LOG PRODUCT EDIT ──────────────────────────────────
 @admin_required
@@ -1501,3 +1495,44 @@ def _get_detail_fields():
         f.name for f in BuyLogDetails._meta.get_fields()
         if hasattr(f, 'column') and f.name not in exclude
     ]
+
+
+
+
+from django.contrib import messages
+from django.shortcuts import render, redirect
+from django.utils import timezone
+from Business.models import ServiceLock
+
+
+@admin_required
+def service_locks(request):
+    """
+    GET  /admin-portal/locks/  → show all locks
+    POST /admin-portal/locks/  → toggle a lock
+    """
+    if request.method == "POST":
+        service   = request.POST.get("service")
+        is_locked = request.POST.get("is_locked") == "1"
+        reason    = request.POST.get("reason", "").strip()
+
+        lock, _ = ServiceLock.objects.get_or_create(service=service)
+
+        if is_locked:
+            if not reason:
+                messages.error(request, "You must provide a reason to lock this service.")
+                return redirect("admin-service-locks")
+            lock.lock(by=request.user, reason=reason)
+            messages.success(request, f"{lock.get_service_display()} locked.")
+        else:
+            lock.unlock()
+            messages.success(request, f"{lock.get_service_display()} unlocked.")
+
+        return redirect("admin-service-locks")
+
+    # Ensure every service has a row to display
+    for service, _ in ServiceLock.Service.choices:
+        ServiceLock.objects.get_or_create(service=service)
+
+    locks = ServiceLock.objects.all().order_by("service")
+    return render(request, "admin/service_locks.html", {"locks": locks})

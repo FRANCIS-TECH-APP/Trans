@@ -751,13 +751,16 @@ class ForeignNumber(models.Model):
 # ══════════════════════════════════════════════════════════════════
 #  ADD TO Business/models.py — wallet funding
 # ══════════════════════════════════════════════════════════════════
-
 class WalletDeposit(models.Model):
-    """Records every NGN wallet top-up payment via Paystack."""
+    """Records every NGN wallet top-up payment via Paystack or Monnify."""
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"
         SUCCESS = "success", "Success"
         FAILED  = "failed",  "Failed"
+
+    class Provider(models.TextChoices):
+        PAYSTACK = "paystack", "Paystack"
+        MONNIFY  = "monnify",  "Monnify"
 
     id                    = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     account               = models.ForeignKey(
@@ -765,8 +768,14 @@ class WalletDeposit(models.Model):
     )
     amount                = models.DecimalField(max_digits=14, decimal_places=2)
     currency              = models.CharField(max_length=5, default="NGN")
+    provider              = models.CharField(
+        max_length=20, choices=Provider.choices, default=Provider.PAYSTACK
+    )
     paystack_reference    = models.CharField(max_length=200, unique=True)
     paystack_access_code  = models.CharField(max_length=200, blank=True)
+    # Monnify's own transactionReference — paystack_reference above stays the
+    # generic merchant-side reference used for both providers
+    provider_transaction_ref = models.CharField(max_length=200, blank=True, default="")
     status                = models.CharField(
         max_length=10, choices=Status.choices, default=Status.PENDING
     )
@@ -778,9 +787,7 @@ class WalletDeposit(models.Model):
 
     def __str__(self):
         identifier = getattr(self.account.user, "email", None) or str(self.account.user.pk)
-        return f"{identifier} — ₦{self.amount} — {self.status}"
-
-
+        return f"{identifier} — ₦{self.amount} — {self.status} ({self.provider})"
 
 
 
@@ -1388,3 +1395,81 @@ class Tutorial(models.Model):
         from django.utils import timezone
         from datetime import timedelta
         return self.created_at >= timezone.now() - timedelta(days=7)
+
+
+import uuid
+from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.db import models
+from django.utils import timezone
+
+
+class ServiceLock(models.Model):
+    class Service(models.TextChoices):
+        BUY_LOGS         = "buy_logs",        "Buy Logs"
+        FOREIGN_NUMBERS  = "foreign_numbers", "Foreign Numbers (SMS)"
+        SHIPMENTS        = "shipments",       "Create Shipment"
+        WALLET_DEPOSIT   = "wallet_deposit",  "Wallet Deposit"
+        BUY_POINTS       = "buy_points",      "Buy Points"
+        TUTORIALS        = "tutorials",       "Tutorials"
+        ALL              = "all",             "Entire Platform"
+
+    id          = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    service     = models.CharField(max_length=30, choices=Service.choices, unique=True)
+    is_locked   = models.BooleanField(default=False)
+    reason      = models.CharField(
+        max_length=255, blank=True,
+        help_text="Message shown to sub-admins when they hit the lock. Required while locked.",
+    )
+    locked_by   = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="service_locks",
+    )
+    locked_at   = models.DateTimeField(null=True, blank=True)
+    updated_at  = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Service Lock"
+        ordering = ["service"]
+
+    def __str__(self):
+        status = "LOCKED" if self.is_locked else "open"
+        return f"{self.get_service_display()} — {status}"
+
+    def clean(self):
+        # Force a reason whenever a lock is turned on — this is the message
+        # sub-admins will see, so it shouldn't be allowed to be blank.
+        if self.is_locked and not self.reason.strip():
+            raise ValidationError({"reason": "A reason is required when locking a service."})
+
+    def lock(self, *, by, reason):
+        self.is_locked = True
+        self.reason = reason
+        self.locked_by = by
+        self.locked_at = timezone.now()
+        self.full_clean()
+        self.save()
+
+    def unlock(self):
+        self.is_locked = False
+        self.locked_by = None
+        self.locked_at = None
+        self.save()
+
+    @classmethod
+    def is_service_locked(cls, service_name):
+        """
+        Returns (is_locked, reason). Platform-wide lock takes priority
+        over an individual service lock.
+        """
+        platform = cls.objects.filter(service=cls.Service.ALL, is_locked=True).first()
+        if platform:
+            return True, platform.reason or "Platform is temporarily unavailable."
+
+        lock = cls.objects.filter(service=service_name, is_locked=True).first()
+        if lock:
+            return True, lock.reason or "This service is temporarily unavailable."
+
+        return False, ""

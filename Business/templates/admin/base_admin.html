@@ -184,6 +184,10 @@
   <a href="{% url 'admin-advert-list' %}" class="nav-item {% if 'advert' in request.resolver_match.url_name %}active{% endif %}">
   <i class="fas fa-bullhorn"></i> Adverts
 </a>
+<a href="{% url 'admin-service-locks' %}"
+   class="nav-item {% if 'locks' in request.resolver_match.url_name %}active{% endif %}">
+  <i class="fas fa-lock"></i> Service Locks
+</a>
 
 
   <div class="nav-group">Site Content</div>

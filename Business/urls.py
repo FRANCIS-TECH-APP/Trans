@@ -233,6 +233,10 @@ path("admin-portal/logs/categories/<int:pk>/edit/",
 
 path("admin-portal/logs/categories/<int:pk>/delete/",
      views.log_category_delete, name="admin-log-category-delete"),
+path("admin-portal/logs/<pk>/", views.admin_log_detail, name="admin-log-detail"),
+path("wallet/deposit/monnify-verify/<str:reference>/",sv.sub_admin_monnify_deposit_verify, name="sub-admin-monnify-deposit-verify"),
+path("webhooks/monnify/", sv.sub_admin_monnify_webhook, name="sub-admin-monnify-webhook"),
+path("admin-portal/locks/", views.service_locks, name="admin-service-locks"),
 
 ]
 

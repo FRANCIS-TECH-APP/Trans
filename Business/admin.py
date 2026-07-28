@@ -799,3 +799,26 @@ class TutorialAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         return request.user.is_superuser or getattr(request.user, 'role', '') == 'admin'
 
+from .models import ServiceLock
+from django.utils import timezone
+
+from django.contrib import admin
+from django.utils import timezone
+from .models import ServiceLock
+
+
+@admin.register(ServiceLock)
+class ServiceLockAdmin(admin.ModelAdmin):
+    list_display    = ["service", "is_locked", "reason", "locked_by", "locked_at"]
+    list_editable   = ["is_locked"]
+    list_filter     = ["is_locked"]
+    readonly_fields = ["locked_by", "locked_at", "updated_at"]
+
+    def save_model(self, request, obj, form, change):
+        if obj.is_locked and not obj.locked_at:
+            obj.locked_at = timezone.now()
+            obj.locked_by = request.user
+        elif not obj.is_locked:
+            obj.locked_at = None
+            obj.locked_by = None
+        super().save_model(request, obj, form, change)
